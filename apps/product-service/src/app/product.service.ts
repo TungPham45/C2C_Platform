@@ -34,14 +34,6 @@ export class ProductService {
   }
 
   // Create a new product
-  // Helper to replace dead blob URLs with persistent placeholders
-  private ensurePersistentUrl(url: string | null | undefined, slug: string, seed: string = 'main'): string {
-    if (!url || url.startsWith('blob:')) {
-      // Use picsum with a unique seed to provide a consistent, beautiful placeholder
-      return `https://picsum.photos/seed/${slug}-${seed}/800/800`;
-    }
-    return url;
-  }
 
   async createProduct(shopId: number, data: any) {
     try {
@@ -59,7 +51,7 @@ export class ProductService {
           description: data.description || '',
           category_id: Number(data.category_id) || 1,
           base_price: Number(data.base_price),
-          thumbnail_url: this.ensurePersistentUrl(data.thumbnail_url, slug, 'thumb'),
+          thumbnail_url: data.thumbnail_url || '',
         }
       });
       console.log('[CREATE] Step 1 done. Product ID:', product.id);
@@ -68,7 +60,7 @@ export class ProductService {
       const images = (data.images || []).length > 0 ? data.images : [data.thumbnail_url];
       const processedImages = images.map((url: string, index: number) => ({
         product_id: product.id,
-        image_url: this.ensurePersistentUrl(url, slug, `img-${index}`),
+        image_url: url,
         is_primary: index === 0,
         sort_order: index
       }));
@@ -164,7 +156,7 @@ export class ProductService {
           description: data.description || '',
           category_id: Number(data.category_id) || product.category_id,
           base_price: Number(data.base_price),
-          thumbnail_url: this.ensurePersistentUrl(data.thumbnail_url, slug, 'thumb'),
+          thumbnail_url: data.thumbnail_url || '',
         }
       });
 
@@ -172,7 +164,7 @@ export class ProductService {
       const images = (data.images || []).length > 0 ? data.images : [data.thumbnail_url];
       const processedImages = images.map((url: string, index: number) => ({
         product_id: productId,
-        image_url: this.ensurePersistentUrl(url, slug, `img-${index}`),
+        image_url: url,
         is_primary: index === 0,
         sort_order: index
       }));

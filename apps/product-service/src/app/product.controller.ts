@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Headers, UnauthorizedException, Inject } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Headers, UnauthorizedException, Inject, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ProductService } from './product.service';
 
 @Controller('products')
@@ -10,6 +11,20 @@ export class ProductController {
     const shopId = headers['x-shop-id'];
     if (!shopId) throw new UnauthorizedException('Missing x-shop-id header for Seller context');
     return parseInt(shopId, 10);
+  }
+
+  // --- FILE UPLOAD ---
+
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file'))
+  uploadImage(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+    // Build the public URL for the uploaded file
+    const port = process.env.PORT || 3001;
+    const url = `http://localhost:${port}/uploads/products/${file.filename}`;
+    return { url };
   }
 
   // --- SELLER ROUTES ---

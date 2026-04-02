@@ -101,7 +101,7 @@ export const ProductManagementPage: FC = () => {
                 <div className="pr-6"><input type="checkbox" className="rounded text-[#00629d] focus:ring-[#00629d]" /></div>
                 <div className={`flex items-center gap-4 ${p.status !== 'active' ? 'opacity-70' : ''}`}>
                   <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${p.status === 'active' ? 'bg-blue-100 text-blue-300' : 'bg-gray-200 text-gray-400 grayscale'}`}>
-                    {p.thumbnail_url ? <img src={p.thumbnail_url} alt="" className="w-full h-full object-cover rounded-2xl" /> : <span className="material-symbols-outlined">image</span>}
+                    {p.thumbnail_url && !p.thumbnail_url.startsWith('blob:') ? <img src={p.thumbnail_url} alt="" className="w-full h-full object-cover rounded-2xl" /> : <span className="material-symbols-outlined">image</span>}
                   </div>
                   <div>
                     <h4 className="font-bold text-[#0f1d25] text-sm line-clamp-1">{p.name}</h4>

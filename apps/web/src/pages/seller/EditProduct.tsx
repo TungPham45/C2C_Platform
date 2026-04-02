@@ -29,15 +29,41 @@ export const EditProductPage: FC = () => {
   const [variantGroups, setVariantGroups] = useState<VariantGroup[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingCount, setUploadingCount] = useState(0);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files).map(file => URL.createObjectURL(file));
-      setFormData(prev => ({ 
-        ...prev, 
-        images: [...prev.images, ...newFiles].slice(0, 9) 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const files = Array.from(e.target.files);
+    const token = localStorage.getItem('c2c_token');
+    
+    setUploadingCount(files.length);
+    
+    try {
+      const uploadPromises = files.map(async (file) => {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch('http://localhost:3001/api/products/upload', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: fd,
+        });
+        if (!res.ok) throw new Error('Upload failed');
+        const data = await res.json();
+        return data.url as string;
+      });
+      
+      const urls = await Promise.all(uploadPromises);
+      setFormData(prev => ({
+        ...prev,
+        images: [...prev.images, ...urls].slice(0, 9)
       }));
+    } catch (err) {
+      console.error('Image upload error:', err);
+      alert('Lỗi khi tải hình ảnh lên. Vui lòng thử lại.');
+    } finally {
+      setUploadingCount(0);
     }
+    
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -272,11 +298,20 @@ export const EditProductPage: FC = () => {
                 
                 {formData.images.length < 9 && (
                   <div 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="aspect-square border-2 border-dashed border-[#00629d]/30 bg-[#00629d]/5 rounded-xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-[#00629d]/10 transition-colors group"
+                    onClick={() => !uploadingCount && fileInputRef.current?.click()}
+                    className={`aspect-square border-2 border-dashed border-[#00629d]/30 bg-[#00629d]/5 rounded-xl flex flex-col items-center justify-center gap-2 transition-colors group ${uploadingCount ? 'cursor-wait opacity-50' : 'cursor-pointer hover:bg-[#00629d]/10'}`}
                   >
-                    <span className="material-symbols-outlined text-[#00629d] group-hover:scale-110 transition-transform">add_a_photo</span>
-                    <span className="text-[10px] text-[#00629d] font-bold">Thêm hình ({formData.images.length}/9)</span>
+                    {uploadingCount > 0 ? (
+                      <>
+                        <span className="material-symbols-outlined text-[#00629d] animate-spin">progress_activity</span>
+                        <span className="text-[10px] text-[#00629d] font-bold">Đang tải...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[#00629d] group-hover:scale-110 transition-transform">add_a_photo</span>
+                        <span className="text-[10px] text-[#00629d] font-bold">Thêm hình ({formData.images.length}/9)</span>
+                      </>
+                    )}
                   </div>
                 )}
                 
