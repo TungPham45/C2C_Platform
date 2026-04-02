@@ -1,0 +1,135 @@
+TRUNCATE TABLE attribute_options, attribute_definitions, categories CASCADE;
+
+-- ==========================================
+-- CATEGORIES (giữ nguyên như lần trước)
+-- ==========================================
+INSERT INTO categories (id, parent_id, shop_id, name, slug, level, is_active) VALUES
+-- CẤP 1
+(1, NULL, NULL, 'Thời Trang Nam', 'thoi-trang-nam', 1, true),
+(2, NULL, NULL, 'Sắc Đẹp', 'sac-dep', 1, true),
+(3, NULL, NULL, 'Sức Khỏe', 'suc-khoe', 1, true),
+(4, NULL, NULL, 'Phụ Kiện Thời Trang', 'phu-kien-thoi-trang', 1, true),
+(5, NULL, NULL, 'Thiết Bị Điện Gia Dụng', 'thiet-bi-dien-gia-dung', 1, true),
+(6, NULL, NULL, 'Giày Dép Nam', 'giay-dep-nam', 1, true),
+(7, NULL, NULL, 'Điện Thoại & Phụ Kiện', 'dien-thoai-phu-kien', 1, true),
+(8, NULL, NULL, 'Du lịch & Hành lý', 'du-lich-hanh-ly', 1, true),
+(9, NULL, NULL, 'Túi Ví Nữ', 'tui-vi-nu', 1, true),
+(10, NULL, NULL, 'Giày Dép Nữ', 'giay-dep-nu', 1, true),
+
+-- CẤP 2 (dưới Thời Trang Nam)
+(11, 1, NULL, 'Quần jean', 'quan-jean', 2, true),
+(12, 1, NULL, 'Hoodie & Áo nỉ', 'hoodie-ao-ni', 2, true),
+(13, 1, NULL, 'Áo len', 'ao-len', 2, true),
+(14, 1, NULL, 'Áo khoác', 'ao-khoac', 2, true),
+(15, 1, NULL, 'Com lê', 'com-le', 2, true),
+(16, 1, NULL, 'Quần dài', 'quan-dai', 2, true),
+(17, 1, NULL, 'Quần đùi', 'quan-dui', 2, true),
+(18, 1, NULL, 'Áo', 'ao-nam', 2, true),
+(19, 1, NULL, 'Đồ lót', 'do-lot-nam', 2, true),
+(20, 1, NULL, 'Đồ ngủ', 'do-ngu-nam', 2, true),
+
+-- CẤP 3 (leaf categories)
+(21, 12, NULL, 'Áo hoodie', 'ao-hoodie', 3, true),
+(22, 12, NULL, 'Áo nỉ', 'ao-ni', 3, true),
+(24, 14, NULL, 'Áo khoác mùa đông & Áo choàng', 'ao-khoac-mua-dong', 3, true),
+(28, 15, NULL, 'Bộ Com lê', 'bo-com-le', 3, true),
+(33, 16, NULL, 'Quần túi hộp', 'quan-tui-hop', 3, true),
+(37, 18, NULL, 'Áo sơ mi', 'ao-so-mi', 3, true),
+(39, 18, NULL, 'Áo thun', 'ao-thun', 3, true),
+(42, 19, NULL, 'Quần lót', 'quan-lot', 3, true),
+(43, 19, NULL, 'Áo lót', 'ao-lot', 3, true)
+ON CONFLICT (id) DO NOTHING;
+
+-- ==========================================
+-- ATTRIBUTE DEFINITIONS (CHỈ CÁC THUỘC TÍNH CHI TIẾT – KHÔNG CÓ MÀU/SIZE)
+-- ==========================================
+INSERT INTO attribute_definitions (id, category_id, name, input_type, is_required, sort_order) VALUES
+-- Áo sơ mi (id 37)
+(1, 37, 'Thương hiệu', 'dropdown', true, 1),
+(2, 37, 'Xuất xứ', 'dropdown', true, 2),
+(3, 37, 'Chất liệu', 'dropdown', true, 3),
+(4, 37, 'Cổ áo', 'dropdown', false, 4),
+(5, 37, 'Dịp', 'dropdown', false, 5),
+(6, 37, 'Mẫu', 'dropdown', false, 6),
+(7, 37, 'Phong cách', 'dropdown', false, 7),
+(8, 37, 'Kiểu cổ áo', 'dropdown', false, 8),
+(9, 37, 'Chiều dài tay áo', 'dropdown', false, 9),
+(10, 37, 'Chiều dài áo', 'dropdown', false, 10),
+
+-- Quần lót (id 42)
+(11, 42, 'Thương hiệu', 'dropdown', true, 1),
+(12, 42, 'Xuất xứ', 'dropdown', true, 2),
+(13, 42, 'Chất liệu', 'dropdown', true, 3),
+(14, 42, 'Kiểu quần lót', 'dropdown', true, 4),
+
+-- Áo thun (id 39)
+(15, 39, 'Thương hiệu', 'dropdown', true, 1),
+(16, 39, 'Xuất xứ', 'dropdown', true, 2),
+(17, 39, 'Chất liệu', 'dropdown', true, 3),
+(18, 39, 'Mẫu', 'dropdown', false, 4),
+(19, 39, 'Dịp', 'dropdown', false, 5),
+
+-- Áo hoodie (id 21)
+(20, 21, 'Thương hiệu', 'dropdown', true, 1),
+(21, 21, 'Xuất xứ', 'dropdown', true, 2),
+(22, 21, 'Chất liệu', 'dropdown', true, 3),
+
+-- Quần jean (id 11)
+(23, 11, 'Thương hiệu', 'dropdown', true, 1),
+(24, 11, 'Xuất xứ', 'dropdown', true, 2),
+(25, 11, 'Chất liệu', 'dropdown', true, 3)
+ON CONFLICT (id) DO NOTHING;
+
+-- ==========================================
+-- ATTRIBUTE OPTIONS
+-- ==========================================
+INSERT INTO attribute_options (attribute_id, value_name, sort_order) VALUES
+-- Thương hiệu (chung)
+(1, 'No brand', 1), (1, 'ADAM STORE', 2), (1, 'ADDICTED', 3), (1, 'AFS Jeep', 4),
+(11, 'No brand', 1), (11, 'ADAM STORE', 2), (11, 'ADDICTED', 3),
+(15, 'No brand', 1), (15, 'ADAM STORE', 2), (15, 'ADDICTED', 3),
+(20, 'No brand', 1), (20, 'ADAM STORE', 2), (20, 'ADDICTED', 3),
+(23, 'No brand', 1), (23, 'ADAM STORE', 2),
+
+-- Xuất xứ
+(2, 'Nhật Bản', 1), (2, 'Trung Quốc', 2), (2, 'Hàn Quốc', 3), (2, 'Indonesia', 4),
+(2, 'Mỹ', 5), (2, 'Đài Loan', 6), (2, 'Thái Lan', 7), (2, 'Khác', 8),
+(12, 'Nhật Bản', 1), (12, 'Trung Quốc', 2), (12, 'Hàn Quốc', 3),
+(16, 'Nhật Bản', 1), (16, 'Trung Quốc', 2), (16, 'Hàn Quốc', 3),
+(21, 'Nhật Bản', 1), (21, 'Trung Quốc', 2), (21, 'Hàn Quốc', 3),
+(24, 'Nhật Bản', 1), (24, 'Trung Quốc', 2),
+
+-- Chất liệu
+(3, 'Cotton', 1), (3, 'Lông cừu', 2), (3, 'Nylon', 3), (3, 'Da', 4),
+(3, 'Denim', 5), (3, 'Lông vũ', 6), (3, 'Nỉ', 7), (3, 'Nỉ mỏng', 8),
+(13, 'Cotton', 1), (13, 'Nylon', 2), (13, 'Denim', 3),
+(17, 'Cotton', 1), (17, 'Lông cừu', 2), (17, 'Nylon', 3),
+(22, 'Cotton', 1), (22, 'Nylon', 2),
+(25, 'Cotton', 1), (25, 'Denim', 2),
+
+-- Cổ áo (cho Áo sơ mi)
+(4, 'Cổ bẻ', 1), (4, 'Cổ trụ', 2), (4, 'Cổ V', 3), (4, 'Cổ henley', 4),
+
+-- Dịp
+(5, 'Công sở', 1), (5, 'Dự tiệc', 2), (5, 'Thường ngày', 3), (5, 'Du lịch', 4),
+
+-- Mẫu
+(6, 'Hoa tiết', 1), (6, 'Sọc caro', 2), (6, 'Hoa', 3), (6, 'Khác', 4),
+(6, 'Trơn', 5), (6, 'Chấm bi', 6), (6, 'In', 7), (6, 'Sọc', 8),
+(18, 'Hoa tiết', 1), (18, 'Sọc caro', 2), (18, 'Trơn', 3),
+
+-- Kiểu quần lót
+(14, 'Boxers & Trunks', 1), (14, 'Briefs', 2), (14, 'Khác', 3), (14, 'Dây', 4),
+
+-- Phong cách (cho Áo sơ mi)
+(7, 'Công sở', 1), (7, 'Casual', 2), (7, 'Streetwear', 3),
+
+-- Kiểu cổ áo
+(8, 'Cổ bẻ', 1), (8, 'Cổ trụ', 2), (8, 'Cổ V', 3),
+
+-- Chiều dài tay áo
+(9, 'Ngắn tay', 1), (9, 'Dài tay', 2), (9, 'Lỡ tay', 3),
+
+-- Chiều dài áo
+(10, 'Ngắn', 1), (10, 'Thường', 2), (10, 'Dài', 3)
+ON CONFLICT DO NOTHING;

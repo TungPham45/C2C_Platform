@@ -1,0 +1,28 @@
+// Chat Service Prisma Schema
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://postgres:123456@localhost:5432/C2C_Platform?schema=chat"
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/@prisma/client/chat"
+}
+
+model Conversation {
+  id        String    @id @default(uuid())
+  buyerId   String
+  sellerId  String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  messages  Message[]
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  senderId       String
+  content        String
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+}
