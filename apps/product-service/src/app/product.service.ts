@@ -1,20 +1,46 @@
 import { Injectable, NotFoundException, UnauthorizedException, Inject } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
-import { Prisma } from '@prisma/client/product';
 
 @Injectable()
 export class ProductService {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
+
+  private async findActiveSellerShop(userId: number) {
+    return this.prisma.shop.findFirst({
+      where: {
+        owner_id: userId,
+        status: 'active'
+      },
+      select: {
+        id: true,
+        owner_id: true,
+        name: true,
+        slug: true,
+        logo_url: true,
+        rating: true,
+        status: true
+      }
+    });
+  }
+
+  private async requireActiveSellerShop(userId: number) {
+    const shop = await this.findActiveSellerShop(userId);
+    if (!shop) {
+      throw new UnauthorizedException('No active seller shop found for this user');
+    }
+    return shop;
+  }
 
   // =====================
   // SELLER CONTEXT (CRUD)
   // =====================
 
   // Get aggregated dashboard metrics
-  async getSellerMetrics(shopId: number) {
+  async getSellerMetrics(userId: number) {
+    const shop = await this.requireActiveSellerShop(userId);
     const [active, pending] = await Promise.all([
-      this.prisma.product.count({ where: { shop_id: shopId, status: 'active' } }),
-      this.prisma.product.count({ where: { shop_id: shopId, status: 'draft' } })
+      this.prisma.product.count({ where: { shop_id: shop.id, status: 'active' } }),
+      this.prisma.product.count({ where: { shop_id: shop.id, status: 'draft' } })
     ]);
     
     return {
@@ -35,8 +61,9 @@ export class ProductService {
 
   // Create a new product
 
-  async createProduct(shopId: number, data: any) {
+  async createProduct(userId: number, data: any) {
     try {
+      const shop = await this.requireActiveSellerShop(userId);
       console.log('[CREATE] Incoming data:', JSON.stringify(data, null, 2));
       const slug = this.generateSlug(data.name || 'product');
       const defaultSku = `DEFAULT-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
@@ -45,7 +72,7 @@ export class ProductService {
       console.log('[CREATE] Step 1: Creating product...');
       const product = await this.prisma.product.create({
         data: {
-          shop_id: shopId,
+          shop_id: shop.id,
           name: data.name,
           slug: slug,
           description: data.description || '',
@@ -122,21 +149,23 @@ export class ProductService {
   }
 
   // Get all products for a specific seller (shop)
-  async getShopProducts(shopId: number) {
+  async getShopProducts(userId: number) {
+    const shop = await this.requireActiveSellerShop(userId);
     return this.prisma.product.findMany({
-      where: { shop_id: shopId },
+      where: { shop_id: shop.id },
       include: { category: true, images: true, variants: true },
       orderBy: { created_at: 'desc' }
     });
   }
 
   // Update a product (ensure the seller owns it)
-  async updateProduct(shopId: number, productId: number, data: any) {
+  async updateProduct(userId: number, productId: number, data: any) {
     try {
+      const shop = await this.requireActiveSellerShop(userId);
       console.log('[UPDATE] Incoming data for product:', productId);
       const product = await this.prisma.product.findUnique({ where: { id: productId } });
       if (!product) throw new NotFoundException('Product not found');
-      if (product.shop_id !== shopId) throw new UnauthorizedException('Not the owner of this product');
+      if (product.shop_id !== shop.id) throw new UnauthorizedException('Not the owner of this product');
 
       const slug = this.generateSlug(data.name || 'product');
       const defaultSku = `DEFAULT-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
@@ -226,7 +255,16 @@ export class ProductService {
   }
 
   // Get a single product for seller editing (no status filter, all relations)
-  async getSellerProductById(shopId: number, productId: number) {
+  async getSellerContext(userId: number) {
+    const shop = await this.findActiveSellerShop(userId);
+    return {
+      isSeller: !!shop,
+      shop
+    };
+  }
+
+  async getSellerProductById(userId: number, productId: number) {
+    const shop = await this.requireActiveSellerShop(userId);
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
       include: {
@@ -237,18 +275,70 @@ export class ProductService {
       }
     });
     if (!product) throw new NotFoundException('Product not found');
-    if (product.shop_id !== shopId) throw new UnauthorizedException('Not the owner');
+    if (product.shop_id !== shop.id) throw new UnauthorizedException('Not the owner');
     return product;
   }
 
   // Delete a product
-  async deleteProduct(shopId: number, productId: number) {
+  async deleteProduct(userId: number, productId: number) {
+    const shop = await this.requireActiveSellerShop(userId);
     const product = await this.prisma.product.findUnique({ where: { id: productId } });
     if (!product) throw new NotFoundException('Product not found');
-    if (product.shop_id !== shopId) throw new UnauthorizedException('Not the owner of this product');
+    if (product.shop_id !== shop.id) throw new UnauthorizedException('Not the owner of this product');
 
     return this.prisma.product.delete({
       where: { id: productId },
+    });
+  }
+
+  // =====================
+  // INTERNAL ADMIN CONTEXT
+  // =====================
+
+  async getAdminStats() {
+    const [activeShops, pendingApplications] = await Promise.all([
+      this.prisma.shop.count({ where: { status: 'active' } }),
+      this.prisma.shop.count({ where: { status: 'pending' } }),
+    ]);
+
+    return {
+      activeShops,
+      pendingApplications,
+    };
+  }
+
+  async getPendingShops() {
+    return this.prisma.shop.findMany({
+      where: { status: 'pending' },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        owner_id: true,
+        status: true,
+        created_at: true,
+      },
+      orderBy: { created_at: 'asc' },
+    });
+  }
+
+  async approveShop(id: number) {
+    const shop = await this.prisma.shop.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!shop) {
+      throw new NotFoundException('Shop not found');
+    }
+
+    return this.prisma.shop.update({
+      where: { id },
+      data: { status: 'active' },
+      select: {
+        id: true,
+        status: true,
+      },
     });
   }
 

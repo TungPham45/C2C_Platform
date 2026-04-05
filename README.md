@@ -1,96 +1,224 @@
-# C2cPlatform
+# C2C Platform
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+This repo is an Nx monorepo for a C2C demo platform.
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is ready ✨.
+Current apps:
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/getting-started/intro#learn-nx?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+- `web`
+- `api-gateway`
+- `auth-service`
+- `product-service`
+- `admin-moderation-service`
 
-## Run tasks
+## What You Need Installed
 
-To run tasks with Nx use:
+Install these on your machine before running the demo:
 
-```sh
-npx nx <target> <project-name>
+- Node.js 22.x
+- npm
+- Docker Desktop
+
+Optional but useful:
+
+- pgAdmin 4
+- Prisma extension for VS Code
+
+## Database Setup
+
+This project uses PostgreSQL in Docker with 5 databases:
+
+- `auth_db`
+- `product_db`
+- `order_db`
+- `chat_db`
+- `admin_mod_db`
+
+Start PostgreSQL:
+
+```powershell
+docker compose up -d postgres
 ```
 
-For example:
+The database container is defined in [docker-compose.yml](/C:/Users/admin/Desktop/C2C_Platform/c2c-platform/docker-compose.yml).
 
-```sh
-npx nx build myproject
+Default local database connection:
+
+```text
+postgresql://postgres:123456@localhost:5432/<database_name>
 ```
 
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
+## Install Project Dependencies
 
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+From repo root:
 
-## Add new projects
-
-While you could add new projects to your workspace manually, you might want to leverage [Nx plugins](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) and their [code generation](https://nx.dev/features/generate-code?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) feature.
-
-To install a new plugin you can use the `nx add` command. Here's an example of adding the React plugin:
-```sh
-npx nx add @nx/react
+```powershell
+npm install
 ```
 
-Use the plugin's generator to create new projects. For example, to create a new React app or library:
+## Service Ports
 
-```sh
-# Generate an app
-npx nx g @nx/react:app demo
+Default local ports:
 
-# Generate a library
-npx nx g @nx/react:lib some-lib
+- `web`: `4200`
+- `api-gateway`: `3000`
+- `product-service`: `3001`
+- `auth-service`: `3002`
+- `admin-moderation-service`: `3005`
+
+## Run The Website Demo
+
+For the seller product-management demo, you only need:
+
+- `product-service`
+- `auth-service`
+- `api-gateway`
+- `web`
+
+Start them in separate terminals from repo root.
+
+Terminal 1:
+
+```powershell
+npx nx serve product-service
 ```
 
-You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx list <plugin-name>` to learn about more specific capabilities of a particular plugin. Alternatively, [install Nx Console](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) to browse plugins and generators in your IDE.
+Terminal 2:
 
-[Learn more about Nx plugins &raquo;](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) | [Browse the plugin registry &raquo;](https://nx.dev/plugin-registry?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Set up CI!
-
-### Step 1
-
-To connect to Nx Cloud, run the following command:
-
-```sh
-npx nx connect
+```powershell
+npx nx serve auth-service
 ```
 
-Connecting to Nx Cloud ensures a [fast and scalable CI](https://nx.dev/ci/intro/why-nx-cloud?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) pipeline. It includes features such as:
+Terminal 3:
 
-- [Remote caching](https://nx.dev/ci/features/remote-cache?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task distribution across multiple machines](https://nx.dev/ci/features/distribute-task-execution?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Automated e2e test splitting](https://nx.dev/ci/features/split-e2e-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task flakiness detection and rerunning](https://nx.dev/ci/features/flaky-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-### Step 2
-
-Use the following command to configure a CI workflow for your workspace:
-
-```sh
-npx nx g ci-workflow
+```powershell
+npx nx serve api-gateway
 ```
 
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+Terminal 4:
 
-## Install Nx Console
+```powershell
+npx nx serve web
+```
 
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
+Then open:
 
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+```text
+http://localhost:4200
+```
 
-## Useful links
+## Optional Admin Demo
 
-Learn more:
+If you also want the admin flow, run one more terminal:
 
-- [Learn more about this workspace setup](https://nx.dev/getting-started/intro#learn-nx?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+```powershell
+$env:INTERNAL_SERVICE_TOKEN='internal-dev-token'
+npx nx serve admin-moderation-service
+```
 
-And join the Nx community:
-- [Discord](https://go.nx.dev/community)
-- [Follow us on X](https://twitter.com/nxdevtools) or [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [Our Youtube channel](https://www.youtube.com/@nxdevtools)
-- [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+If you run admin cross-service calls, use the same `INTERNAL_SERVICE_TOKEN` value in:
+
+- `auth-service`
+- `product-service`
+- `admin-moderation-service`
+
+Example:
+
+```powershell
+$env:INTERNAL_SERVICE_TOKEN='internal-dev-token'
+npx nx serve product-service
+```
+
+```powershell
+$env:INTERNAL_SERVICE_TOKEN='internal-dev-token'
+npx nx serve auth-service
+```
+
+```powershell
+$env:INTERNAL_SERVICE_TOKEN='internal-dev-token'
+npx nx serve admin-moderation-service
+```
+
+## Demo Flow That Should Work
+
+Current expected demo path:
+
+1. Open the website
+2. Login through `auth-service`
+3. Seller context is resolved from `product-service`
+4. Enter seller dashboard
+5. Open product management
+6. Create, edit, list, and delete products
+
+This flow depends on:
+
+- PostgreSQL running
+- the seller user existing in `auth_db`
+- the seller having an active shop in `product_db`
+
+## Useful Nx Commands
+
+Build a service:
+
+```powershell
+npx nx build product-service
+```
+
+Show registered Nx projects:
+
+```powershell
+npx nx show projects
+```
+
+Show one project:
+
+```powershell
+npx nx show project product-service
+```
+
+## Troubleshooting
+
+### Port already in use
+
+If `nx serve` fails with `EADDRINUSE`, another process is already using that port.
+
+Example:
+
+- `3001` is used by `product-service`
+- `3002` is used by `auth-service`
+
+Stop the old process, then rerun the service.
+
+### Prisma client import issue during `nx serve`
+
+This repo uses generated Prisma clients under:
+
+- `@prisma/client/auth`
+- `@prisma/client/product`
+- `@prisma/client/order`
+- `@prisma/client/chat`
+- `@prisma/client/admin-mod`
+
+For runtime Nest services in this repo, use explicit imports like:
+
+```ts
+import { PrismaClient } from '@prisma/client/product/index.js';
+```
+
+That avoids the module-resolution failure seen with plain directory imports during `nx serve`.
+
+### Login returns `401 Unauthorized`
+
+That means auth rejected the credentials.
+
+The login route checks:
+
+- user exists by email
+- password matches the bcrypt hash in `auth_db`
+
+It is not caused by the gateway if the response is `401 Invalid credentials`.
+
+## Repo Notes
+
+- Prisma schemas live under [libs/prisma-clients](/C:/Users/admin/Desktop/C2C_Platform/c2c-platform/libs/prisma-clients)
+- Backend service workflow is documented in [service-module-workflow.md](/C:/Users/admin/Desktop/C2C_Platform/c2c-platform/service-module-workflow.md)
+- Current project status and follow-up notes are in [microservices-fix-ideas.txt](/C:/Users/admin/Desktop/C2C_Platform/c2c-platform/microservices-fix-ideas.txt)

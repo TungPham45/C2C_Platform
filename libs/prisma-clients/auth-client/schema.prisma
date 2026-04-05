@@ -1,12 +1,11 @@
-// Auth Service Prisma Schema
-datasource db {
-  provider = "postgresql"
-  url      = "postgresql://postgres:123456@localhost:5432/C2C_Platform"
-}
-
 generator client {
   provider = "prisma-client-js"
   output   = "../../../node_modules/@prisma/client/auth"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://postgres:123456@localhost:5432/auth_db"
 }
 
 model User {
@@ -15,50 +14,31 @@ model User {
   password   String    @db.VarChar(255)
   full_name  String?   @db.VarChar(255)
   phone      String?   @unique @db.VarChar(20)
-  avatar_url String?   @db.Text
-  role       String?   @default("user") @db.VarChar(50) // 'user', 'admin'
-  status     String?   @default("active") @db.VarChar(50) // 'active', 'banned', 'suspended'
+  avatar_url String?
+  role       String?   @default("user") @db.VarChar(50)
+  status     String?   @default("active") @db.VarChar(50)
   created_at DateTime? @default(now()) @db.Timestamp(6)
   updated_at DateTime? @default(now()) @db.Timestamp(6)
+  addresses  Address[]
+  carts      Cart?
+  wallet     Wallet?
 
-  shops       Shop[]
-  addresses   Address[]
-  wallets     Wallet?
-  carts       Cart?
-
+  @@index([email], map: "idx_users_email")
   @@map("users")
-}
-
-model Shop {
-  id          Int       @id @default(autoincrement())
-  owner_id    Int
-  name        String    @db.VarChar(255)
-  slug        String?   @unique @db.VarChar(255)
-  description String?   @db.Text
-  logo_url    String?   @db.Text
-  rating      Decimal?  @default(0) @db.Decimal(3, 2)
-  status      String?   @default("pending") @db.VarChar(50) // 'pending', 'active', 'suspended'
-  created_at  DateTime? @default(now()) @db.Timestamp(6)
-  updated_at  DateTime? @default(now()) @db.Timestamp(6)
-
-  owner       User      @relation(fields: [owner_id], references: [id], onDelete: Cascade)
-
-  @@map("shops")
 }
 
 model Address {
   id            Int       @id @default(autoincrement())
   user_id       Int
-  address_line  String    @db.Text
+  address_line  String
   city          String?   @db.VarChar(100)
   district      String?   @db.VarChar(100)
   ward          String?   @db.VarChar(100)
   phone_contact String?   @db.VarChar(20)
-  type          String?   @db.VarChar(50) // 'home', 'office', 'shop_pickup'
+  type          String?   @db.VarChar(50)
   is_default    Boolean?  @default(false)
   created_at    DateTime? @default(now()) @db.Timestamp(6)
-
-  user          User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user          User      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@map("addresses")
 }
@@ -67,20 +47,32 @@ model Cart {
   id         Int       @id @default(autoincrement())
   user_id    Int       @unique
   updated_at DateTime? @default(now()) @db.Timestamp(6)
-
-  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@map("carts")
 }
 
 model Wallet {
-  id         Int       @id @default(autoincrement())
-  user_id    Int       @unique
-  balance    Decimal?  @default(0) @db.Decimal(12, 2)
-  created_at DateTime? @default(now()) @db.Timestamp(6)
-  updated_at DateTime? @default(now()) @db.Timestamp(6)
-
-  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  id           Int                 @id @default(autoincrement())
+  user_id      Int                 @unique
+  balance      Decimal?            @default(0) @db.Decimal(12, 2)
+  created_at   DateTime?           @default(now()) @db.Timestamp(6)
+  updated_at   DateTime?           @default(now()) @db.Timestamp(6)
+  transactions WalletTransaction[]
+  user         User                @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@map("wallets")
+}
+
+model WalletTransaction {
+  id           Int       @id @default(autoincrement())
+  wallet_id    Int
+  amount       Decimal   @db.Decimal(12, 2)
+  type         String?   @db.VarChar(50)
+  reason       String?   @db.VarChar(100)
+  reference_id Int?
+  created_at   DateTime? @default(now()) @db.Timestamp(6)
+  wallet       Wallet    @relation(fields: [wallet_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@map("wallet_transactions")
 }

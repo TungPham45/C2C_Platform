@@ -1,5 +1,3 @@
-TRUNCATE TABLE attribute_options, attribute_definitions, categories CASCADE;
-
 -- ==========================================
 -- CATEGORIES (giữ nguyên như lần trước)
 -- ==========================================

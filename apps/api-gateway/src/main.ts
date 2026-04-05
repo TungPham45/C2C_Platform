@@ -17,9 +17,6 @@ async function bootstrap() {
         const decoded = jwt.verify(token, 'serene-c2c-super-secret-key-2026') as any;
         req.headers['x-user-id'] = decoded.sub;
         req.headers['x-role'] = decoded.role;
-        if (decoded.shopId) {
-          req.headers['x-shop-id'] = decoded.shopId.toString();
-        }
       } catch (err) {
         // Invalid token, just ignore and let it pass unauthenticated
       }

@@ -1,29 +1,12 @@
 // Admin & Moderation Service Prisma Schema (Reports & Reviews)
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres:123456@localhost:5432/C2C_Platform"
+  url      = "postgresql://postgres:123456@localhost:5432/admin_mod_db"
 }
 
 generator client {
   provider = "prisma-client-js"
   output   = "../../../node_modules/@prisma/client/admin-mod"
-}
-
-model Review {
-  id            Int       @id @default(autoincrement())
-  user_id       Int
-  product_id    Int
-  shop_order_id Int
-  rating        Int
-  comment       String?   @db.Text
-  media_urls    Json?
-  created_at    DateTime? @default(now()) @db.Timestamp(6)
-
-  user          User      @relation(fields: [user_id], references: [id])
-  product       Product   @relation(fields: [product_id], references: [id])
-  shop_order    ShopOrder @relation(fields: [shop_order_id], references: [id])
-
-  @@map("reviews")
 }
 
 model ReportReason {
@@ -61,45 +44,7 @@ model Report {
   updated_at       DateTime? @default(now()) @db.Timestamp(6)
   resolved_at      DateTime? @db.Timestamp(6)
 
-  reporter         User          @relation("Reporter", fields: [reporter_id], references: [id])
-  admin            User?         @relation("AdminResolver", fields: [admin_id], references: [id])
   report_reason    ReportReason  @relation(fields: [report_reason_id], references: [id])
-  product          Product?      @relation(fields: [product_id], references: [id], onDelete: Cascade)
-  shop             Shop?         @relation(fields: [shop_id], references: [id], onDelete: Cascade)
-  shop_order       ShopOrder?    @relation(fields: [shop_order_id], references: [id], onDelete: Cascade)
 
   @@map("reports")
-}
-
-// Stubs for cross-service relations
-model User {
-  id               Int       @id @default(autoincrement())
-  reviews          Review[]
-  reports_filed    Report[]  @relation("Reporter")
-  reports_resolved Report[]  @relation("AdminResolver")
-  @@map("users")
-}
-model Product {
-  id       Int       @id @default(autoincrement())
-  reviews  Review[]
-  reports  Report[]
-  @@map("products")
-}
-model Shop {
-  id          Int        @id @default(autoincrement())
-  owner_id    Int?
-  name        String?    @db.VarChar(255)
-  slug        String?    @unique @db.VarChar(255)
-  description String?    @db.Text
-  logo_url    String?    @db.Text
-  rating      Decimal?   @default(0) @db.Decimal(3, 2)
-  status      String?    @default("pending") @db.VarChar(50)
-  reports     Report[]
-  @@map("shops")
-}
-model ShopOrder {
-  id       Int       @id @default(autoincrement())
-  reviews  Review[]
-  reports  Report[]
-  @@map("shop_orders")
 }

@@ -1,12 +1,30 @@
 // Product Service Prisma Schema
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres:123456@localhost:5432/C2C_Platform"
+  url      = "postgresql://postgres:123456@localhost:5432/product_db"
 }
 
 generator client {
   provider = "prisma-client-js"
   output   = "../../../node_modules/@prisma/client/product"
+}
+
+model Shop {
+  id          Int        @id @default(autoincrement())
+  owner_id    Int?
+  name        String?    @db.VarChar(255)
+  slug        String?    @unique @db.VarChar(255)
+  description String?    @db.Text
+  logo_url    String?    @db.Text
+  rating      Decimal?   @default(0) @db.Decimal(3, 2)
+  status      String?    @default("pending") @db.VarChar(50)
+  created_at  DateTime?  @default(now()) @db.Timestamp(6)
+  updated_at  DateTime?  @default(now()) @db.Timestamp(6)
+
+  products    Product[]
+  categories  Category[]
+
+  @@map("shops")
 }
 
 model Product {
@@ -29,6 +47,7 @@ model Product {
   variants      ProductVariant[]
   images        ProductImage[]
   attribute_values ProductAttributeValue[]
+  reviews       Review[]
 
   @@map("products")
 }
@@ -127,18 +146,17 @@ model ProductAttributeValue {
   @@map("product_attribute_values")
 }
 
-// Minimal stubs to satisfy relations
-model Shop {
-  id          Int        @id @default(autoincrement())
-  owner_id    Int?
-  name        String?    @db.VarChar(255)
-  slug        String?    @unique @db.VarChar(255)
-  description String?    @db.Text
-  logo_url    String?    @db.Text
-  rating      Decimal?   @default(0) @db.Decimal(3, 2)
-  status      String?    @default("pending") @db.VarChar(50)
-  products    Product[]
-  categories  Category[]
+model Review {
+  id            Int       @id @default(autoincrement())
+  user_id       Int
+  product_id    Int
+  shop_order_id Int
+  rating        Int
+  comment       String?   @db.Text
+  media_urls    Json?
+  created_at    DateTime? @default(now()) @db.Timestamp(6)
 
-  @@map("shops")
+  product       Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
 }

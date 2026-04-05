@@ -1,4 +1,4 @@
-import { Injectable, Inject, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
@@ -13,7 +13,6 @@ export class AuthService {
   async validateUser(email: string, pass: string): Promise<any> {
     const user = await this.prisma.user.findUnique({
       where: { email },
-      include: { shops: true },
     });
     
     if (user && await bcrypt.compare(pass, user.password)) {
@@ -24,13 +23,9 @@ export class AuthService {
   }
 
   async login(user: any) {
-    // If the user has an active shop, they implicitly hold seller capabilities for that shop id
-    const activeShop = user.shops?.find(s => s.status === 'active');
-    
     const payload = { 
       sub: user.id, 
       role: user.role, // 'user' | 'admin'
-      shopId: activeShop?.id || null 
     };
 
     return {
@@ -40,7 +35,7 @@ export class AuthService {
         email: user.email,
         full_name: user.full_name,
         role: user.role,
-        shop: activeShop || null
+        shop: null
       }
     };
   }
@@ -57,5 +52,13 @@ export class AuthService {
     });
     const { password, ...result } = user;
     return result;
+  }
+
+  async getAdminStats() {
+    const activeUsers = await this.prisma.user.count({
+      where: { status: 'active' },
+    });
+
+    return { activeUsers };
   }
 }

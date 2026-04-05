@@ -31,12 +31,27 @@ export const LoginPage: FC = () => {
 
       // Store JWT Token & Session Data securely
       localStorage.setItem('c2c_token', data.access_token);
-      localStorage.setItem('c2c_user', JSON.stringify(data.user));
+
+      let sellerContext: { isSeller?: boolean; shop?: any } | null = null;
+      if (data.user.role !== 'admin') {
+        const sellerRes = await fetch('http://localhost:3000/api/products/seller/context', {
+          headers: { 'Authorization': `Bearer ${data.access_token}` }
+        });
+        if (sellerRes.ok) {
+          sellerContext = await sellerRes.json();
+        }
+      }
+
+      const sessionUser = {
+        ...data.user,
+        shop: sellerContext?.shop || null
+      };
+      localStorage.setItem('c2c_user', JSON.stringify(sessionUser));
 
       // Route to correct portal based on role/shop status
-      if (data.user.shop) {
+      if (sellerContext?.shop) {
         navigate('/seller');
-      } else if (data.user.role === 'admin') {
+      } else if (sessionUser.role === 'admin') {
         navigate('/admin');
       } else {
         navigate('/'); // Default marketplace
