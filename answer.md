@@ -221,3 +221,142 @@ Mà là:
 - tạo đúng database
 - chạy đúng migration SQL
 - seed dữ liệu cần thiết nếu muốn demo hoạt động
+
+---
+
+## Nếu `git push` rồi máy khác `clone` về thì có thiếu file hoặc folder cần thiết không?
+
+Với flow Docker hiện tại của repo này: **không thiếu file nguồn bắt buộc**.
+
+Những phần cần để máy khác clone về rồi chạy Docker đã đang được commit:
+
+- `docker-compose.yml`
+- `docker/backend.Dockerfile`
+- `docker/web.Dockerfile`
+- `init-multiple-db.sh`
+- thư mục `libs/prisma-clients/.../migrations`
+- thư mục `db/seeds`
+- toàn bộ source trong `apps/`
+- `package.json` và `package-lock.json`
+
+Nên về mặt source code và file cấu hình, máy khác `git clone` về là có đủ để build lại môi trường.
+
+## Thứ gì sẽ không đi theo Git?
+
+Có một số thứ **cố ý không commit**, nên máy khác clone về sẽ không có sẵn:
+
+- `node_modules/`
+- `dist/`
+- `.nx/cache`
+- `tmp/`
+- `public/uploads/`
+- dữ liệu trong Docker volume như `postgres_data`
+- image, container, build cache của Docker trên máy cũ
+
+Những thứ này là dữ liệu runtime hoặc file sinh ra sau khi chạy, không phải file nguồn cần push lên Git.
+
+## Có rủi ro thiếu gì không?
+
+Có 2 điểm cần phân biệt rõ:
+
+1. **Không thiếu source để chạy lại từ đầu**
+   - máy khác vẫn có thể `clone` và `docker compose up ...`
+   - DB sẽ được tạo lại từ migration/seed
+   - folder upload sẽ được tạo lại lúc app chạy
+
+2. **Không mang theo dữ liệu cũ**
+   - ảnh đã upload trước đó trong `public/uploads/` sẽ không đi theo Git
+   - dữ liệu thật đã nằm trong volume Postgres trên máy cũ cũng không đi theo Git
+
+Nên nếu mục tiêu là:
+
+- chạy được project từ đầu: **đủ**
+- giữ nguyên dữ liệu cũ, ảnh cũ, database cũ: **không đủ chỉ với Git**
+
+## Có thiếu file `.env` không?
+
+Hiện tại, với flow Docker đang dùng, repo **không phụ thuộc bắt buộc vào file `.env`** để lên được stack cơ bản, vì các biến chính đã được khai báo thẳng trong `docker-compose.yml`.
+
+Điều đó có nghĩa là:
+
+- máy khác clone về sẽ không bị thiếu `.env` để Docker khởi động cơ bản
+- nhưng nếu sau này bạn muốn tách password, port, URL ra cấu hình riêng thì lúc đó mới nên thêm file `.env.example`
+
+## Kết luận ngắn
+
+Nếu bạn `git push` trạng thái repo hiện tại, rồi một máy khác `clone` về, thì:
+
+- **không thiếu file hoặc folder nguồn bắt buộc để build/chạy lại**
+- nhưng **không mang theo dữ liệu runtime cũ** như database volume, upload image, Docker cache/image/container
+
+Nói ngắn gọn:
+
+- clone về để dựng mới môi trường: **được**
+- clone về để có nguyên trạng dữ liệu từ máy cũ: **không**
+
+---
+
+## Vì sao máy clone mới bị lỗi `COPY public ./public: "/public": not found`?
+
+Nguyên nhân là:
+
+- `docker/backend.Dockerfile` trước đó có dòng `COPY public ./public`
+- nhưng thư mục `public/` ở root repo của bạn là thư mục rỗng hoặc chỉ chứa dữ liệu runtime
+- Git **không giữ thư mục rỗng**
+- nên máy khác `clone` về sẽ không có thư mục `public/` này
+- đến lúc Docker build, lệnh `COPY public ./public` sẽ fail vì nguồn không tồn tại
+
+Đây là lỗi rất điển hình của việc:
+
+- source code đang phụ thuộc vào một thư mục runtime cục bộ
+- nhưng thư mục đó lại không phải file nguồn thực sự được quản lý bởi Git
+
+## Lỗi này có nghĩa là repo đang thiếu file quan trọng không?
+
+Không phải thiếu source code quan trọng.
+
+Đúng hơn là:
+
+- Dockerfile cũ đang yêu cầu copy một thư mục mà máy clone mới không chắc có
+
+## Tôi đã sửa theo hướng nào?
+
+Tôi đã sửa `docker/backend.Dockerfile` để:
+
+- bỏ phụ thuộc vào `COPY public ./public`
+- tự tạo `public/uploads/products` trong image bằng `mkdir -p`
+
+Lý do cách này đúng hơn:
+
+- thư mục upload là dữ liệu runtime, không nên bắt buộc phải có sẵn trong Git
+- bản thân `product-service` cũng đã có logic tự tạo thư mục upload khi start
+- nên backend image không cần copy một thư mục rỗng từ máy host nữa
+
+## Sau khi pull thay đổi mới thì chạy gì?
+
+Sau khi máy đó có Dockerfile mới, chạy lại:
+
+```powershell
+docker compose up --build
+```
+
+Nếu muốn chắc hơn, có thể:
+
+```powershell
+docker compose build --no-cache
+docker compose up
+```
+
+## Kết luận ngắn
+
+Lỗi này không phải do PostgreSQL hay Compose.
+
+Nó đến từ việc:
+
+- Git không mang thư mục rỗng `public/`
+- còn Dockerfile cũ lại cố `COPY` thư mục đó
+
+Sửa đúng là:
+
+- đừng phụ thuộc vào `public/` rỗng trong Git
+- để image hoặc app tự tạo thư mục runtime khi chạy
