@@ -2,7 +2,10 @@
   "name": "@c2c-platform/source",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "prisma:generate": "nx run prisma-clients:generate",
+    "prepare": "npm run prisma:generate || true"
+  },
   "private": true,
   "devDependencies": {
     "@nx/js": "22.6.3",

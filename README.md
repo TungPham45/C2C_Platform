@@ -20,7 +20,8 @@ Dự án này tuân theo Kiến trúc Microservices sử dụng Nx Monorepo.
 ## 🚀 Hướng dẫn bắt đầu (Getting Started)
 
 1.  **Điều kiện tiên quyết**: Đảm bảo bạn đã cài đặt Node.js 22, npm và Docker Desktop.
-2.  **Cài đặt dependencies**: Chạy lệnh `npm install` tại thư mục gốc.
+2.  **Cài đặt dependencies**: Chạy lệnh `npm install` tại thư mục gốc. 
+    *(Lệnh này sẽ tự động chạy `prisma:generate` để tạo các Prisma Client).*
 3.  **Hạ tầng (Infrastructure)**: Khởi động các cơ sở dữ liệu bằng lệnh `docker compose up -d postgres`.
 4.  **Chạy các dịch vụ**: Mở các terminal riêng biệt và chạy các lệnh sau:
     - `npx nx serve auth-service`
