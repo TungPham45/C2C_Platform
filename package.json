@@ -4,7 +4,7 @@
   "license": "MIT",
   "scripts": {
     "prisma:generate": "nx run prisma-clients:generate",
-    "prepare": "npm run prisma:generate || true"
+    "prepare": "npm run prisma:generate"
   },
   "private": true,
   "devDependencies": {
