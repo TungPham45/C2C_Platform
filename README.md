@@ -1,222 +1,116 @@
-# C2C Platform
+# Nền tảng C2C (C2C Platform)
 
-This repo is an Nx monorepo for a C2C demo platform.
+Kho lưu trữ (repo) này là một Nx monorepo cho nền tảng demo C2C.
 
-Current apps:
+Các ứng dụng hiện tại:
 
-- `web`
-- `api-gateway`
-- `auth-service`
-- `product-service`
-- `admin-moderation-service`
+- **Frontend**: `web` (React/Vite)
+- **Edge**: `api-gateway` (NestJS)
+- **Dịch vụ (Services)**: `auth-service`, `product-service`, `admin-moderation-service`
 
-## What You Need Installed
+## 🏗️ Tổng quan về Kiến trúc (Architecture Overview)
 
-Install these on your machine before running the demo:
+Dự án này tuân theo Kiến trúc Microservices sử dụng Nx Monorepo.
 
-- Node.js 22.x
-- npm
-- Docker Desktop
+- **Frontend (`web`)**: Một ứng dụng React giao tiếp duy nhất với `api-gateway`.
+- **API Gateway**: Đóng vai trò là điểm đầu vào cho frontend. Nó điều hướng (proxy) các yêu cầu đến các microservices tương ứng.
+- **Microservices**: Các dịch vụ NestJS độc lập, mỗi dịch vụ sở hữu cơ sở dữ liệu PostgreSQL riêng (được quản lý thông qua Prisma).
+- **Thư viện (`libs`)**: Mã nguồn dùng chung, chẳng hạn như các Prisma client được tạo tự động và các kiểu dữ liệu (types) chung.
 
-Optional but useful:
+## 🚀 Hướng dẫn bắt đầu (Getting Started)
 
-- pgAdmin 4
-- Prisma extension for VS Code
+1.  **Điều kiện tiên quyết**: Đảm bảo bạn đã cài đặt Node.js 22, npm và Docker Desktop.
+2.  **Cài đặt dependencies**: Chạy lệnh `npm install` tại thư mục gốc.
+3.  **Hạ tầng (Infrastructure)**: Khởi động các cơ sở dữ liệu bằng lệnh `docker compose up -d postgres`.
+4.  **Chạy các dịch vụ**: Mở các terminal riêng biệt và chạy các lệnh sau:
+    - `npx nx serve auth-service`
+    - `npx nx serve product-service`
+    - `npx nx serve api-gateway`
+    - `npx nx serve web`
+5.  **Truy cập**: Mở trình duyệt tại [http://localhost:4200](http://localhost:4200). Đăng nhập với tài khoản: `seller@example.com` / mật khẩu: `123456`.
 
-## Database Setup
+> [!NOTE]
+> Trong lần chạy đầu tiên, script `init-multiple-db.sh` sẽ tự động xử lý việc tạo cơ sở dữ liệu, chạy migration và nạp dữ liệu mẫu (seeding).
 
-This project uses PostgreSQL in Docker with 5 databases:
+## 🗄️ Tự động hóa Cơ sở dữ liệu (Database Automation)
 
-- `auth_db`
-- `product_db`
-- `order_db`
-- `chat_db`
-- `admin_mod_db`
+Bạn **không cần** phải tạo cơ sở dữ liệu thủ công hay sử dụng pgAdmin để thiết lập dữ liệu ban đầu. Dự án này đã được tự động hóa hoàn toàn:
 
-On first container startup, Docker now does all of this automatically:
+- **Tự động tạo Database**: Khi chạy `docker compose up -d postgres`, hệ thống sẽ tự động tạo đủ 5 database phục vụ cho các microservices.
+- **Tự động chạy Migration**: Cấu trúc bảng (schema) từ Prisma sẽ được tự động áp dụng.
+- **Tự động nạp dữ liệu mẫu (Seeding)**: Các tài khoản demo (Seller, Admin) và sản phẩm mẫu sẽ được chèn sẵn vào hệ thống.
 
-- creates all databases
-- applies Prisma SQL migrations for each service database
-- inserts local demo seed data
-
-Start PostgreSQL:
-
-```powershell
-docker compose up -d postgres
-```
-
-If this is not your first run and you want to re-initialize schema + seed data from scratch:
+### Cách "làm sạch" dữ liệu (Reset Database)
+Nếu bạn muốn xóa sạch dữ liệu cũ và bắt đầu lại từ đầu với trạng thái "sạch", hãy chạy bộ lệnh sau:
 
 ```powershell
 docker compose down -v
 docker compose up -d postgres
 ```
+*(Tham số `-v` sẽ xóa Volume dữ liệu của Docker, buộc hệ thống phải khởi chạy lại quy trình tự động hóa từ đầu).*
 
-The database container is defined in [docker-compose.yml](/C:/Users/admin/Desktop/C2C_Platform/c2c-platform/docker-compose.yml).
+### Demo cho Admin (Tùy chọn)
 
-Default local database connection:
-
-```text
-postgresql://postgres:123456@localhost:5432/<database_name>
-```
-
-### Seeded Demo Accounts
-
-When the DB volume is fresh, these users are inserted into `auth_db`:
-
-- `seller@example.com` / `123456`
-- `admin@example.com` / `123456`
-
-And product demo data is inserted into `product_db`:
-
-- active shop: `demo-seller-shop` (owned by user id `1`)
-- starter categories
-- one sample product with variant and primary image
-
-## Install Project Dependencies
-
-From repo root:
-
-```powershell
-npm install
-```
-
-## Service Ports
-
-Default local ports:
-
-- `web`: `4200`
-- `api-gateway`: `3000`
-- `product-service`: `3001`
-- `auth-service`: `3002`
-- `admin-moderation-service`: `3005`
-
-## Run The Website Demo
-
-For the seller product-management demo, you only need:
-
-- `product-service`
-- `auth-service`
-- `api-gateway`
-- `web`
-
-Start them in separate terminals from repo root.
-
-Terminal 1:
-
-```powershell
-npx nx serve product-service
-```
-
-Terminal 2:
-
-```powershell
-npx nx serve auth-service
-```
-
-Terminal 3:
-
-```powershell
-npx nx serve api-gateway
-```
-
-Terminal 4:
-
-```powershell
-npx nx serve web
-```
-
-Then open:
-
-```text
-http://localhost:4200
-```
-
-## Optional Admin Demo
-
-If you also want the admin flow, run one more terminal:
+Để chạy luồng dành cho admin, bạn cần chạy thêm dịch vụ `admin-moderation-service` cùng với một mã code nội bộ (internal token):
 
 ```powershell
 $env:INTERNAL_SERVICE_TOKEN='internal-dev-token'
 npx nx serve admin-moderation-service
 ```
 
-If you run admin cross-service calls, use the same `INTERNAL_SERVICE_TOKEN` value in:
+## Luồng Demo Dự kiến
 
-- `auth-service`
-- `product-service`
-- `admin-moderation-service`
+Các bước trải nghiệm demo hiện tại:
 
-Example:
+1. Mở trang web.
+2. Đăng nhập thông qua `auth-service`.
+3. Thông tin người bán (seller context) được lấy từ `product-service`.
+4. Truy cập vào bảng điều khiển người bán (seller dashboard).
+5. Mở phần quản lý sản phẩm.
+6. Thực hiện tạo, chỉnh sửa, liệt kê và xóa sản phẩm.
 
-```powershell
-$env:INTERNAL_SERVICE_TOKEN='internal-dev-token'
-npx nx serve product-service
-```
+Luồng này phụ thuộc vào:
 
-```powershell
-$env:INTERNAL_SERVICE_TOKEN='internal-dev-token'
-npx nx serve auth-service
-```
+- PostgreSQL đang chạy.
+- Tài khoản người bán đã tồn tại trong `auth_db`.
+- Người bán có một cửa hàng đang hoạt động trong `product_db`.
 
-```powershell
-$env:INTERNAL_SERVICE_TOKEN='internal-dev-token'
-npx nx serve admin-moderation-service
-```
+## Các lệnh Nx hữu ích
 
-## Demo Flow That Should Work
-
-Current expected demo path:
-
-1. Open the website
-2. Login through `auth-service`
-3. Seller context is resolved from `product-service`
-4. Enter seller dashboard
-5. Open product management
-6. Create, edit, list, and delete products
-
-This flow depends on:
-
-- PostgreSQL running
-- the seller user existing in `auth_db`
-- the seller having an active shop in `product_db`
-
-## Useful Nx Commands
-
-Build a service:
+Xây dựng (build) một dịch vụ:
 
 ```powershell
 npx nx build product-service
 ```
 
-Show registered Nx projects:
+Hiển thị các project Nx đã đăng ký:
 
 ```powershell
 npx nx show projects
 ```
 
-Show one project:
+Hiển thị thông tin chi tiết của một project:
 
 ```powershell
 npx nx show project product-service
 ```
 
-## Troubleshooting
+## Xử lý sự cố (Troubleshooting)
 
-### Port already in use
+### Cổng (Port) đã bị chiếm dụng
 
-If `nx serve` fails with `EADDRINUSE`, another process is already using that port.
+Nếu `nx serve` thất bại với lỗi `EADDRINUSE`, nghĩa là một tiến trình khác đã sử dụng cổng đó.
 
-Example:
+Ví dụ:
 
-- `3001` is used by `product-service`
-- `3002` is used by `auth-service`
+- `3001` được sử dụng bởi `product-service`
+- `3002` được sử dụng bởi `auth-service`
 
-Stop the old process, then rerun the service.
+Hãy dừng tiến trình cũ và chạy lại dịch vụ.
 
-### Prisma client import issue during `nx serve`
+### Lỗi import Prisma client khi chạy `nx serve`
 
-This repo uses generated Prisma clients under:
+Repo này sử dụng các Prisma client được tạo trong:
 
 - `@prisma/client/auth`
 - `@prisma/client/product`
@@ -224,27 +118,35 @@ This repo uses generated Prisma clients under:
 - `@prisma/client/chat`
 - `@prisma/client/admin-mod`
 
-For runtime Nest services in this repo, use explicit imports like:
+Đối với các dịch vụ Nest trong repo này, hãy sử dụng cách import tường minh như sau:
 
 ```ts
 import { PrismaClient } from '@prisma/client/product/index.js';
 ```
 
-That avoids the module-resolution failure seen with plain directory imports during `nx serve`.
+Điều này giúp tránh lỗi không tìm thấy module khi chạy lệnh `nx serve`.
 
-### Login returns `401 Unauthorized`
+### Đăng nhập trả về lỗi `401 Unauthorized`
 
-That means auth rejected the credentials.
+Điều này có nghĩa là hệ thống từ chối thông tin đăng nhập.
 
-The login route checks:
+Luồng đăng nhập sẽ kiểm tra:
 
-- user exists by email
-- password matches the bcrypt hash in `auth_db`
+- Người dùng có tồn tại theo email hay không.
+- Mật khẩu có khớp với mã hash bcrypt trong `auth_db` hay không.
 
-It is not caused by the gateway if the response is `401 Invalid credentials`.
+Nếu phản hồi là `401 Invalid credentials`, lỗi thường không nằm ở gateway mà do thông tin đăng nhập sai.
 
-## Repo Notes
+## Ghi chú về Repo (Repo Notes)
 
-- Prisma schemas live under [libs/prisma-clients](/C:/Users/admin/Desktop/C2C_Platform/c2c-platform/libs/prisma-clients)
-- Backend service workflow is documented in [service-module-workflow.md](/C:/Users/admin/Desktop/C2C_Platform/c2c-platform/service-module-workflow.md)
-- Current project status and follow-up notes are in [microservices-fix-ideas.txt](/C:/Users/admin/Desktop/C2C_Platform/c2c-platform/microservices-fix-ideas.txt)
+- [Prisma schemas](./libs/prisma-clients)
+- [Quy trình làm việc backend (Backend service workflow)](./service-module-workflow.md)
+- [Ý tưởng sửa lỗi Microservices](./microservices-fix-ideas.txt)
+
+## Các bản mẫu giao diện (UI Prototypes)
+
+Các bản mẫu HTML/Tailwind chất lượng cao được sử dụng để tham khảo giao diện nằm trong thư mục [./prototypes](./prototypes). Bạn có thể xem các bản thiết kế mục tiêu tại đây trước khi chúng được tích hợp hoàn toàn vào các React component trong ứng dụng `web`.
+
+- `seller_center.html`: Bản mẫu bảng điều khiển chính.
+- `product_mgmt.html`: Bản mẫu quản lý kho hàng.
+- `add_product.html`: Bản mẫu tạo sản phẩm mới.
