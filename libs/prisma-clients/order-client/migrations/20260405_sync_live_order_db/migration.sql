@@ -27,7 +27,7 @@ ALTER COLUMN "quantity" SET NOT NULL,
 ALTER COLUMN "quantity" DROP DEFAULT;
 
 -- DropTable
-DROP TABLE IF EXISTS "carts";
+DROP TABLE IF EXISTS "carts" CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "checkout_sessions" ADD CONSTRAINT "checkout_sessions_platform_voucher_id_fkey" FOREIGN KEY ("platform_voucher_id") REFERENCES "vouchers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
