@@ -1,47 +1,47 @@
 -- DropForeignKey
-ALTER TABLE "attribute_definitions" DROP CONSTRAINT "attribute_definitions_category_id_fkey";
+ALTER TABLE "attribute_definitions" DROP CONSTRAINT IF EXISTS "attribute_definitions_category_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "attribute_options" DROP CONSTRAINT "attribute_options_attribute_id_fkey";
+ALTER TABLE "attribute_options" DROP CONSTRAINT IF EXISTS "attribute_options_attribute_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "categories" DROP CONSTRAINT "categories_parent_id_fkey";
+ALTER TABLE "categories" DROP CONSTRAINT IF EXISTS "categories_parent_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "product_attribute_values" DROP CONSTRAINT "product_attribute_values_attribute_id_fkey";
+ALTER TABLE "product_attribute_values" DROP CONSTRAINT IF EXISTS "product_attribute_values_attribute_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "product_attribute_values" DROP CONSTRAINT "product_attribute_values_attribute_option_id_fkey";
+ALTER TABLE "product_attribute_values" DROP CONSTRAINT IF EXISTS "product_attribute_values_attribute_option_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "product_attribute_values" DROP CONSTRAINT "product_attribute_values_product_id_fkey";
+ALTER TABLE "product_attribute_values" DROP CONSTRAINT IF EXISTS "product_attribute_values_product_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "product_images" DROP CONSTRAINT "product_images_product_id_fkey";
+ALTER TABLE "product_images" DROP CONSTRAINT IF EXISTS "product_images_product_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "product_images" DROP CONSTRAINT "product_images_variant_id_fkey";
+ALTER TABLE "product_images" DROP CONSTRAINT IF EXISTS "product_images_variant_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "product_variants" DROP CONSTRAINT "product_variants_product_id_fkey";
+ALTER TABLE "product_variants" DROP CONSTRAINT IF EXISTS "product_variants_product_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "products" DROP CONSTRAINT "products_category_id_fkey";
+ALTER TABLE "products" DROP CONSTRAINT IF EXISTS "products_category_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "reviews" DROP CONSTRAINT "reviews_product_id_fkey";
+ALTER TABLE "reviews" DROP CONSTRAINT IF EXISTS "reviews_product_id_fkey";
 
 -- DropIndex
-DROP INDEX "idx_product_variants_product_id";
+DROP INDEX IF EXISTS "idx_product_variants_product_id";
 
 -- DropIndex
-DROP INDEX "idx_products_category_id";
+DROP INDEX IF EXISTS "idx_products_category_id";
 
 -- DropIndex
-DROP INDEX "idx_products_shop_id";
+DROP INDEX IF EXISTS "idx_products_shop_id";
 
 -- DropIndex
-DROP INDEX "idx_shops_owner_id";
+DROP INDEX IF EXISTS "idx_shops_owner_id";
 
 -- AlterTable
 ALTER TABLE "shops" ALTER COLUMN "owner_id" DROP NOT NULL,

@@ -1,32 +1,33 @@
 -- DropForeignKey
-ALTER TABLE "cart_items" DROP CONSTRAINT "cart_items_cart_id_fkey";
+ALTER TABLE "cart_items" DROP CONSTRAINT IF EXISTS "cart_items_cart_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "checkout_sessions" DROP CONSTRAINT "checkout_sessions_platform_voucher_id_fkey";
+ALTER TABLE "checkout_sessions" DROP CONSTRAINT IF EXISTS "checkout_sessions_platform_voucher_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "order_items" DROP CONSTRAINT "order_items_shop_order_id_fkey";
+ALTER TABLE "order_items" DROP CONSTRAINT IF EXISTS "order_items_shop_order_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "shop_orders" DROP CONSTRAINT "shop_orders_checkout_session_id_fkey";
+ALTER TABLE "shop_orders" DROP CONSTRAINT IF EXISTS "shop_orders_checkout_session_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "shop_orders" DROP CONSTRAINT "shop_orders_shop_voucher_id_fkey";
+ALTER TABLE "shop_orders" DROP CONSTRAINT IF EXISTS "shop_orders_shop_voucher_id_fkey";
 
 -- DropIndex
-DROP INDEX "idx_cart_items_cart_id";
+DROP INDEX IF EXISTS "idx_cart_items_cart_id";
 
 -- DropIndex
-DROP INDEX "idx_shop_orders_checkout_session_id";
+DROP INDEX IF EXISTS "idx_shop_orders_checkout_session_id";
 
 -- AlterTable
-ALTER TABLE "cart_items" DROP COLUMN "shop_id",
-DROP COLUMN "updated_at",
+ALTER TABLE "cart_items" 
+DROP COLUMN IF EXISTS "shop_id",
+DROP COLUMN IF EXISTS "updated_at",
 ALTER COLUMN "quantity" SET NOT NULL,
 ALTER COLUMN "quantity" DROP DEFAULT;
 
 -- DropTable
-DROP TABLE "carts";
+DROP TABLE IF EXISTS "carts";
 
 -- AddForeignKey
 ALTER TABLE "checkout_sessions" ADD CONSTRAINT "checkout_sessions_platform_voucher_id_fkey" FOREIGN KEY ("platform_voucher_id") REFERENCES "vouchers"("id") ON DELETE SET NULL ON UPDATE CASCADE;

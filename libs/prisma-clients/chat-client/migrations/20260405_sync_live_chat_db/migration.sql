@@ -1,12 +1,12 @@
 -- DropForeignKey
-ALTER TABLE "messages" DROP CONSTRAINT "fk_messages_conversation";
+ALTER TABLE "messages" DROP CONSTRAINT IF EXISTS "fk_messages_conversation";
 
 -- DropForeignKey
-ALTER TABLE "messages" DROP CONSTRAINT "messages_conversation_id_fkey";
+ALTER TABLE "messages" DROP CONSTRAINT IF EXISTS "messages_conversation_id_fkey";
 
 -- DropTable
-DROP TABLE "conversations";
+DROP TABLE IF EXISTS "conversations";
 
 -- DropTable
-DROP TABLE "messages";
+DROP TABLE IF EXISTS "messages";
 
