@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
+import { PRODUCT_API_URL } from '../config/api';
 
 // Centralize API fetches through the Next-Gen API Gateway
-const API_BASE = 'http://localhost:3000/api/products'; 
+const API_BASE = PRODUCT_API_URL;
 
 export const useProducts = () => {
   const [products, setProducts] = useState<any[]>([]);

@@ -1,5 +1,6 @@
 import { FC, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AUTH_API_URL, PRODUCT_API_URL } from '../../config/api';
 
 export const LoginPage: FC = () => {
   const [email, setEmail] = useState('');
@@ -15,7 +16,7 @@ export const LoginPage: FC = () => {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:3000/api/auth/login', {
+      const res = await fetch(`${AUTH_API_URL}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -34,7 +35,7 @@ export const LoginPage: FC = () => {
 
       let sellerContext: { isSeller?: boolean; shop?: any } | null = null;
       if (data.user.role !== 'admin') {
-        const sellerRes = await fetch('http://localhost:3000/api/products/seller/context', {
+        const sellerRes = await fetch(`${PRODUCT_API_URL}/seller/context`, {
           headers: { 'Authorization': `Bearer ${data.access_token}` }
         });
         if (sellerRes.ok) {

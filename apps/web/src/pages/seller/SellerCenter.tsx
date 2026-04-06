@@ -1,6 +1,7 @@
 import { FC, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { SellerLayout } from '../../components/layout/SellerLayout';
+import { PRODUCT_API_URL } from '../../config/api';
 
 export const SellerCenterPage: FC = () => {
   const [userName, setUserName] = useState('');
@@ -25,7 +26,7 @@ export const SellerCenterPage: FC = () => {
     const fetchMetrics = async () => {
       try {
         const token = localStorage.getItem('c2c_token');
-        const res = await fetch('http://localhost:3000/api/products/seller/metrics', {
+        const res = await fetch(`${PRODUCT_API_URL}/seller/metrics`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {

@@ -4,6 +4,7 @@ import { SellerLayout } from '../../components/layout/SellerLayout';
 import { VariantBuilder, GeneratedVariant } from '../../components/products/VariantBuilder';
 import { CategorySelector } from '../../components/products/CategorySelector';
 import { DynamicAttributes } from '../../components/products/DynamicAttributes';
+import { PRODUCT_API_URL } from '../../config/api';
 
 export const AddProductPage: FC = () => {
   const navigate = useNavigate();
@@ -39,7 +40,7 @@ export const AddProductPage: FC = () => {
       const uploadPromises = files.map(async (file) => {
         const fd = new FormData();
         fd.append('file', file);
-        const res = await fetch('http://localhost:3001/api/products/upload', {
+        const res = await fetch(`${PRODUCT_API_URL}/upload`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` },
           body: fd,
@@ -81,7 +82,7 @@ export const AddProductPage: FC = () => {
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem('c2c_token');
-      const res = await fetch('http://localhost:3000/api/products/seller', {
+      const res = await fetch(`${PRODUCT_API_URL}/seller`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

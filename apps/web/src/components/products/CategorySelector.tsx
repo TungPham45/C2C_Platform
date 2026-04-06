@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { PRODUCT_API_URL } from '../../config/api';
 
 export interface Category {
   id: number;
@@ -35,7 +36,7 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
     const fetchCats = async () => {
       setIsLoading(true);
       try {
-        const res = await fetch('http://localhost:3000/api/products/categories/all');
+        const res = await fetch(`${PRODUCT_API_URL}/categories/all`);
         if (res.ok) {
           const data = await res.json();
           setCategories(data);

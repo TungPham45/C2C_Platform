@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { PRODUCT_API_URL } from '../../config/api';
 
 export interface AttributeOption {
   value_name: string;
@@ -32,7 +33,7 @@ export const DynamicAttributes: React.FC<DynamicAttributesProps> = ({ categoryId
     const fetchAttributes = async () => {
       setIsLoading(true);
       try {
-        const res = await fetch(`http://localhost:3000/api/products/categories/${categoryId}/attributes`);
+        const res = await fetch(`${PRODUCT_API_URL}/categories/${categoryId}/attributes`);
         if (res.ok) {
           const data = await res.json();
           setAttributes(data);

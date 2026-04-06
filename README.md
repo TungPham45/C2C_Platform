@@ -19,25 +19,76 @@ Dự án này tuân theo Kiến trúc Microservices sử dụng Nx Monorepo.
 
 ## 🚀 Hướng dẫn bắt đầu (Getting Started)
 
-1.  **Điều kiện tiên quyết**: Đảm bảo bạn đã cài đặt Node.js 22, npm và Docker Desktop.
-2.  **Cài đặt dependencies**: Chạy lệnh `npm install` tại thư mục gốc. 
-    *(Lệnh này sẽ tự động chạy `prisma:generate` để tạo các Prisma Client).*
-3.  **Hạ tầng (Infrastructure)**: Khởi động các cơ sở dữ liệu bằng lệnh `docker compose up -d postgres`.
-4.  **Chạy các dịch vụ**: Mở các terminal riêng biệt và chạy các lệnh sau:
-    - `npx nx serve auth-service`
-    - `npx nx serve product-service`
-    - `npx nx serve api-gateway`
-    - `npx nx serve web`
-5.  **Truy cập**: Mở trình duyệt tại [http://localhost:4200](http://localhost:4200). Đăng nhập với tài khoản: `seller@example.com` / mật khẩu: `123456`.
+### Thiết lập bằng 1 lệnh
+
+Sau khi clone repo, tại thư mục gốc hãy chạy:
+
+```powershell
+docker compose up --build
+```
+
+Lệnh này sẽ tự động:
+
+- build toàn bộ container cần thiết cho hệ thống
+- khởi động `postgres`, `auth-service`, `product-service`, `admin-moderation-service`, `api-gateway`, `web`
+- tự tạo 5 database, chạy migration và seed dữ liệu mẫu ở lần khởi tạo PostgreSQL đầu tiên
+- nối toàn bộ service vào cùng mạng nội bộ Docker để chúng gọi nhau bằng tên service
+
+### Điều kiện tiên quyết
+
+Trước khi chạy `docker compose up --build`, máy cần có:
+
+- Docker Desktop đang mở và sẵn sàng nhận lệnh
+
+### Truy cập
+
+Sau khi stack chạy xong:
+
+- Frontend: [http://localhost:4200](http://localhost:4200)
+- API Gateway: [http://localhost:3000](http://localhost:3000)
+- PostgreSQL: `localhost:5432`
+
+Tài khoản demo:
+
+- `seller@example.com` / `123456`
+- `admin@example.com` / `123456`
 
 > [!NOTE]
-> Trong lần chạy đầu tiên, script `init-multiple-db.sh` sẽ tự động xử lý việc tạo cơ sở dữ liệu, chạy migration và nạp dữ liệu mẫu (seeding).
+> Ở lần khởi tạo PostgreSQL đầu tiên, script `init-multiple-db.sh` sẽ tự động tạo database, chạy migration và nạp dữ liệu mẫu. Các lần chạy sau sẽ dùng lại volume dữ liệu Docker.
+
+### Dừng hệ thống
+
+```powershell
+docker compose down
+```
+
+### Reset sạch dữ liệu database
+
+```powershell
+docker compose down -v
+docker compose up --build
+```
+
+### Chế độ chạy local không Docker cho app (tùy chọn)
+
+Nếu bạn chỉ muốn Docker chạy database còn app chạy bằng Node trên máy host:
+
+```powershell
+npm run setup
+```
+
+Sau đó mở các terminal riêng biệt và chạy:
+
+- `npx nx serve auth-service`
+- `npx nx serve product-service`
+- `npx nx serve api-gateway`
+- `npx nx serve web`
 
 ## 🗄️ Tự động hóa Cơ sở dữ liệu (Database Automation)
 
-Bạn **không cần** phải tạo cơ sở dữ liệu thủ công hay sử dụng pgAdmin để thiết lập dữ liệu ban đầu. Dự án này đã được tự động hóa hoàn toàn:
+Bạn **không cần** phải tạo cơ sở dữ liệu thủ công hay sử dụng pgAdmin để thiết lập dữ liệu ban đầu. Dự án này đã được tự động hóa hoàn toàn bên trong Docker:
 
-- **Tự động tạo Database**: Khi chạy `docker compose up -d postgres`, hệ thống sẽ tự động tạo đủ 5 database phục vụ cho các microservices.
+- **Tự động tạo Database**: Khi chạy `docker compose up --build`, hệ thống sẽ tự động tạo đủ 5 database phục vụ cho các microservices.
 - **Tự động chạy Migration**: Cấu trúc bảng (schema) từ Prisma sẽ được tự động áp dụng.
 - **Tự động nạp dữ liệu mẫu (Seeding)**: Các tài khoản demo (Seller, Admin) và sản phẩm mẫu sẽ được chèn sẵn vào hệ thống.
 
@@ -46,18 +97,20 @@ Nếu bạn muốn xóa sạch dữ liệu cũ và bắt đầu lại từ đầ
 
 ```powershell
 docker compose down -v
-docker compose up -d postgres
+docker compose up --build
 ```
 *(Tham số `-v` sẽ xóa Volume dữ liệu của Docker, buộc hệ thống phải khởi chạy lại quy trình tự động hóa từ đầu).*
 
-### Demo cho Admin (Tùy chọn)
+### Dịch vụ được dựng cùng nhau
 
-Để chạy luồng dành cho admin, bạn cần chạy thêm dịch vụ `admin-moderation-service` cùng với một mã code nội bộ (internal token):
+Stack Docker hiện tại sẽ dựng:
 
-```powershell
-$env:INTERNAL_SERVICE_TOKEN='internal-dev-token'
-npx nx serve admin-moderation-service
-```
+- `postgres`
+- `auth-service`
+- `product-service`
+- `admin-moderation-service`
+- `api-gateway`
+- `web`
 
 ## Luồng Demo Dự kiến
 

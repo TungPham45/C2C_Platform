@@ -4,6 +4,7 @@ import { SellerLayout } from '../../components/layout/SellerLayout';
 import { VariantBuilder, GeneratedVariant, VariantGroup } from '../../components/products/VariantBuilder';
 import { CategorySelector } from '../../components/products/CategorySelector';
 import { DynamicAttributes } from '../../components/products/DynamicAttributes';
+import { PRODUCT_API_URL } from '../../config/api';
 
 export const EditProductPage: FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -42,7 +43,7 @@ export const EditProductPage: FC = () => {
       const uploadPromises = files.map(async (file) => {
         const fd = new FormData();
         fd.append('file', file);
-        const res = await fetch('http://localhost:3001/api/products/upload', {
+        const res = await fetch(`${PRODUCT_API_URL}/upload`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` },
           body: fd,
@@ -78,7 +79,7 @@ export const EditProductPage: FC = () => {
     const fetchProduct = async () => {
       try {
         const token = localStorage.getItem('c2c_token');
-        const res = await fetch(`http://localhost:3000/api/products/seller/${id}`, {
+        const res = await fetch(`${PRODUCT_API_URL}/seller/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
@@ -108,7 +109,7 @@ export const EditProductPage: FC = () => {
           // Hydrate category path — build breadcrumb from the categories tree
           if (data.category_id) {
             try {
-              const catRes = await fetch('http://localhost:3000/api/products/categories/all');
+              const catRes = await fetch(`${PRODUCT_API_URL}/categories/all`);
               if (catRes.ok) {
                 const allCats = await catRes.json();
                 const buildPath = (catId: number): string => {
@@ -197,7 +198,7 @@ export const EditProductPage: FC = () => {
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem('c2c_token');
-      const res = await fetch(`http://localhost:3000/api/products/seller/${id}`, {
+      const res = await fetch(`${PRODUCT_API_URL}/seller/${id}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',

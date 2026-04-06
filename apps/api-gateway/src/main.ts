@@ -7,6 +7,10 @@ import * as jwt from 'jsonwebtoken';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors();
+  const authServiceUrl = process.env.AUTH_SERVICE_URL ?? 'http://localhost:3002/api/auth';
+  const productServiceUrl = process.env.PRODUCT_SERVICE_URL ?? 'http://localhost:3001/api/products';
+  const adminServiceUrl = process.env.ADMIN_SERVICE_URL ?? 'http://localhost:3005/api/admin';
+  const productPublicUrl = process.env.PRODUCT_PUBLIC_URL ?? 'http://localhost:3001/uploads';
   
   // Custom middleware to extract JWT and append headers safely downstream
   app.use((req, res, next) => {
@@ -26,19 +30,25 @@ async function bootstrap() {
 
   // Proxy Auth Service
   app.use('/api/auth', createProxyMiddleware({
-    target: 'http://localhost:3002/api/auth',
+    target: authServiceUrl,
     changeOrigin: true,
   }));
 
   // Proxy Product Service
   app.use('/api/products', createProxyMiddleware({
-    target: 'http://localhost:3001/api/products',
+    target: productServiceUrl,
     changeOrigin: true,
   }));
 
   // Proxy Admin Service
   app.use('/api/admin', createProxyMiddleware({
-    target: 'http://localhost:3005/api/admin',
+    target: adminServiceUrl,
+    changeOrigin: true,
+  }));
+
+  // Proxy product uploads so the browser only needs the gateway's public URL.
+  app.use('/uploads', createProxyMiddleware({
+    target: productPublicUrl,
     changeOrigin: true,
   }));
 
