@@ -11,6 +11,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-multiple-db.sh:/docker-entrypoint-initdb.d/init-multiple-db.sh
+      - ./libs/prisma-clients:/docker-entrypoint-initdb.d/prisma-clients:ro
+      - ./db/seeds:/docker-entrypoint-initdb.d/seeds:ro
 
 volumes:
   postgres_data:

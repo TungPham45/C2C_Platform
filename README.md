@@ -33,9 +33,22 @@ This project uses PostgreSQL in Docker with 5 databases:
 - `chat_db`
 - `admin_mod_db`
 
+On first container startup, Docker now does all of this automatically:
+
+- creates all databases
+- applies Prisma SQL migrations for each service database
+- inserts local demo seed data
+
 Start PostgreSQL:
 
 ```powershell
+docker compose up -d postgres
+```
+
+If this is not your first run and you want to re-initialize schema + seed data from scratch:
+
+```powershell
+docker compose down -v
 docker compose up -d postgres
 ```
 
@@ -46,6 +59,19 @@ Default local database connection:
 ```text
 postgresql://postgres:123456@localhost:5432/<database_name>
 ```
+
+### Seeded Demo Accounts
+
+When the DB volume is fresh, these users are inserted into `auth_db`:
+
+- `seller@example.com` / `123456`
+- `admin@example.com` / `123456`
+
+And product demo data is inserted into `product_db`:
+
+- active shop: `demo-seller-shop` (owned by user id `1`)
+- starter categories
+- one sample product with variant and primary image
 
 ## Install Project Dependencies
 
