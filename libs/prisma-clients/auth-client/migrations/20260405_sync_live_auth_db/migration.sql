@@ -1,25 +1,26 @@
 -- DropForeignKey
-ALTER TABLE "addresses" DROP CONSTRAINT "addresses_user_id_fkey";
+ALTER TABLE "addresses" DROP CONSTRAINT IF EXISTS "addresses_user_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "carts" DROP CONSTRAINT "carts_user_id_fkey";
+ALTER TABLE "carts" DROP CONSTRAINT IF EXISTS "carts_user_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "wallet_transactions" DROP CONSTRAINT "wallet_transactions_wallet_id_fkey";
+ALTER TABLE "wallet_transactions" DROP CONSTRAINT IF EXISTS "wallet_transactions_wallet_id_fkey";
 
 -- DropForeignKey
-ALTER TABLE "wallets" DROP CONSTRAINT "wallets_user_id_fkey";
+ALTER TABLE "wallets" DROP CONSTRAINT IF EXISTS "wallets_user_id_fkey";
 
 -- DropIndex
-DROP INDEX "carts_user_id_key";
+DROP INDEX IF EXISTS "carts_user_id_key";
 
 -- DropIndex
-DROP INDEX "idx_users_email";
+DROP INDEX IF EXISTS "idx_users_email";
 
 -- AlterTable
-ALTER TABLE "wallet_transactions" DROP COLUMN "reason",
-DROP COLUMN "reference_id",
-DROP COLUMN "type",
+ALTER TABLE "wallet_transactions" 
+DROP COLUMN IF EXISTS "reason",
+DROP COLUMN IF EXISTS "reference_id",
+DROP COLUMN IF EXISTS "type",
 ADD COLUMN     "description" TEXT,
 ADD COLUMN     "transaction_type" VARCHAR(50);
 
