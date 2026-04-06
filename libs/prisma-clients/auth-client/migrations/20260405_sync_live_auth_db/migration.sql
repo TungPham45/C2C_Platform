@@ -21,8 +21,8 @@ ALTER TABLE "wallet_transactions"
 DROP COLUMN IF EXISTS "reason",
 DROP COLUMN IF EXISTS "reference_id",
 DROP COLUMN IF EXISTS "type",
-ADD COLUMN     "description" TEXT,
-ADD COLUMN     "transaction_type" VARCHAR(50);
+ADD COLUMN IF NOT EXISTS "description" TEXT,
+ADD COLUMN IF NOT EXISTS "transaction_type" VARCHAR(50);
 
 -- AddForeignKey
 ALTER TABLE "addresses" ADD CONSTRAINT "addresses_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
