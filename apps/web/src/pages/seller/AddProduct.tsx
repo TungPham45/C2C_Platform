@@ -4,7 +4,7 @@ import { SellerLayout } from '../../components/layout/SellerLayout';
 import { VariantBuilder, GeneratedVariant } from '../../components/products/VariantBuilder';
 import { CategorySelector } from '../../components/products/CategorySelector';
 import { DynamicAttributes } from '../../components/products/DynamicAttributes';
-import { PRODUCT_API_URL } from '../../config/api';
+import { PRODUCT_API_URL, resolveAssetUrl } from '../../config/api';
 
 export const AddProductPage: FC = () => {
   const navigate = useNavigate();
@@ -47,7 +47,7 @@ export const AddProductPage: FC = () => {
         });
         if (!res.ok) throw new Error('Upload failed');
         const data = await res.json();
-        return data.url as string;
+        return resolveAssetUrl(data.url as string);
       });
       
       const urls = await Promise.all(uploadPromises);

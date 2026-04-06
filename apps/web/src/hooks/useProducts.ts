@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { PRODUCT_API_URL } from '../config/api';
+import { normalizeProductAssetUrls, PRODUCT_API_URL } from '../config/api';
 
 // Centralize API fetches through the Next-Gen API Gateway
 const API_BASE = PRODUCT_API_URL;
@@ -20,7 +20,7 @@ export const useProducts = () => {
       });
       if (!res.ok) throw new Error('Failed to fetch products from gateway');
       const data = await res.json();
-      setProducts(data);
+      setProducts(Array.isArray(data) ? data.map(normalizeProductAssetUrls) : []);
     } catch (err: any) {
       setError(err.message);
     } finally {

@@ -4,7 +4,7 @@ import { SellerLayout } from '../../components/layout/SellerLayout';
 import { VariantBuilder, GeneratedVariant, VariantGroup } from '../../components/products/VariantBuilder';
 import { CategorySelector } from '../../components/products/CategorySelector';
 import { DynamicAttributes } from '../../components/products/DynamicAttributes';
-import { PRODUCT_API_URL } from '../../config/api';
+import { normalizeProductAssetUrls, PRODUCT_API_URL, resolveAssetUrl } from '../../config/api';
 
 export const EditProductPage: FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -50,7 +50,7 @@ export const EditProductPage: FC = () => {
         });
         if (!res.ok) throw new Error('Upload failed');
         const data = await res.json();
-        return data.url as string;
+        return resolveAssetUrl(data.url as string);
       });
       
       const urls = await Promise.all(uploadPromises);
@@ -83,7 +83,7 @@ export const EditProductPage: FC = () => {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
-          const data = await res.json();
+          const data = normalizeProductAssetUrls(await res.json());
 
           // Hydrate images from the images relation (sorted by sort_order)
           // Filter out blob: URLs as they are dead across sessions
@@ -157,7 +157,7 @@ export const EditProductPage: FC = () => {
                 price: v.price_override?.toString() || '',
                 stock: v.stock_quantity?.toString() || '0',
                 sku: v.sku?.replace(/-v\d+$/, '') || '',
-                image: v.image_url || ''
+                image: resolveAssetUrl(v.image_url) || ''
               };
             });
             setVariantsMap(hydratedVariants);

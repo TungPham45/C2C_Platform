@@ -30,10 +30,9 @@ export class ProductController {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
-    // Build the public URL for the uploaded file
-    const publicBaseUrl =
-      (process.env.PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || 3001}`).replace(/\/+$/, '');
-    const url = `${publicBaseUrl}/uploads/products/${file.filename}`;
+    const publicBaseUrl = (process.env.PUBLIC_BASE_URL ?? '').replace(/\/+$/, '');
+    const uploadPath = `/uploads/products/${file.filename}`;
+    const url = publicBaseUrl ? `${publicBaseUrl}${uploadPath}` : uploadPath;
     return { url };
   }
 
