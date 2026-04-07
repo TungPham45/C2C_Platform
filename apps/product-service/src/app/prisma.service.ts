@@ -4,17 +4,15 @@ import { PrismaClient } from '@prisma/client/product/index.js';
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
   constructor() {
-    super(
-      process.env.DATABASE_URL
-        ? {
-            datasources: {
-              db: {
-                url: process.env.DATABASE_URL,
-              },
-            },
-          }
-        : undefined,
-    );
+    super({
+      datasources: {
+        db: {
+          url:
+            process.env.DATABASE_URL ??
+            'postgresql://postgres:123456@localhost:5433/product_db',
+        },
+      },
+    });
   }
 
   async onModuleInit() {

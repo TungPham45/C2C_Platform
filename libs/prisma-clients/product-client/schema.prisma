@@ -1,7 +1,7 @@
 // Product Service Prisma Schema
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres:123456@localhost:5432/product_db"
+  url      = "postgresql://postgres:123456@localhost:5433/product_db"
 }
 
 generator client {
