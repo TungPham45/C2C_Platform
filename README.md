@@ -34,13 +34,15 @@ Lệnh này sẽ tự động:
 - tự tạo 5 database, chạy migration và seed dữ liệu mẫu ở lần khởi tạo PostgreSQL đầu tiên
 - nối toàn bộ service vào cùng mạng nội bộ Docker để chúng gọi nhau bằng tên service
 
-### Điều kiện tiên quyết
+### Điều kiện tiên quyết (Prerequisites)
 
-Trước khi chạy `docker compose up --build`, máy cần có:
+Trước khi bắt đầu, hãy đảm bảo máy bạn đã cài đặt:
 
-- Docker Desktop đang mở và sẵn sàng nhận lệnh
+- **Docker Desktop**: Để chạy PostgreSQL và các dịch vụ đi kèm. Đảm bảo Docker đang mở.
+- **Node.js (v20 trở lên)**: Để chạy ứng dụng trực tiếp trên máy host.
+- **npm**: Đi kèm với Node.js.
 
-### Truy cập
+### Truy cập (Access Information)
 
 Sau khi stack chạy xong:
 
@@ -116,33 +118,37 @@ PostgreSQL do repo khởi động sẽ được expose ra máy host ở `localho
 
 Lệnh này **không** tự mở terminal và **không** tự chạy `auth-service`, `product-service`, `admin-moderation-service`, `api-gateway`, `web`.
 
-Sau khi chạy `setup`, nếu muốn tự bật từng service bằng tay thì mở các terminal riêng biệt và chạy:
+### Cách 1: Tự mở 5 terminal (Thực hiện thủ công)
 
-- `npx.cmd nx serve auth-service`
-- `npx.cmd nx serve product-service`
-- `npx.cmd nx serve admin-moderation-service`
-- `npx.cmd nx serve api-gateway`
-- `npx.cmd nx serve web`
+Nếu bạn muốn kiểm soát từng dịch vụ hoặc đang ở trên hệ điều hành không phải Windows:
 
-Nếu muốn bật nhanh toàn bộ stack local và tự mở sẵn các cửa sổ riêng cho 5 service, dùng:
+1.  **Cài đặt & Chuẩn bị**:
+    ```powershell
+    npm install
+    ```
+    *(Lệnh này sẽ tự động cài thư viện và tự generate toàn bộ Prisma Clients cho bạn)*.
+
+2.  **Khởi động Database**:
+    ```powershell
+    docker compose up -d postgres
+    ```
+
+3.  **Mở 5 cửa sổ terminal riêng biệt** và chạy:
+    - **Terminal 1**: `npx nx serve auth-service`
+    - **Terminal 2**: `npx nx serve product-service`
+    - **Terminal 3**: `npx nx serve admin-moderation-service`
+    - **Terminal 4**: `npx nx serve api-gateway`
+    - **Terminal 5**: `npx nx serve web`
+
+### Cách 2: Tự động mở 5 terminal (Dùng script - Khuyên dùng)
+
+Nếu bạn muốn bật nhanh toàn bộ stack local mà không phải gõ lệnh nhiều lần, hãy dùng:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run-local-stack.ps1
+npm run local:up
 ```
 
-Hoặc:
-
-```powershell
-npm.cmd run local:up
-```
-
-Lệnh `local:up` sẽ:
-
-- cài dependencies nếu còn thiếu
-- generate Prisma clients nếu còn thiếu
-- khởi động `postgres`
-- mở 5 cửa sổ PowerShell riêng để chạy:
-`auth-service`, `product-service`, `admin-moderation-service`, `api-gateway`, `web`
+Lệnh này sẽ tự động kiểm tra Docker, cài đặt những gì còn thiếu và **tự mở 5 cửa sổ PowerShell** cho bạn.
 
 ## 🗄️ Tự động hóa Cơ sở dữ liệu (Database Automation)
 
