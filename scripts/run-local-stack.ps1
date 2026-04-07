@@ -19,7 +19,7 @@ $Services = @(
     Project = 'auth-service'
     Port = 3002
     Env = @{
-      DATABASE_URL = 'postgresql://postgres:123456@localhost:5432/auth_db'
+      DATABASE_URL = 'postgresql://postgres:123456@localhost:5433/auth_db'
       INTERNAL_SERVICE_TOKEN = $InternalServiceToken
     }
   },
@@ -28,7 +28,7 @@ $Services = @(
     Project = 'product-service'
     Port = 3001
     Env = @{
-      DATABASE_URL = 'postgresql://postgres:123456@localhost:5432/product_db'
+      DATABASE_URL = 'postgresql://postgres:123456@localhost:5433/product_db'
       INTERNAL_SERVICE_TOKEN = $InternalServiceToken
       PUBLIC_BASE_URL = 'http://localhost:3001/uploads'
     }
@@ -39,7 +39,7 @@ $Services = @(
     Port = 3005
     Env = @{
       AUTH_SERVICE_BASE_URL = 'http://localhost:3002/api/auth'
-      DATABASE_URL = 'postgresql://postgres:123456@localhost:5432/admin_mod_db'
+      DATABASE_URL = 'postgresql://postgres:123456@localhost:5433/admin_mod_db'
       INTERNAL_SERVICE_TOKEN = $InternalServiceToken
       PRODUCT_SERVICE_BASE_URL = 'http://localhost:3001/api/products'
     }

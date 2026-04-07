@@ -1,7 +1,7 @@
 // Admin & Moderation Service Prisma Schema (Reports & Reviews)
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres:123456@localhost:5432/admin_mod_db"
+  url      = "postgresql://postgres:123456@localhost:5433/admin_mod_db"
 }
 
 generator client {

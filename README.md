@@ -46,7 +46,7 @@ Sau khi stack chạy xong:
 
 - Frontend: [http://localhost:4200](http://localhost:4200)
 - API Gateway: [http://localhost:3000](http://localhost:3000)
-- PostgreSQL: `localhost:5432`
+- PostgreSQL: `localhost:5433`
 - pgAdmin: [http://localhost:5050](http://localhost:5050)
 
 Thông tin đăng nhập pgAdmin:
@@ -54,6 +54,27 @@ Thông tin đăng nhập pgAdmin:
 - Email: `admin@c2cplatform.com`
 - Password: `123456`
 - Server được cấu hình sẵn: `C2C Platform Postgres`
+
+Nếu bạn kết nối PostgreSQL từ máy host bằng `psql`, DBeaver, hoặc pgAdmin cài trực tiếp trên Windows/macOS, hãy dùng:
+
+- Host: `localhost`
+- Port: `5433`
+- Username: `postgres`
+- Password: `123456`
+
+Không dùng `localhost:5432` cho repo này. Trên nhiều máy phát triển, `5432` đã được PostgreSQL local sử dụng, còn PostgreSQL Docker của project được publish ra host ở `5433`.
+
+Trong pgAdmin web của Docker, sau khi đăng nhập hãy mở:
+
+- `Servers > C2C Platform > C2C Platform Postgres > Databases`
+
+Bạn sẽ thấy 5 database:
+
+- `admin_mod_db`
+- `auth_db`
+- `chat_db`
+- `order_db`
+- `product_db`
 
 Tài khoản demo:
 
@@ -88,6 +109,8 @@ Lệnh `setup` chỉ làm 2 việc:
 
 - cài dependencies
 - khởi động container `postgres`
+
+PostgreSQL do repo khởi động sẽ được expose ra máy host ở `localhost:5433`.
 
 Lệnh này **không** tự mở terminal và **không** tự chạy `auth-service`, `product-service`, `admin-moderation-service`, `api-gateway`, `web`.
 
@@ -198,6 +221,17 @@ Ví dụ:
 - `3002` được sử dụng bởi `auth-service`
 
 Hãy dừng tiến trình cũ và chạy lại dịch vụ.
+
+### Prisma báo `Database "<db_name>" does not exist on the database server at "localhost:5432"`
+
+Lỗi này gần như luôn có nghĩa là service đang trỏ nhầm vào PostgreSQL cài local trên máy, không phải PostgreSQL Docker của repo.
+
+Cách xử lý:
+
+- dùng `postgresql://postgres:123456@localhost:5433/<db_name>`
+- nếu chạy stack local của repo, dùng `powershell -ExecutionPolicy Bypass -File .\scripts\run-local-stack.ps1` hoặc `npm.cmd run local:up`
+- nếu dùng pgAdmin hoặc database client cài trên máy, sửa connection sang `localhost:5433`
+- nếu cần nạp lại migration và seed từ đầu, chạy `docker compose down -v` rồi `docker compose up --build`
 
 ### Lỗi import Prisma client khi chạy `nx serve`
 

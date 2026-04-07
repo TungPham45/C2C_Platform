@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres:123456@localhost:5432/order_db"
+  url      = "postgresql://postgres:123456@localhost:5433/order_db"
 }
 
 model Voucher {
