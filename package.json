@@ -5,6 +5,7 @@
   "scripts": {
     "setup": "node scripts/setup.mjs",
     "local:up": "powershell.exe -ExecutionPolicy Bypass -File scripts/run-local-stack.ps1",
+    "db:sync": "node scripts/sync-db-schema.mjs",
     "prisma:generate": "nx run prisma-clients:generate",
     "prepare": "npm run prisma:generate"
   },

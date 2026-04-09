@@ -45,10 +45,13 @@ function main() {
   ensureFileExists('docker-compose.yml', 'The setup script requires docker-compose.yml in the repo root.');
 
   console.log('[setup] Bootstrapping C2C Platform');
-  console.log('[setup] This will install dependencies, generate Prisma clients via npm prepare, and start PostgreSQL with seeded databases.');
+  console.log(
+    '[setup] This will install dependencies, start PostgreSQL, apply pending Prisma migrations, and regenerate Prisma clients.'
+  );
 
   run(npmCommand, ['install'], 'Installing dependencies');
   run(dockerCommand, ['compose', 'up', '-d', 'postgres'], 'Starting PostgreSQL container');
+  run(npmCommand, ['run', 'db:sync'], 'Applying database schema changes');
 
   console.log('\n[setup] Completed successfully.');
   console.log('[setup] Next step: start the apps with Nx when you are ready.');
