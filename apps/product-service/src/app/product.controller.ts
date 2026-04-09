@@ -50,6 +50,12 @@ export class ProductController {
     return this.productService.createProduct(userId, data);
   }
 
+  @Post('seller/register')
+  registerShop(@Headers() headers: any, @Body() data: any) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.registerShop(userId, data);
+  }
+
   @Get('seller')
   getMyShopProducts(@Headers() headers: any) {
     const userId = this.getProviderUserId(headers);

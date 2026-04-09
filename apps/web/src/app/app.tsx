@@ -14,6 +14,7 @@ import { ProductDetailPage } from '../pages/ProductDetail';
 import { AuthPage } from '../pages/auth/AuthPage';
 import AdminDashboard from '../pages/admin/AdminDashboard';
 import ProductModeration from '../pages/admin/ProductModeration';
+import ShopModeration from '../pages/admin/ShopModeration';
 import { SellerProtectedRoute } from '../components/auth/SellerProtectedRoute';
 import { SellerRegistration } from '../pages/seller/SellerRegistration';
 
@@ -46,7 +47,7 @@ export function App() {
       {/* Admin Routes */}
       <Route path="/admin" element={<AdminDashboard />} />
       <Route path="/admin/products" element={<ProductModeration />} />
-      <Route path="/admin/applications" element={<div className="p-10 text-center font-bold text-slate-400">Shop Approval - Coming Soon</div>} />
+      <Route path="/admin/applications" element={<ShopModeration />} />
 
     </Routes>
   );
