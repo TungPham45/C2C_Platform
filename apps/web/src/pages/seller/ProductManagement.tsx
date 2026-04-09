@@ -106,9 +106,25 @@ export const ProductManagementPage: FC = () => {
                   <div>
                     <h4 className="font-bold text-[#0f1d25] text-sm line-clamp-1">{p.name}</h4>
                     <p className="text-[10px] text-[#707882] mt-1 font-mono">SKU: {p.slug || `PRD-${p.id}`}</p>
-                    <span className={`inline-block mt-1 px-2 py-0.5 text-[10px] font-bold rounded ${p.status === 'active' ? 'bg-[#cfe5ff] text-[#00629d]' : 'bg-[#ffddb4] text-[#291800]'}`}>
-                      {p.status === 'active' ? (p.category?.name || 'Phân loại') : 'Chờ duyệt'}
-                    </span>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      <span className={`inline-block px-2 py-0.5 text-[10px] font-bold rounded ${
+                        p.status === 'active' ? 'bg-[#cfe5ff] text-[#00629d]' : 
+                        p.status === 'rejected' ? 'bg-[#ffdad6] text-[#ba1a1a]' : 
+                        'bg-[#ffddb4] text-[#291800]'
+                      }`}>
+                        {p.status === 'active' ? (p.category?.name || 'Phân loại') : 
+                         p.status === 'rejected' ? 'Bị từ chối' : 'Chờ duyệt'}
+                      </span>
+                      {p.status === 'rejected' && p.moderation_note && (
+                        <div className="group/note relative">
+                          <span className="material-symbols-outlined text-sm text-[#ba1a1a] cursor-help">info</span>
+                          <div className="absolute left-0 bottom-full mb-2 w-64 p-3 bg-[#0f1d25] text-white text-[10px] rounded-xl opacity-0 group-hover/note:opacity-100 transition-opacity pointer-events-none shadow-xl z-50">
+                            <p className="font-bold mb-1 text-[#42a5f5]">Lý do từ chối:</p>
+                            {p.moderation_note}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className={`text-center font-bold text-[#0f1d25] text-sm ${p.status !== 'active' ? 'opacity-70' : ''}`}>
@@ -130,6 +146,8 @@ export const ProductManagementPage: FC = () => {
                       </div>
                       <p className="text-[10px] text-[#707882]">Lượt xem: {p.sold_count || 0}</p>
                     </>
+                  ) : p.status === 'rejected' ? (
+                    <div className="text-[#ba1a1a] font-bold text-[10px] uppercase tracking-tighter">Cần chỉnh sửa</div>
                   ) : (
                     <div className="italic text-[#707882] text-[10px]">Đang kiểm duyệt...</div>
                   )}

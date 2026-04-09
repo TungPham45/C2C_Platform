@@ -10,6 +10,7 @@ async function bootstrap() {
   const authServiceUrl = process.env.AUTH_SERVICE_URL ?? 'http://localhost:3002/api/auth';
   const productServiceUrl = process.env.PRODUCT_SERVICE_URL ?? 'http://localhost:3001/api/products';
   const adminServiceUrl = process.env.ADMIN_SERVICE_URL ?? 'http://localhost:3005/api/admin';
+  const orderServiceUrl = process.env.ORDER_SERVICE_URL ?? 'http://localhost:3004/api/orders';
   const productPublicUrl = process.env.PRODUCT_PUBLIC_URL ?? 'http://localhost:3001/uploads';
   
   // Custom middleware to extract JWT and append headers safely downstream
@@ -43,6 +44,12 @@ async function bootstrap() {
   // Proxy Admin Service
   app.use('/api/admin', createProxyMiddleware({
     target: adminServiceUrl,
+    changeOrigin: true,
+  }));
+
+  // Proxy Order Service
+  app.use('/api/orders', createProxyMiddleware({
+    target: orderServiceUrl,
     changeOrigin: true,
   }));
 

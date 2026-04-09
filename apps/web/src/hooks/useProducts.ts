@@ -70,5 +70,34 @@ export const useProducts = () => {
     }
   };
 
-  return { products, loading, error, fetchShopProducts, createProduct, deleteProduct };
+  const fetchPublicProducts = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE}`);
+      if (!res.ok) throw new Error('Failed to fetch public products');
+      const data = await res.json();
+      setProducts(Array.isArray(data) ? data.map(normalizeProductAssetUrls) : []);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchProductDetail = useCallback(async (id: number) => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE}/${id}`);
+      if (!res.ok) throw new Error('Failed to fetch product details');
+      const data = await res.json();
+      return normalizeProductAssetUrls(data);
+    } catch (err: any) {
+      setError(err.message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { products, loading, error, fetchShopProducts, fetchPublicProducts, fetchProductDetail, createProduct, deleteProduct };
 };

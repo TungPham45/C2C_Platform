@@ -29,6 +29,21 @@ export class AuthController {
     return this.authService.register(body);
   }
 
+  @Post('forgot-password')
+  async forgotPassword(@Body('email') email: string) {
+    return this.authService.requestForgotPassword(email);
+  }
+
+  @Post('verify-otp')
+  async verifyOtp(@Body() body: { email: string; code: string; purpose: string }) {
+    return this.authService.verifyOtp(body.email, body.code, body.purpose);
+  }
+
+  @Post('reset-password')
+  async resetPassword(@Body() body: any) {
+    return this.authService.resetPassword(body);
+  }
+
   @Get('internal/admin/stats')
   getAdminStats(@Headers() headers: Record<string, string | string[] | undefined>) {
     this.requireInternalAccess(headers);

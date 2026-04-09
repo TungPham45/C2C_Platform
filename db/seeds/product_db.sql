@@ -69,7 +69,7 @@ FROM (
     ('thoi-trang-nam', 'Quần jean', 'quan-jean', 2, 1, true),
     ('thoi-trang-nam', 'Hoodie & Áo nỉ', 'hoodie-ao-ni', 2, 2, true),
     ('thoi-trang-nam', 'Áo khoác', 'ao-khoac', 2, 3, true),
-    ('thoi-trang-nam', 'Ao', 'ao-nam', 2, 4, true),
+    ('thoi-trang-nam', 'Áo', 'ao-nam', 2, 4, true),
     ('thoi-trang-nam', 'Đồ lót', 'do-lot-nam', 2, 5, true),
     ('giay-dep-nam', 'Giày thể thao', 'giay-the-thao-nam', 2, 1, true)
 ) AS child(parent_slug, name, slug, level, sort_order, is_active)
@@ -208,7 +208,7 @@ LEFT JOIN attribute_options existing
  AND existing.value_name = o.value_name
 WHERE existing.id IS NULL;
 
-WITH product_rows(shop_slug, category_slug, name, slug, description, base_price, thumbnail_url, rating, sold_count, status) AS (
+WITH product_rows(shop_slug, category_slug, name, slug, description, base_price, thumbnail_url, rating, sold_count, status, moderation_note) AS (
   VALUES
     (
       'thoi-trang-b',
@@ -220,7 +220,8 @@ WITH product_rows(shop_slug, category_slug, name, slug, description, base_price,
       'https://via.placeholder.com/600x600.png?text=Classic+T-Shirt',
       4.70,
       18,
-      'active'
+      'active',
+      NULL
     ),
     (
       'thoi-trang-b',
@@ -232,7 +233,8 @@ WITH product_rows(shop_slug, category_slug, name, slug, description, base_price,
       'https://via.placeholder.com/600x600.png?text=Premium+Hoodie',
       4.90,
       9,
-      'active'
+      'active',
+      NULL
     ),
     (
       'thoi-trang-b',
@@ -244,7 +246,8 @@ WITH product_rows(shop_slug, category_slug, name, slug, description, base_price,
       'https://via.placeholder.com/600x600.png?text=Linen+Overshirt',
       0.00,
       0,
-      'draft'
+      'pending_approval',
+      NULL
     ),
     (
       'thoi-trang-b',
@@ -256,7 +259,8 @@ WITH product_rows(shop_slug, category_slug, name, slug, description, base_price,
       'https://via.placeholder.com/600x600.png?text=Boxer+Pack',
       4.60,
       22,
-      'active'
+      'active',
+      NULL
     ),
     (
       'giay-sneaker-pro',
@@ -268,7 +272,21 @@ WITH product_rows(shop_slug, category_slug, name, slug, description, base_price,
       'https://via.placeholder.com/600x600.png?text=Sneaker+Runner+Pro',
       4.85,
       14,
-      'active'
+      'active',
+      NULL
+    ),
+    (
+      'thoi-trang-b',
+      'ao-thun',
+      'Sample Rejected Product',
+      'sample-rejected',
+      'Sản phẩm mẫu bị từ chối để demo tính năng hiển thị lỗi.',
+      50000.00,
+      'https://via.placeholder.com/600x600.png?text=Rejected',
+      0,
+      0,
+      'rejected',
+      'Hình ảnh quá mờ và mô tả sản phẩm không đầy đủ thông tin kỹ thuật.'
     )
 )
 INSERT INTO products (
@@ -281,7 +299,8 @@ INSERT INTO products (
   thumbnail_url,
   rating,
   sold_count,
-  status
+  status,
+  moderation_note
 )
 SELECT s.id,
        c.id,
@@ -292,7 +311,8 @@ SELECT s.id,
        p.thumbnail_url,
        p.rating,
        p.sold_count,
-       p.status
+       p.status,
+       p.moderation_note
 FROM product_rows p
 JOIN shops s ON s.slug = p.shop_slug
 JOIN categories c ON c.slug = p.category_slug
@@ -307,6 +327,7 @@ SET
   rating = EXCLUDED.rating,
   sold_count = EXCLUDED.sold_count,
   status = EXCLUDED.status,
+  moderation_note = EXCLUDED.moderation_note,
   updated_at = NOW();
 
 WITH variant_rows(product_slug, sku, stock_quantity, price_override, attributes) AS (

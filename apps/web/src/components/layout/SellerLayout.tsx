@@ -1,5 +1,5 @@
 import { FC, ReactNode } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, Link, useLocation } from 'react-router-dom';
 
 interface SellerLayoutProps {
   children: ReactNode;
@@ -28,17 +28,17 @@ export const SellerLayout: FC<SellerLayoutProps> = ({ children, pageTitle = 'Ser
       <aside className="w-64 h-screen fixed left-0 top-0 bg-blue-50 dark:bg-slate-950 flex flex-col p-4 z-50">
         <div className="mb-8 px-4">
           <h1 className="text-xl font-bold text-blue-900 dark:text-blue-100 font-['Plus_Jakarta_Sans']">{pageTitle}</h1>
-          <p className="text-xs text-slate-500 font-medium tracking-wide">Merchant Portal</p>
+          <p className="text-xs text-slate-500 font-medium tracking-wide">Cổng người bán</p>
         </div>
         
         <nav className="flex-1 space-y-1 font-medium text-sm">
           <NavLink to="/seller" end className={getNavLinkClass}>
-            <span className="material-symbols-outlined">dashboard</span> Dashboard
+            <span className="material-symbols-outlined">dashboard</span> Tổng quan
           </NavLink>
           
-          <a href="#" className="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-60">
-            <span className="material-symbols-outlined">shopping_cart</span> Orders
-          </a>
+          <NavLink to="/seller/orders" className={getNavLinkClass}>
+            <span className="material-symbols-outlined">shopping_cart</span> Đơn hàng
+          </NavLink>
           
           <NavLink 
             to="/seller/products" 
@@ -48,25 +48,25 @@ export const SellerLayout: FC<SellerLayoutProps> = ({ children, pageTitle = 'Ser
                 : 'text-slate-600 dark:text-slate-400 hover:bg-blue-100/50 dark:hover:bg-slate-900/50'
             }`}
           >
-            <span className="material-symbols-outlined">inventory_2</span> Products
+            <span className="material-symbols-outlined">inventory_2</span> Sản phẩm
           </NavLink>
           
           <a href="#" className="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-60">
-            <span className="material-symbols-outlined">layers</span> Inventory
+            <span className="material-symbols-outlined">layers</span> Kho hàng
           </a>
           
           <a href="#" className="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-60">
-            <span className="material-symbols-outlined">monitoring</span> Analytics
+            <span className="material-symbols-outlined">monitoring</span> Phân tích
           </a>
           
           <a href="#" className="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-60">
-            <span className="material-symbols-outlined">settings</span> Settings
+            <span className="material-symbols-outlined">settings</span> Cài đặt
           </a>
         </nav>
         
         <div className="mt-auto border-t border-blue-100/50 pt-4">
           <a href="#" className="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-60">
-            <span className="material-symbols-outlined">help</span> Help Center
+            <span className="material-symbols-outlined">help</span> Hỗ trợ
           </a>
         </div>
       </aside>
@@ -83,14 +83,18 @@ export const SellerLayout: FC<SellerLayoutProps> = ({ children, pageTitle = 'Ser
             />
           </div>
         </div>
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4">
+          <Link to="/" className="flex items-center gap-2 text-sm font-semibold text-[#00629d] bg-[#e9f5ff] px-4 py-2 rounded-full hover:bg-blue-100 transition-colors">
+            <span className="material-symbols-outlined text-[18px]">home</span>
+            Trang chủ
+          </Link>
           <div className="flex items-center gap-4 text-[#707882]">
             <button className="hover:text-[#00629d] transition-colors"><span className="material-symbols-outlined">notifications</span></button>
             <button className="hover:text-[#00629d] transition-colors"><span className="material-symbols-outlined">chat_bubble</span></button>
             <button className="hover:text-[#00629d] transition-colors"><span className="material-symbols-outlined">account_circle</span></button>
           </div>
           <button className="bg-[#00629d] text-white px-6 py-2 rounded-full text-sm font-semibold hover:opacity-90 transition-opacity">
-            Go Live
+            Đăng bán
           </button>
         </div>
       </header>

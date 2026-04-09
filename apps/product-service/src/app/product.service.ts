@@ -296,15 +296,82 @@ export class ProductService {
   // =====================
 
   async getAdminStats() {
-    const [activeShops, pendingApplications] = await Promise.all([
+    const [activeShops, pendingApplications, pendingProducts] = await Promise.all([
       this.prisma.shop.count({ where: { status: 'active' } }),
       this.prisma.shop.count({ where: { status: 'pending' } }),
+      this.prisma.product.count({ where: { status: 'pending_approval' } }),
     ]);
 
     return {
       activeShops,
       pendingApplications,
+      pendingProducts,
     };
+  }
+
+  async getPendingProducts() {
+    return this.prisma.product.findMany({
+      where: { status: 'pending_approval' },
+      include: {
+        shop: { select: { name: true } },
+        category: { select: { name: true } },
+        images: true,
+        variants: true,
+        attribute_values: {
+          include: {
+            attribute: { select: { name: true } },
+            attribute_option: { select: { value_name: true } },
+          },
+        },
+      },
+      orderBy: { created_at: 'asc' },
+    });
+  }
+
+  async approveProduct(id: number) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    return this.prisma.product.update({
+      where: { id },
+      data: {
+        status: 'active',
+        moderation_note: null,
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+  }
+
+  async rejectProduct(id: number, reason: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    return this.prisma.product.update({
+      where: { id },
+      data: {
+        status: 'rejected',
+        moderation_note: reason,
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
   }
 
   async getPendingShops() {
@@ -364,7 +431,13 @@ export class ProductService {
     const product = await this.prisma.product.findUnique({
       where: { id },
       include: {
-        shop: true,
+        shop: {
+          include: {
+            _count: {
+              select: { products: { where: { status: 'active' } } }
+            }
+          }
+        },
         category: true,
         images: true,
         variants: true,

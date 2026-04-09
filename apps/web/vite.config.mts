@@ -25,9 +25,9 @@ export default defineConfig(() => ({
     host: true, // cho phép truy cập từ ngoài (ngrok)
     allowedHosts,
     proxy,
-    hmr: {
-      clientPort: 443, // quan trọng khi dùng ngrok HTTPS
-    },
+    // hmr: {
+    //   clientPort: 443, // quan trọng khi dùng ngrok HTTPS
+    // },
   },
 
   preview: {

@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Param } from '@nestjs/common';
+import { Controller, Get, Put, Param, Body } from '@nestjs/common';
 import { AdminService } from './admin.service';
 
 @Controller('admin')
@@ -18,5 +18,20 @@ export class AdminController {
   @Put('applications/:id/approve')
   approveShop(@Param('id') id: string) {
     return this.adminService.approveShop(+id);
+  }
+
+  @Get('products/pending')
+  getPendingProducts() {
+    return this.adminService.getPendingProducts();
+  }
+
+  @Put('products/:id/approve')
+  approveProduct(@Param('id') id: string) {
+    return this.adminService.approveProduct(+id);
+  }
+
+  @Put('products/:id/reject')
+  rejectProduct(@Param('id') id: string, @Body('reason') reason: string) {
+    return this.adminService.rejectProduct(+id, reason);
   }
 }

@@ -3,6 +3,7 @@ $Apps = @(
   "auth-service",
   "product-service",
   "admin-moderation-service",
+  "order-service",
   "api-gateway",
   "web"
 )

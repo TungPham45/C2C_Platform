@@ -45,7 +45,7 @@ export class AdminService {
   async getStats() {
     const [authStats, productStats] = await Promise.all([
       this.requestJson<{ activeUsers: number }>(`${this.authBaseUrl}/internal/admin/stats`),
-      this.requestJson<{ activeShops: number; pendingApplications: number }>(
+      this.requestJson<{ activeShops: number; pendingApplications: number; pendingProducts: number }>(
         `${this.productBaseUrl}/internal/admin/stats`,
       ),
     ]);
@@ -54,6 +54,7 @@ export class AdminService {
       activeUsers: authStats.activeUsers,
       activeShops: productStats.activeShops,
       pendingApplications: productStats.pendingApplications,
+      pendingProducts: productStats.pendingProducts,
     };
   }
 
@@ -75,5 +76,23 @@ export class AdminService {
         method: 'PUT',
       },
     );
+  }
+
+  async getPendingProducts() {
+    return this.requestJson<Array<any>>(`${this.productBaseUrl}/internal/admin/pending-products`);
+  }
+
+  async approveProduct(id: number) {
+    return this.requestJson<any>(`${this.productBaseUrl}/internal/admin/products/${id}/approve`, {
+      method: 'PUT',
+    });
+  }
+
+  async rejectProduct(id: number, reason: string) {
+    return this.requestJson<any>(`${this.productBaseUrl}/internal/admin/products/${id}/reject`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    });
   }
 }

@@ -38,7 +38,8 @@ model Product {
   thumbnail_url String?   @db.Text
   rating        Decimal?  @default(0) @db.Decimal(3, 2)
   sold_count    Int?      @default(0)
-  status        String?   @default("active") @db.VarChar(50) // 'active', 'hidden', 'banned'
+  status        String?   @default("pending_approval") @db.VarChar(50) // 'pending_approval', 'active', 'hidden', 'banned', 'rejected'
+  moderation_note String? @db.Text
   created_at    DateTime? @default(now()) @db.Timestamp(6)
   updated_at    DateTime? @default(now()) @db.Timestamp(6)
 

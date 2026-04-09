@@ -103,6 +103,31 @@ export class ProductController {
     return this.productService.approveShop(+id);
   }
 
+  @Get('internal/admin/pending-products')
+  getPendingProducts(@Headers() headers: Record<string, string | string[] | undefined>) {
+    this.requireInternalAccess(headers);
+    return this.productService.getPendingProducts();
+  }
+
+  @Put('internal/admin/products/:id/approve')
+  approveProduct(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Param('id') id: string,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.productService.approveProduct(+id);
+  }
+
+  @Put('internal/admin/products/:id/reject')
+  rejectProduct(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Param('id') id: string,
+    @Body('reason') reason: string,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.productService.rejectProduct(+id, reason);
+  }
+
   // --- PUBLIC ROUTES (TAXONOMY MUST BE BEFORE :id) ---
 
   @Get('categories/all')
