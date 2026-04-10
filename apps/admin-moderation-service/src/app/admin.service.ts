@@ -170,4 +170,38 @@ export class AdminService {
       body: JSON.stringify({ reason }),
     });
   }
+
+  // --- Banners ---
+
+  async getAllBanners() {
+    return this.prisma.banner.findMany({
+      orderBy: { sort_order: 'asc' },
+    });
+  }
+
+  async getActiveBanners() {
+    return this.prisma.banner.findMany({
+      where: { is_active: true },
+      orderBy: { sort_order: 'asc' },
+    });
+  }
+
+  async createBanner(data: { title: string; image_url: string; target_url?: string; is_active?: boolean; sort_order?: number }) {
+    return this.prisma.banner.create({
+      data,
+    });
+  }
+
+  async updateBanner(id: number, data: { title?: string; image_url?: string; target_url?: string; is_active?: boolean; sort_order?: number }) {
+    return this.prisma.banner.update({
+      where: { id },
+      data,
+    });
+  }
+
+  async deleteBanner(id: number) {
+    return this.prisma.banner.delete({
+      where: { id },
+    });
+  }
 }

@@ -1,72 +1,101 @@
-import { FC } from 'react';
+import { FC, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
+interface Banner {
+  id: number;
+  title: string;
+  image_url: string;
+  target_url: string | null;
+  sort_order: number;
+}
+
 export const HomeHero: FC = () => {
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    const fetchBanners = async () => {
+      try {
+        const res = await fetch('/api/admin/public/banners');
+        if (res.ok) {
+          const data = await res.json();
+          setBanners(data);
+        }
+      } catch (e) {
+        console.error('Failed to fetch banners', e);
+      }
+    };
+    fetchBanners();
+  }, []);
+
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % banners.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [banners]);
+
+  if (banners.length === 0) return null;
+
+  const currentBanner = banners[activeIndex];
+
   return (
-    <section className="px-6 mb-20">
-      <div className="max-w-7xl mx-auto h-[600px] rounded-[4rem] overflow-hidden relative group">
-        {/* Background Image */}
-        <img 
-          src="/assets/marketplace_hero_banner_1775628876670.png" 
-          alt="Curated Collection" 
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-[2000ms]"
-        />
+    <section className="px-6 mb-20 relative">
+      <div className="max-w-7xl mx-auto h-[600px] rounded-[4rem] overflow-hidden relative group shadow-2xl">
+        {/* Background Image Carousel */}
+        {banners.map((banner, index) => (
+          <img 
+            key={banner.id}
+            src={banner.image_url} 
+            alt={banner.title} 
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ease-in-out ${index === activeIndex ? 'opacity-100' : 'opacity-0'} group-hover:scale-105`}
+            style={{ transitionProperty: 'opacity, transform' }}
+          />
+        ))}
         
         {/* Overlay Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#00629d]/40 via-transparent to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0f1d25]/80 via-[#0f1d25]/40 to-transparent"></div>
         
         {/* Content */}
-        <div className="absolute inset-0 flex items-center px-16">
-          <div className="max-w-xl space-y-8 animate-in slide-in-from-left-20 duration-1000">
-            <div className="space-y-2">
-              <span className="inline-block px-4 py-1.5 bg-[#42a5f5] text-white rounded-full text-[10px] font-bold uppercase tracking-[0.3em]">
-                New Collection 2026
+        <div className="absolute inset-0 flex items-center px-16 z-10">
+          <div className="max-w-xl space-y-8 animate-in slide-in-from-bottom-10 fade-in duration-1000" key={currentBanner.id}>
+            <div className="space-y-4">
+              <span className="inline-block px-4 py-1.5 bg-[#42a5f5] text-white rounded-full text-[10px] font-bold uppercase tracking-[0.3em] shadow-lg">
+                Nổi bật
               </span>
-              <h1 className="text-7xl font-black font-['Plus_Jakarta_Sans'] leading-[1.1] text-white">
-                The New <br />
-                <span className="text-[#99cbff]">Standard</span> Of <br />
-                Discovery
+              <h1 className="text-5xl md:text-6xl font-black font-['Plus_Jakarta_Sans'] leading-[1.1] text-white drop-shadow-md">
+                {currentBanner.title}
               </h1>
             </div>
             
-            <p className="text-white/80 text-lg font-medium leading-relaxed max-w-sm">
-              Discover unique products crafted with intention and curated for the minimalist lifestyle.
-            </p>
-            
-            <div className="flex items-center gap-4">
-              <Link 
-                to="/products" 
-                className="px-10 py-5 bg-white text-[#00629d] rounded-full font-black uppercase text-xs tracking-widest shadow-2xl hover:bg-[#cfe5ff] transition-all hover:scale-105 active:scale-95"
-              >
-                Shop Now
-              </Link>
-              <button className="w-14 h-14 rounded-full border-2 border-white/20 text-white flex items-center justify-center hover:bg-white/10 transition-all backdrop-blur-sm group/play">
-                <span className="material-symbols-outlined text-3xl group-hover:scale-125 transition-transform">play_arrow</span>
-              </button>
-            </div>
+            {currentBanner.target_url && (
+              <div className="flex items-center gap-4 pt-4">
+                <a 
+                  href={currentBanner.target_url} 
+                  target={currentBanner.target_url.startsWith('http') ? '_blank' : '_self'}
+                  rel="noreferrer"
+                  className="px-10 py-5 bg-white text-[#00629d] rounded-full font-black uppercase text-xs tracking-widest shadow-2xl hover:bg-[#cfe5ff] transition-all hover:scale-105 active:scale-95"
+                >
+                  Xem ngay
+                </a>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Floating Stat Component */}
-        <div className="absolute bottom-12 right-12 bg-white/20 backdrop-blur-2xl border border-white/20 p-8 rounded-[2.5rem] text-white space-y-4 animate-in fade-in zoom-in duration-1000 delay-500">
-           <div className="flex items-center gap-4">
-              <div className="flex -space-x-4">
-                {[1,2,3].map(i => (
-                  <div key={i} className="w-10 h-10 rounded-full border-2 border-white overflow-hidden bg-slate-400">
-                    <img src={`https://i.pravatar.cc/100?img=${i+10}`} alt="" />
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs font-bold leading-tight">
-                Trusted by <br />
-                <span className="text-lg">+12k Sellers</span>
-              </p>
-           </div>
-           <div className="w-full h-px bg-white/10"></div>
-           <button className="w-full py-3 bg-white text-[#0f1d25] rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#42a5f5] hover:text-white transition-all">
-              Join The Community
-           </button>
-        </div>
+        {/* Carousel Indicators */}
+        {banners.length > 1 && (
+          <div className="absolute bottom-12 left-16 flex gap-3 z-20">
+            {banners.map((_, idx) => (
+              <button 
+                key={idx}
+                onClick={() => setActiveIndex(idx)}
+                className={`h-2 rounded-full transition-all duration-500 ${activeIndex === idx ? 'w-10 bg-white' : 'w-2 bg-white/40 hover:bg-white/70'}`}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
