@@ -202,12 +202,13 @@ export const CheckoutPage = () => {
               <div className="grid grid-cols-2 gap-4">
                 {[
                   { id: 'credit_card', label: 'Thẻ tín dụng', icon: 'credit_card' },
-                  { id: 'paypal', label: 'PayPal', icon: 'account_balance_wallet' },
                   { id: 'bank_transfer', label: 'Chuyển khoản', icon: 'account_balance' },
+                  { id: 'vnpay', label: 'VN Pay', icon: 'qr_code' },
                   { id: 'cod', label: 'Khi nhận hàng', icon: 'payments' },
                 ].map((method) => (
                   <button
                     key={method.id}
+                    type="button"
                     onClick={() => setPaymentMethod(method.id)}
                     className={`flex items-center gap-4 p-5 lg:p-6 rounded-2xl border-2 transition-all ${
                       paymentMethod === method.id 
@@ -219,6 +220,58 @@ export const CheckoutPage = () => {
                     <span className="font-bold text-sm lg:text-base">{method.label}</span>
                   </button>
                 ))}
+              </div>
+
+              {/* Payment Details Block */}
+              <div className="mt-8 p-6 bg-[#f5faff] rounded-2xl border border-[#e1f0fb]">
+                {paymentMethod === 'credit_card' && (
+                  <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                    <h3 className="font-bold text-[#0f1d25] mb-2">Nhập thông tin thẻ</h3>
+                    <input type="text" placeholder="Số thẻ (0000 0000 0000 0000)" className="w-full h-12 px-4 rounded-xl border border-[#dbeaf5] outline-none focus:border-[#00629d] text-sm" />
+                    <div className="flex gap-4">
+                      <input type="text" placeholder="MM/YY" className="w-1/2 h-12 px-4 rounded-xl border border-[#dbeaf5] outline-none focus:border-[#00629d] text-sm" />
+                      <input type="text" placeholder="CVC" className="w-1/2 h-12 px-4 rounded-xl border border-[#dbeaf5] outline-none focus:border-[#00629d] text-sm" />
+                    </div>
+                    <input type="text" placeholder="Tên chủ thẻ" className="w-full h-12 px-4 rounded-xl border border-[#dbeaf5] outline-none focus:border-[#00629d] text-sm" />
+                  </div>
+                )}
+
+                {paymentMethod === 'bank_transfer' && (
+                  <div className="flex flex-col items-center text-center space-y-4 animate-in fade-in slide-in-from-top-2">
+                    <div className="w-40 h-40 bg-white p-2 rounded-2xl shadow-sm border border-[#e1f0fb]">
+                      <img src="https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg" alt="QR Code" className="w-full h-full mix-blend-darken" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-[#0f1d25] text-sm uppercase tracking-widest mb-1">Ngân hàng Vietcombank</p>
+                      <p className="text-2xl font-black text-[#00629d] font-['Plus_Jakarta_Sans'] tracking-widest mb-1">1023 456 789</p>
+                      <p className="text-sm font-bold text-[#404751]">C2C PLATFORM VN</p>
+                      <p className="text-xs text-[#707882] mt-3 bg-white px-4 py-2 rounded-full border border-[#e1f0fb]">
+                        Nội dung: <span className="font-bold text-[#0f1d25]">Thanh toan don hang</span>
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {paymentMethod === 'vnpay' && (
+                  <div className="flex flex-col items-center justify-center space-y-4 py-6 animate-in fade-in slide-in-from-top-2 text-center">
+                    <img src="https://vnpay.vn/s1/statics.vnpay.vn/2023/6/0oxhzjmxbksr1686814746087.png" alt="VNPay Logo" className="h-12 object-contain hidden" />
+                    <span className="material-symbols-outlined text-5xl text-[#00629d] mb-2">qr_code_scanner</span>
+                    <p className="font-medium text-[#404751] text-sm max-w-[280px]">
+                      Hệ thống sẽ chuyển hướng bạn đến <strong className="text-[#00629d]">Cổng thanh toán an toàn VNPAY</strong> sau khi bấm Xác nhận đặt hàng.
+                    </p>
+                  </div>
+                )}
+
+                {paymentMethod === 'cod' && (
+                  <div className="flex items-center gap-5 py-4 animate-in fade-in slide-in-from-top-2">
+                    <div className="w-16 h-16 rounded-full bg-[#e1f0fb] flex items-center justify-center flex-shrink-0 text-[#00629d]">
+                      <span className="material-symbols-outlined text-3xl">local_shipping</span>
+                    </div>
+                    <p className="text-sm font-medium leading-relaxed text-[#404751]">
+                      Bộ phận vận chuyển sẽ giao hàng đến địa chỉ của bạn. Bạn chỉ thanh toán bằng tiền mặt <strong className="text-[#0f1d25]">khi đã kiểm tra và nhận hàng</strong> thành công.
+                    </p>
+                  </div>
+                )}
               </div>
             </section>
           </div>

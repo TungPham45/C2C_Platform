@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { ProductPrismaService } from './product-prisma.service';
 
@@ -10,7 +10,45 @@ export class OrderService {
   ) {}
 
   async createOrder(userId: number, data: any) {
-    // 1. Create the CheckoutSession
+    // ============================================================
+    // STEP 0: Validate stock availability for ALL items FIRST
+    // (Fail fast before writing anything to DB)
+    // ============================================================
+    const allItems: { product_variant_id: number; quantity: number; product_name: string }[] = [];
+    for (const shopOrder of (data.shop_orders || [])) {
+      for (const item of (shopOrder.items || [])) {
+        allItems.push({
+          product_variant_id: Number(item.product_variant_id),
+          quantity: Number(item.quantity),
+          product_name: item.product_name || 'Sản phẩm',
+        });
+      }
+    }
+
+    // Fetch all variants at once for efficiency
+    const variantIds = allItems.map(i => i.product_variant_id);
+    const variants = await this.productPrisma.productVariant.findMany({
+      where: { id: { in: variantIds } },
+      select: { id: true, stock_quantity: true },
+    });
+
+    const variantMap = new Map(variants.map(v => [v.id, v.stock_quantity ?? 0]));
+
+    for (const item of allItems) {
+      const currentStock = variantMap.get(item.product_variant_id);
+      if (currentStock === undefined) {
+        throw new NotFoundException(`Không tìm thấy sản phẩm (variant ID: ${item.product_variant_id})`);
+      }
+      if (item.quantity > currentStock) {
+        throw new BadRequestException(
+          `Sản phẩm "${item.product_name}" chỉ còn ${currentStock} trong kho. Bạn đã chọn ${item.quantity}.`
+        );
+      }
+    }
+
+    // ============================================================
+    // STEP 1: Create the CheckoutSession
+    // ============================================================
     const checkoutSession = await this.prisma.checkoutSession.create({
       data: {
         user_id: userId,
@@ -20,7 +58,9 @@ export class OrderService {
       },
     });
 
-    // 2. Create ShopOrders with OrderItems
+    // ============================================================
+    // STEP 2: Create ShopOrders with OrderItems
+    // ============================================================
     const createdOrders = [];
     for (const shopOrder of (data.shop_orders || [])) {
       const created = await this.prisma.shopOrder.create({
@@ -45,7 +85,23 @@ export class OrderService {
       createdOrders.push(created);
     }
 
-    // 3. Clear Cart if requested
+    // ============================================================
+    // STEP 3: Deduct stock for each purchased variant
+    // ============================================================
+    for (const item of allItems) {
+      await this.productPrisma.productVariant.update({
+        where: { id: item.product_variant_id },
+        data: {
+          stock_quantity: {
+            decrement: item.quantity,
+          },
+        },
+      });
+    }
+
+    // ============================================================
+    // STEP 4: Clear Cart if requested
+    // ============================================================
     if (data.cart_item_ids && Array.isArray(data.cart_item_ids) && data.cart_item_ids.length > 0) {
       await this.prisma.cartItem.deleteMany({
         where: {
