@@ -1,5 +1,6 @@
 import { FC, ReactNode, useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useCart } from '../../hooks/useCart';
 
 interface MarketplaceLayoutProps {
   children: ReactNode;
@@ -19,6 +20,16 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
       } catch (e) {}
     }
   }, []);
+
+  const { cartItems, fetchCartItems } = useCart();
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchCartItems();
+    }
+  }, [currentUser, fetchCartItems]);
+
+  const totalCartItems = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
   const handleLogout = () => {
     localStorage.removeItem('c2c_token');
@@ -53,7 +64,13 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
             <div className="w-full relative group">
               <input 
                 type="text" 
-                placeholder="Tìm kiếm sản phẩm, cửa hàng..." 
+                placeholder="Tìm kiếm sản phẩm, cửa hàng..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const val = e.currentTarget.value.trim();
+                    if (val) navigate(`/products?q=${encodeURIComponent(val)}`);
+                  }
+                }}
                 className="w-full h-11 pl-12 pr-4 bg-[#f5faff]/50 border border-transparent focus:bg-white focus:border-[#00629d]/10 rounded-2xl text-sm outline-none transition-all placeholder:text-[#707882]/50"
               />
               <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#707882] group-focus-within:text-[#00629d] transition-colors">search</span>
@@ -81,10 +98,14 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
                 <Link to="/messages" className="relative w-10 h-10 flex items-center justify-center text-[#0f1d25] hover:bg-white/50 rounded-xl transition-colors" title="Tin nhắn">
                   <span className="material-symbols-outlined">chat</span>
                 </Link>
-                <button className="relative w-10 h-10 flex items-center justify-center text-[#0f1d25] hover:bg-white/50 rounded-xl transition-colors">
+                <Link to="/cart" className="relative w-10 h-10 flex items-center justify-center text-[#0f1d25] hover:bg-white/50 rounded-xl transition-colors">
                   <span className="material-symbols-outlined">shopping_bag</span>
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#ba1a1a] text-white text-[10px] flex items-center justify-center rounded-full font-bold">3</span>
-                </button>
+                  {totalCartItems > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-[#ba1a1a] text-white text-[10px] flex items-center justify-center rounded-full font-bold">
+                      {totalCartItems}
+                    </span>
+                  )}
+                </Link>
                 </>
               )}
               

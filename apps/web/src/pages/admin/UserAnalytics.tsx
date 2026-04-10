@@ -119,7 +119,7 @@ const UserAnalytics: FC = () => {
                           padding: '16px 20px',
                           fontWeight: 'bold'
                         }}
-                        formatter={(value: number) => [`${value} tài khoản`, 'Mới đăng ký']}
+                        formatter={(value: any) => [`${value} tài khoản`, 'Mới đăng ký']}
                         labelStyle={{ color: '#707882', marginBottom: '8px', fontSize: '12px' }}
                       />
                       <Area 

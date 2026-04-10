@@ -2,6 +2,7 @@ import { FC, useEffect, useState, useMemo } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useProducts } from '../hooks/useProducts';
+import { useCart } from '../hooks/useCart';
 
 export const ProductDetailPage: FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +16,9 @@ export const ProductDetailPage: FC = () => {
   const [quantity, setQuantity] = useState(1);
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [isStartingChat, setIsStartingChat] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+
+  const { addToCart } = useCart();
 
   useEffect(() => {
     const userStr = localStorage.getItem('c2c_user');
@@ -123,6 +127,24 @@ export const ProductDetailPage: FC = () => {
        alert("Không thể bắt đầu chat lúc này.");
     } finally {
        setIsStartingChat(false);
+    }
+  };
+
+  const handleAddToCart = async () => {
+    const token = localStorage.getItem('c2c_token');
+    if (!token) {
+      navigate('/login', { state: { from: location.pathname } });
+      return;
+    }
+
+    if (!selectedVariant) return;
+    
+    const success = await addToCart(product.shop_id, selectedVariant.id, quantity);
+    if (success) {
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } else {
+      alert('Có lỗi xảy ra khi thêm vào giỏ hàng.');
     }
   };
 
@@ -359,7 +381,10 @@ export const ProductDetailPage: FC = () => {
                       >
                          <span className={`material-symbols-outlined ${isStartingChat ? 'animate-pulse' : ''}`}>chat</span>
                       </button>
-                      <button className="flex-1 h-14 bg-white border-2 border-[#00629d] text-[#00629d] rounded-full font-bold text-base flex items-center justify-center gap-2 transition-all hover:bg-[#f0f7ff] active:scale-[0.98]">
+                      <button 
+                         onClick={handleAddToCart}
+                         className="flex-1 h-14 bg-white border-2 border-[#00629d] text-[#00629d] rounded-full font-bold text-base flex items-center justify-center gap-2 transition-all hover:bg-[#f0f7ff] active:scale-[0.98]"
+                      >
                          <span className="material-symbols-outlined">shopping_bag</span>
                          Thêm vào giỏ
                       </button>
@@ -405,9 +430,9 @@ export const ProductDetailPage: FC = () => {
                   </div>
                 </div>
 
-                <button className="w-full py-3 bg-[#e4e9f0] hover:bg-[#dbeaf5] text-[#00629d] rounded-xl font-bold transition-colors">
+                <Link to={`/shop/${product.shop_id}`} className="w-full py-3 bg-[#e4e9f0] hover:bg-[#dbeaf5] text-[#00629d] rounded-xl font-bold transition-colors block text-center mt-6">
                   Xem cửa hàng
-                </button>
+                </Link>
               </div>
             </div>
 
@@ -529,6 +554,20 @@ export const ProductDetailPage: FC = () => {
 
         </div>
       </div>
+
+      {/* Toast Notification */}
+      <div 
+        className={`fixed bottom-8 left-1/2 -translate-x-1/2 bg-[#0f1d25] text-white px-8 py-4 rounded-full shadow-2xl shadow-black/20 flex items-center gap-4 transition-all duration-300 z-50 ${
+          showToast ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'
+        }`}
+      >
+        <span className="material-symbols-outlined text-[#4caf50]">check_circle</span>
+        <span className="font-semibold text-sm">Đã thêm vào giỏ hàng thành công!</span>
+        <Link to="/cart" className="ml-4 text-xs font-bold text-[#42a5f5] uppercase tracking-wider hover:opacity-80">
+          Xem Giỏ
+        </Link>
+      </div>
+
     </MarketplaceLayout>
   );
 };

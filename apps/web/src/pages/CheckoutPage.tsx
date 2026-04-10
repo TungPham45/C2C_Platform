@@ -19,7 +19,8 @@ export const CheckoutPage = () => {
   const location = useLocation();
   const stateData = location.state as any;
 
-  const getPrice = () => {
+  // Single Item Logic (Fallback / Buy Now)
+  const getSinglePrice = () => {
     if (!stateData?.product) return 450000;
     let rawPrice = stateData.variant?.price;
     if (rawPrice === undefined || rawPrice === null) {
@@ -29,57 +30,105 @@ export const CheckoutPage = () => {
     return isNaN(numPrice) ? 0 : numPrice;
   };
 
-  // Pull real data from navigation state if available, otherwise fallback
-  const mockItem = stateData?.product ? {
-    id: stateData.variant?.id || stateData.product.id,
-    name: stateData.product.name + (stateData.variant?.sku ? ` - ${stateData.variant.sku}` : ''),
-    price: getPrice(),
-    quantity: stateData.quantity || 1,
-    image: stateData.variant?.image_url || stateData.product.thumbnail_url || (stateData.product.images?.[0]?.image_url) || 'https://via.placeholder.com/200',
-    shopId: stateData.product.shop_id
-  } : {
-    id: 1,
-    name: 'Serene Ceramic Vase',
-    price: 450000,
-    quantity: 1,
-    image: 'https://images.unsplash.com/photo-1581783898377-1c85bf937427?auto=format&fit=crop&q=80&w=200',
-    shopId: 101
+  const getCartItemPrice = (item: any) => {
+    let rawPrice = item.variant?.price;
+    if (rawPrice === undefined || rawPrice === null) {
+       rawPrice = item.product?.base_price;
+    }
+    const numPrice = Number(String(rawPrice).replace(/[^0-9.-]+/g,""));
+    return isNaN(numPrice) ? 0 : numPrice;
   };
+
+  const isMultiItem = stateData?.fromCart === true;
+
+  // Build the list of groups to display and calculate
+  const groups = isMultiItem ? stateData.groupedItems : [
+    {
+      shop: { 
+        id: stateData?.product?.shop_id || 101, 
+        name: stateData?.product?.shop?.name || 'Cửa hàng' 
+      },
+      items: [
+        {
+          id: stateData?.variant?.id || stateData?.product?.id || 1, // variant ID
+          cart_item_id: null,
+          product: stateData?.product || { name: 'Serene Ceramic Vase' },
+          variant: stateData?.variant,
+          quantity: stateData?.quantity || 1,
+          price: getSinglePrice(),
+          image: stateData?.variant?.image_url || stateData?.product?.thumbnail_url || 'https://images.unsplash.com/photo-1581783898377-1c85bf937427?auto=format&fit=crop&q=80&w=200'
+        }
+      ]
+    }
+  ];
+
+  const SHIPPING_FEE_PER_SHOP = 50000;
+  
+  // Calculate Subtotals
+  const calculateSubtotal = () => {
+    let total = 0;
+    groups.forEach((group: any) => {
+      group.items.forEach((item: any) => {
+        const price = isMultiItem ? getCartItemPrice(item) : item.price;
+        total += price * item.quantity;
+      });
+    });
+    return total;
+  };
+
+  const totalShippingFee = groups.length * SHIPPING_FEE_PER_SHOP;
+  const subTotal = calculateSubtotal();
+  const totalPayment = subTotal + totalShippingFee;
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const orderData = {
-      total_payment: (mockItem.price * mockItem.quantity + 50000), // + shipping
+    const shopOrders = groups.map((group: any) => {
+      let groupSubtotal = 0;
+      const orderItems = group.items.map((item: any) => {
+        const price = isMultiItem ? getCartItemPrice(item) : item.price;
+        groupSubtotal += price * item.quantity;
+        return {
+          product_variant_id: isMultiItem ? item.product_variant_id : item.id,
+          product_name: typeof item.product?.name === 'string' ? item.product.name : 'Sản phẩm',
+          quantity: item.quantity,
+          price_at_purchase: price,
+        };
+      });
+
+      return {
+        shop_id: group.shop.id,
+        subtotal: groupSubtotal,
+        shipping_fee: SHIPPING_FEE_PER_SHOP,
+        items: orderItems
+      };
+    });
+
+    const orderData: any = {
+      total_payment: totalPayment,
       payment_method: paymentMethod,
       shipping_address: `${shippingAddress.fullName}, ${shippingAddress.address}, ${shippingAddress.city}, ${shippingAddress.phone}`,
-      shop_orders: [
-        {
-          shop_id: mockItem.shopId,
-          subtotal: (mockItem.price * mockItem.quantity),
-          shipping_fee: 50000,
-          items: [
-            {
-              product_variant_id: mockItem.id,
-              product_name: mockItem.name,
-              quantity: mockItem.quantity,
-              price_at_purchase: mockItem.price,
-            }
-          ]
-        }
-      ]
+      shop_orders: shopOrders
     };
+
+    if (isMultiItem && stateData.cartItems) {
+      orderData.cart_item_ids = stateData.cartItems.map((item: any) => item.id);
+    }
 
     const result = await createOrder(orderData);
     if (result) {
+      if (isMultiItem) {
+         // Optionally you could force a refresh or context update here, but 
+         // reloading the page or relying on the context re-fetching unmounted might be fine.
+      }
       navigate('/order-success', { state: { orderId: result.id } });
     }
   };
 
   return (
     <MarketplaceLayout>
-      <div className="max-w-7xl mx-auto px-6 py-12">
-        <h1 className="text-4xl font-black font-['Plus_Jakarta_Sans'] mb-12 flex items-center gap-4">
+      <div className="max-w-[1200px] mx-auto px-6 py-12">
+        <h1 className="text-4xl font-black font-['Plus_Jakarta_Sans'] mb-12 flex items-center gap-4 text-[#0f1d25]">
           <span className="material-symbols-outlined text-4xl text-[#00629d]">shopping_cart_checkout</span>
           Thanh toán
         </h1>
@@ -91,16 +140,16 @@ export const CheckoutPage = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-12 gap-12">
+        <div className="grid grid-cols-12 gap-8 lg:gap-12">
           {/* Shipping Form */}
-          <div className="col-span-12 lg:col-span-8 space-y-8">
-            <section className="bg-white/40 backdrop-blur-md border border-white/20 rounded-[2.5rem] p-10 shadow-sm">
-              <h2 className="text-xl font-bold mb-8 flex items-center gap-3">
+          <div className="col-span-12 lg:col-span-7 space-y-8">
+            <section className="bg-white border border-[#e4e9f0] rounded-[2rem] p-8 lg:p-10 shadow-sm">
+              <h2 className="text-xl font-bold mb-8 flex items-center gap-3 text-[#0f1d25]">
                 <span className="w-8 h-8 rounded-lg bg-[#e1f0fb] text-[#00629d] flex items-center justify-center text-sm">1</span>
                 Thông tin giao hàng
               </h2>
               
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-6 text-[#0f1d25]">
                 <div className="col-span-2 space-y-2">
                   <label className="text-xs font-bold uppercase tracking-widest text-[#707882] ml-1">Họ và tên</label>
                   <input 
@@ -108,7 +157,7 @@ export const CheckoutPage = () => {
                     value={shippingAddress.fullName}
                     onChange={(e) => setShippingAddress({...shippingAddress, fullName: e.target.value})}
                     placeholder="Nhập họ và tên"
-                    className="w-full h-14 px-6 bg-[#f5faff]/50 border border-transparent focus:bg-white focus:border-[#00629d]/20 rounded-2xl outline-none transition-all"
+                    className="w-full h-14 px-6 bg-[#f5faff] border border-transparent focus:bg-white focus:border-[#00629d]/50 rounded-2xl outline-none transition-all placeholder-[#a0aab5]"
                   />
                 </div>
                 <div className="col-span-2 space-y-2">
@@ -118,7 +167,7 @@ export const CheckoutPage = () => {
                     value={shippingAddress.address}
                     onChange={(e) => setShippingAddress({...shippingAddress, address: e.target.value})}
                     placeholder="Số nhà, tên đường, phường/xã"
-                    className="w-full h-14 px-6 bg-[#f5faff]/50 border border-transparent focus:bg-white focus:border-[#00629d]/20 rounded-2xl outline-none transition-all"
+                    className="w-full h-14 px-6 bg-[#f5faff] border border-transparent focus:bg-white focus:border-[#00629d]/50 rounded-2xl outline-none transition-all placeholder-[#a0aab5]"
                   />
                 </div>
                 <div className="space-y-2">
@@ -128,7 +177,7 @@ export const CheckoutPage = () => {
                     value={shippingAddress.city}
                     onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
                     placeholder="Thành phố"
-                    className="w-full h-14 px-6 bg-[#f5faff]/50 border border-transparent focus:bg-white focus:border-[#00629d]/20 rounded-2xl outline-none transition-all"
+                    className="w-full h-14 px-6 bg-[#f5faff] border border-transparent focus:bg-white focus:border-[#00629d]/50 rounded-2xl outline-none transition-all placeholder-[#a0aab5]"
                   />
                 </div>
                 <div className="space-y-2">
@@ -137,15 +186,15 @@ export const CheckoutPage = () => {
                     type="text" 
                     value={shippingAddress.phone}
                     onChange={(e) => setShippingAddress({...shippingAddress, phone: e.target.value})}
-                    placeholder="+123456789"
-                    className="w-full h-14 px-6 bg-[#f5faff]/50 border border-transparent focus:bg-white focus:border-[#00629d]/20 rounded-2xl outline-none transition-all"
+                    placeholder="0123456789"
+                    className="w-full h-14 px-6 bg-[#f5faff] border border-transparent focus:bg-white focus:border-[#00629d]/50 rounded-2xl outline-none transition-all placeholder-[#a0aab5]"
                   />
                 </div>
               </div>
             </section>
 
-            <section className="bg-white/40 backdrop-blur-md border border-white/20 rounded-[2.5rem] p-10 shadow-sm">
-              <h2 className="text-xl font-bold mb-8 flex items-center gap-3">
+            <section className="bg-white border border-[#e4e9f0] rounded-[2rem] p-8 lg:p-10 shadow-sm">
+              <h2 className="text-xl font-bold mb-8 flex items-center gap-3 text-[#0f1d25]">
                 <span className="w-8 h-8 rounded-lg bg-[#e1f0fb] text-[#00629d] flex items-center justify-center text-sm">2</span>
                 Phương thức thanh toán
               </h2>
@@ -155,19 +204,19 @@ export const CheckoutPage = () => {
                   { id: 'credit_card', label: 'Thẻ tín dụng', icon: 'credit_card' },
                   { id: 'paypal', label: 'PayPal', icon: 'account_balance_wallet' },
                   { id: 'bank_transfer', label: 'Chuyển khoản', icon: 'account_balance' },
-                  { id: 'cod', label: 'Thanh toán khi nhận', icon: 'payments' },
+                  { id: 'cod', label: 'Khi nhận hàng', icon: 'payments' },
                 ].map((method) => (
                   <button
                     key={method.id}
                     onClick={() => setPaymentMethod(method.id)}
-                    className={`flex items-center gap-4 p-6 rounded-2xl border-2 transition-all ${
+                    className={`flex items-center gap-4 p-5 lg:p-6 rounded-2xl border-2 transition-all ${
                       paymentMethod === method.id 
-                        ? 'bg-[#e1f0fb]/50 border-[#00629d] text-[#00629d]' 
-                        : 'bg-white/50 border-transparent hover:border-[#00629d]/10'
+                        ? 'bg-[#f5faff] border-[#00629d] text-[#00629d]' 
+                        : 'bg-white border-[#f0f3f8] hover:border-[#dbeaf5] text-[#404751]'
                     }`}
                   >
                     <span className="material-symbols-outlined">{method.icon}</span>
-                    <span className="font-bold">{method.label}</span>
+                    <span className="font-bold text-sm lg:text-base">{method.label}</span>
                   </button>
                 ))}
               </div>
@@ -175,66 +224,85 @@ export const CheckoutPage = () => {
           </div>
 
           {/* Order Summary */}
-          <div className="col-span-12 lg:col-span-4">
+          <div className="col-span-12 lg:col-span-5">
             <div className="sticky top-32 space-y-8">
-              <section className="bg-[#0f1d25] rounded-[2.5rem] p-10 text-white shadow-2xl shadow-slate-300">
-                <h2 className="text-xl font-bold mb-8">Tóm tắt đơn hàng</h2>
+              <section className="bg-white border border-[#e4e9f0] rounded-[2rem] p-8 lg:p-10 shadow-sm">
+                <h2 className="text-xl font-black mb-6 text-[#0f1d25] font-['Plus_Jakarta_Sans']">Sản phẩm thanh toán</h2>
                 
-                <div className="space-y-6 mb-8">
-                  <div className="flex gap-4">
-                    <img src={mockItem.image} alt={mockItem.name} className="w-16 h-16 rounded-xl object-cover" />
-                    <div className="flex-1">
-                      <p className="font-bold text-sm line-clamp-1">{mockItem.name}</p>
-                      <p className="text-[#bfc7d3] text-xs mt-1">SL: {mockItem.quantity}</p>
-                      <p className="font-bold text-[#42a5f5] mt-1">{mockItem.price.toLocaleString('vi-VN')} VND</p>
+                <div className="max-h-[300px] overflow-y-auto pr-2 space-y-6 scrollbar-thin scrollbar-thumb-[#dbeaf5] scrollbar-track-transparent">
+                  {groups.map((group: any, index: number) => (
+                    <div key={index} className="space-y-4 pb-6 border-b border-[#f0f3f8] last:border-0 last:pb-0">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-[#00629d]">storefront</span>
+                        <span className="font-bold text-sm text-[#0f1d25]">{group.shop.name}</span>
+                      </div>
+                      
+                      {group.items.map((item: any, iIndex: number) => {
+                        const price = isMultiItem ? getCartItemPrice(item) : item.price;
+                        const image = isMultiItem ? (item.variant?.image_url || item.product?.thumbnail_url) : item.image;
+                        const displayImage = image?.startsWith('http') ? image : `http://localhost:3000${image}`;
+
+                        return (
+                          <div key={iIndex} className="flex gap-4">
+                            <div className="w-[60px] h-[60px] rounded-xl bg-[#f0f3f8] flex-shrink-0 overflow-hidden">
+                              {image ? <img src={displayImage} alt="thumbnail" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><span className="material-symbols-outlined text-[#a0aab5]">image</span></div>}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-sm text-[#0f1d25] line-clamp-1">{item.product?.name || item.name}</p>
+                              {item.variant?.attributes && (
+                                <p className="text-[#707882] text-[11px] mt-0.5">
+                                    {Object.entries(item.variant.attributes).map(([k,v])=> `${v}`).join(', ')}
+                                </p>
+                              )}
+                              <div className="flex justify-between items-center mt-1">
+                                <p className="text-[#00629d] font-bold text-sm">{price.toLocaleString('vi-VN')} ₫</p>
+                                <p className="text-[#707882] text-xs font-semibold">x{item.quantity}</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="bg-white border border-[#e4e9f0] rounded-[2rem] p-8 lg:p-10 shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 inset-x-0 h-1 bg-[#00629d]"></div>
+                
+                <div className="space-y-4 text-sm font-medium border-b border-[#f0f3f8] pb-6 mb-6">
+                  <div className="flex justify-between text-[#707882]">
+                    <span>Tổng phụ</span>
+                    <span className="font-bold text-[#0f1d25]">{subTotal.toLocaleString('vi-VN')} ₫</span>
+                  </div>
+                  <div className="flex justify-between text-[#707882]">
+                    <span>Phí vận chuyển ({groups.length} kiện)</span>
+                    <span className="font-bold text-[#0f1d25]">{totalShippingFee.toLocaleString('vi-VN')} ₫</span>
                   </div>
                 </div>
 
-                <div className="space-y-4 pt-6 border-t border-white/10 text-sm">
-                  <div className="flex justify-between text-[#bfc7d3]">
-                    <span>Tạm tính</span>
-                    <span>{(mockItem.price * mockItem.quantity).toLocaleString('vi-VN')} VND</span>
-                  </div>
-                  <div className="flex justify-between text-[#bfc7d3]">
-                    <span>Vận chuyển</span>
-                    <span>50.000 VND</span>
-                  </div>
-                  <div className="flex justify-between text-[#bfc7d3]">
-                    <span>Voucher</span>
-                    <span className="text-[#6cbdfe]">-0 VND</span>
-                  </div>
-                  <div className="flex justify-between text-xl font-black pt-4 border-t border-white/10">
-                    <span>Tổng cộng</span>
-                    <span className="text-[#42a5f5]">{(mockItem.price * mockItem.quantity + 50000).toLocaleString('vi-VN')} VND</span>
+                <div className="flex justify-between items-end">
+                  <span className="text-[#0f1d25] font-bold">Tổng thanh toán</span>
+                  <div className="text-2xl font-black text-[#00629d] font-['Plus_Jakarta_Sans']">
+                    {totalPayment.toLocaleString('vi-VN')} ₫
                   </div>
                 </div>
 
                 <button 
                   onClick={handleCheckout}
                   disabled={loading}
-                  className="w-full mt-10 h-16 bg-gradient-to-r from-[#00629d] to-[#42a5f5] rounded-2xl font-black text-lg transition-all hover:scale-[1.02] active:scale-95 shadow-xl shadow-blue-900/40 flex items-center justify-center gap-3 disabled:opacity-50"
+                  className="w-full mt-8 h-14 bg-[#0f1d25] text-white rounded-2xl font-bold text-base transition-all hover:bg-[#00629d] shadow-lg shadow-blue-500/10 flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {loading ? (
-                    <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    <div className="w-6 h-6 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
                   ) : (
                     <>
-                      Đặt hàng
-                      <span className="material-symbols-outlined">arrow_forward</span>
+                      Xác nhận đặt hàng
+                      <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
                     </>
                   )}
                 </button>
-                <p className="text-[10px] text-center text-[#707882] mt-6 uppercase tracking-widest font-bold">
-                  Mã hóa bảo mật bởi Serene
-                </p>
               </section>
-
-              <div className="bg-[#e9f5ff] rounded-[2rem] p-8 text-[#00629d] text-sm flex items-center gap-4 border border-[#00629d]/10">
-                <span className="material-symbols-outlined text-3xl">verified_user</span>
-                <p className="font-bold leading-snug">
-                  Đơn hàng được bảo vệ bởi Chính sách Bảo vệ Người mua Serene.
-                </p>
-              </div>
             </div>
           </div>
         </div>

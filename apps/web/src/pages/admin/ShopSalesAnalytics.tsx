@@ -123,13 +123,13 @@ const ShopSalesAnalytics: FC = () => {
                           tickLine={false} 
                           tick={{ fill: '#707882', fontSize: 10, fontWeight: 500 }}
                           dy={10}
-                          tickFormatter={(val) => val.length > 15 ? val.substring(0, 15) + '...' : val}
+                          tickFormatter={(val: string) => val.length > 15 ? val.substring(0, 15) + '...' : val}
                         />
                         <YAxis 
                           axisLine={false} 
                           tickLine={false} 
                           tick={{ fill: '#707882', fontSize: 10, fontWeight: 500 }}
-                          tickFormatter={(val) => new Intl.NumberFormat('vi-VN', { notation: "compact", compactDisplay: "short" }).format(val)}
+                          tickFormatter={(val: number) => new Intl.NumberFormat('vi-VN', { notation: "compact", compactDisplay: "short" }).format(val)}
                         />
                         <Tooltip 
                           cursor={{ fill: '#f5faff' }}
@@ -139,7 +139,7 @@ const ShopSalesAnalytics: FC = () => {
                             boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
                             padding: '16px 20px'
                           }}
-                          formatter={(value: number) => [<span className="font-bold text-[#00629d] text-sm">{formatCurrency(value)}</span>, <span className="text-xs text-[#707882] uppercase tracking-widest font-bold">Doanh số</span>]}
+                          formatter={(value: any) => [<span className="font-bold text-[#00629d] text-sm">{formatCurrency(value)}</span>, <span className="text-xs text-[#707882] uppercase tracking-widest font-bold">Doanh số</span>]}
                         />
                         <Bar 
                           dataKey="total_revenue" 

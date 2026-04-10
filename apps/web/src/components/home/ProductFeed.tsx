@@ -20,7 +20,8 @@ export const ProductFeed: FC = () => {
         const response = await fetch('/api/products');
         if (response.ok) {
           const data = await response.json();
-          setProducts(data);
+          // Chỉ lấy 8 sản phẩm mới nhất để không làm loãng giao diện trang chủ
+          setProducts(data.slice(0, 8));
         }
       } catch (err) {
         console.error('Failed to fetch products', err);
