@@ -222,4 +222,12 @@ export class AuthService {
       newUsers
     }));
   }
+
+  async getUsersByIds(ids: number[]) {
+    if (!ids.length) return [];
+    return this.prisma.user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, full_name: true, avatar_url: true },
+    });
+  }
 }

@@ -11,6 +11,9 @@ interface Conversation {
   updated_at: string;
   unread_count_buyer: number;
   unread_count_seller: number;
+  buyer_name?: string;
+  seller_name?: string;
+  shop_name?: string;
 }
 
 interface Message {
@@ -165,7 +168,7 @@ export const MessagesPage: FC = () => {
                         </div>
                         <div className="flex-1 overflow-hidden">
                           <h4 className="font-bold text-[#0f1d25] truncate">
-                            {isMyShop ? `Người mua #${conv.buyer_id}` : `Shop #${conv.shop_id}`}
+                            {isMyShop ? (conv.buyer_name || `Người mua #${conv.buyer_id}`) : (conv.shop_name || `Shop #${conv.shop_id}`)}
                           </h4>
                           <p className={`text-sm truncate ${unread > 0 ? 'text-[#0f1d25] font-bold' : 'text-[#707882]'}`}>
                             {conv.last_message_preview || "Bắt đầu cuộc trò chuyện..."}
@@ -198,7 +201,7 @@ export const MessagesPage: FC = () => {
                         </div>
                         <div>
                           <h3 className="font-black text-lg text-[#0f1d25]">
-                             {currentConv?.seller_id === currentUser?.id ? `Người mua #${currentConv?.buyer_id}` : `Shop #${currentConv?.shop_id}`}
+                              {currentConv?.seller_id === currentUser?.id ? (currentConv?.buyer_name || `Người mua #${currentConv?.buyer_id}`) : (currentConv?.shop_name || `Shop #${currentConv?.shop_id}`)}
                           </h3>
                           <p className="text-[10px] uppercase font-bold tracking-widest text-[#2e7d32]">Đang hoạt động</p>
                         </div>

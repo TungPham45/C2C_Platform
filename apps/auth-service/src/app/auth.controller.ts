@@ -77,4 +77,15 @@ export class AuthController {
     this.requireInternalAccess(headers);
     return this.authService.getUserGrowthAnalytics(timeframe);
   }
+
+  @Get('internal/users-by-ids')
+  getUsersByIds(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query('ids') ids: string,
+  ) {
+    this.requireInternalAccess(headers);
+    if (!ids) return [];
+    const idArray = ids.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
+    return this.authService.getUsersByIds(idArray);
+  }
 }

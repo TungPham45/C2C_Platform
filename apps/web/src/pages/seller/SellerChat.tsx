@@ -10,6 +10,9 @@ interface Conversation {
   last_message_preview: string | null;
   updated_at: string;
   unread_count_seller: number;
+  buyer_name?: string;
+  seller_name?: string;
+  shop_name?: string;
 }
 
 interface Message {
@@ -148,7 +151,7 @@ const SellerChat: FC = () => {
                         <div className="flex-1 overflow-hidden">
                           <div className="flex items-center justify-between mb-0.5">
                             <h4 className={`text-sm truncate ${unread > 0 ? 'font-black text-[#0f1d25]' : 'font-bold text-[#404751]'}`}>
-                              Người mua #{conv.buyer_id}
+                              {conv.buyer_name || `Người mua #${conv.buyer_id}`}
                             </h4>
                             <span className="text-[10px] text-[#707882] font-medium flex-shrink-0 ml-2">
                               {new Date(conv.updated_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
@@ -184,7 +187,7 @@ const SellerChat: FC = () => {
                         <span className="material-symbols-outlined">face</span>
                       </div>
                       <div>
-                        <h3 className="font-black text-[#0f1d25]">Người mua #{conversations.find(c => c.id === currentConvId)?.buyer_id}</h3>
+                        <h3 className="font-black text-[#0f1d25]">{conversations.find(c => c.id === currentConvId)?.buyer_name || `Người mua #${conversations.find(c => c.id === currentConvId)?.buyer_id}`}</h3>
                         <div className="flex items-center gap-1.5">
                           <div className="w-2 h-2 bg-[#2e7d32] rounded-full"></div>
                           <p className="text-[10px] text-[#2e7d32] font-bold uppercase tracking-widest">Đang hoạt động</p>
