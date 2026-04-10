@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException, Inject } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, Inject, BadRequestException } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 
 @Injectable()
@@ -256,11 +256,45 @@ export class ProductService {
 
   // Get a single product for seller editing (no status filter, all relations)
   async getSellerContext(userId: number) {
-    const shop = await this.findActiveSellerShop(userId);
+    const shop = await this.prisma.shop.findFirst({
+      where: { owner_id: userId },
+      select: {
+        id: true,
+        owner_id: true,
+        name: true,
+        slug: true,
+        logo_url: true,
+        rating: true,
+        status: true
+      }
+    });
+
     return {
-      isSeller: !!shop,
+      isSeller: !!shop && shop.status === 'active',
       shop
     };
+  }
+
+  async registerShop(userId: number, data: any) {
+    const existingShop = await this.prisma.shop.findFirst({
+      where: { owner_id: userId }
+    });
+
+    if (existingShop) {
+      throw new BadRequestException('You have already registered a shop');
+    }
+
+    const slug = this.generateSlug(data.name || 'shop');
+    return this.prisma.shop.create({
+      data: {
+        owner_id: userId,
+        name: data.name,
+        slug: slug,
+        description: data.description || '',
+        logo_url: data.logo_url || null,
+        status: 'pending'
+      }
+    });
   }
 
   async getSellerProductById(userId: number, productId: number) {
@@ -409,6 +443,40 @@ export class ProductService {
     });
   }
 
+  async getAllShops() {
+    return this.prisma.shop.findMany({
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        owner_id: true,
+        status: true,
+        created_at: true,
+      },
+      orderBy: { created_at: 'desc' },
+    });
+  }
+
+  async updateShopStatus(id: number, status: string) {
+    const shop = await this.prisma.shop.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!shop) {
+      throw new NotFoundException('Shop not found');
+    }
+
+    return this.prisma.shop.update({
+      where: { id },
+      data: { status },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+  }
+
   // =====================
   // PUBLIC CONTEXT
   // =====================
@@ -466,6 +534,20 @@ export class ProductService {
         options: { orderBy: { sort_order: 'asc' } }
       },
       orderBy: { sort_order: 'asc' }
+    });
+  }
+
+  async getShopsByIds(ids: number[]) {
+    return this.prisma.shop.findMany({
+      where: {
+        id: { in: ids }
+      },
+      select: {
+        id: true,
+        name: true,
+        logo_url: true,
+        slug: true
+      }
     });
   }
 }

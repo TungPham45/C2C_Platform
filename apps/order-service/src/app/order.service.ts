@@ -159,4 +159,43 @@ export class OrderService {
 
     return updatedOrder;
   }
+
+  async getShopSalesAnalytics(timeframe: string) {
+    const whereClause: any = {
+      // Bỏ qua những đơn bị huỷ
+      status: { not: 'cancelled' }
+    };
+
+    if (timeframe === 'week') {
+      const dt = new Date();
+      dt.setDate(dt.getDate() - 7);
+      whereClause.created_at = { gte: dt };
+    } else if (timeframe === 'month') {
+      const dt = new Date();
+      dt.setMonth(dt.getMonth() - 1);
+      whereClause.created_at = { gte: dt };
+    }
+
+    const aggregated = await this.prisma.shopOrder.groupBy({
+      by: ['shop_id'],
+      where: whereClause,
+      _sum: {
+        subtotal: true,
+      },
+      _count: {
+        id: true,
+      },
+      orderBy: {
+        _sum: {
+          subtotal: 'desc',
+        },
+      },
+    });
+
+    return aggregated.map(item => ({
+      shop_id: item.shop_id,
+      total_revenue: item._sum.subtotal ? item._sum.subtotal.toNumber() : 0,
+      total_orders: item._count.id,
+    }));
+  }
 }

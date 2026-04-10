@@ -50,6 +50,12 @@ export class ProductController {
     return this.productService.createProduct(userId, data);
   }
 
+  @Post('seller/register')
+  registerShop(@Headers() headers: any, @Body() data: any) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.registerShop(userId, data);
+  }
+
   @Get('seller')
   getMyShopProducts(@Headers() headers: any) {
     const userId = this.getProviderUserId(headers);
@@ -101,6 +107,33 @@ export class ProductController {
   ) {
     this.requireInternalAccess(headers);
     return this.productService.approveShop(+id);
+  }
+
+  @Get('internal/admin/shops')
+  getAllShops(@Headers() headers: Record<string, string | string[] | undefined>) {
+    this.requireInternalAccess(headers);
+    return this.productService.getAllShops();
+  }
+
+  @Put('internal/admin/shops/:id/status')
+  updateShopStatus(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Param('id') id: string,
+    @Body('status') status: string,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.productService.updateShopStatus(+id, status);
+  }
+
+  @Get('internal/admin/shops-by-ids')
+  getShopsByIds(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query('ids') ids: string,
+  ) {
+    this.requireInternalAccess(headers);
+    if (!ids) return [];
+    const idArray = ids.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
+    return this.productService.getShopsByIds(idArray);
   }
 
   @Get('internal/admin/pending-products')
