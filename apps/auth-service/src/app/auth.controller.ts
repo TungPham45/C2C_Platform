@@ -19,7 +19,10 @@ export class AuthController {
     const { email, password } = body;
     const user = await this.authService.validateUser(email, password);
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ');
+    }
+    if (user.status === 'suspended' || user.status === 'banned') {
+      throw new ForbiddenException('Tài khoản của bạn đã bị đình chỉ hoặc khoá. Vui lòng liên hệ bộ phận hỗ trợ.');
     }
     return this.authService.login(user);
   }
