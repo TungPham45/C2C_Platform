@@ -154,4 +154,60 @@ export class AuthService {
 
     return { activeUsers };
   }
+
+  async getAllUsers() {
+    return this.prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        full_name: true,
+        phone: true,
+        avatar_url: true,
+        role: true,
+        status: true,
+        created_at: true,
+      },
+      orderBy: { created_at: 'desc' },
+    });
+  }
+
+  async updateUserStatus(id: number, status: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true }
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return this.prisma.user.update({
+      where: { id },
+      data: { status },
+      select: { id: true, status: true },
+    });
+  }
+
+  async getUserGrowthAnalytics() {
+    const users = await this.prisma.user.findMany({
+      select: { created_at: true },
+      where: { created_at: { not: null } },
+      orderBy: { created_at: 'asc' }
+    });
+
+    const growth: Record<string, number> = {};
+    
+    users.forEach(user => {
+      if (user.created_at) {
+        // format YYYY-MM-DD
+        const date = user.created_at.toISOString().split('T')[0];
+        growth[date] = (growth[date] || 0) + 1;
+      }
+    });
+
+    return Object.entries(growth).map(([date, newUsers]) => ({
+      date,
+      newUsers
+    }));
+  }
 }

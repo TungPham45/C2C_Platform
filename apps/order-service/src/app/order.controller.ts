@@ -1,9 +1,18 @@
-import { Controller, Get, Post, Body, Param, Put, Query, Req, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Query, Req, UnauthorizedException, Headers, ForbiddenException } from '@nestjs/common';
 import { OrderService } from './order.service';
 
 @Controller('orders')
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
+
+  private requireInternalAccess(headers: Record<string, string | string[] | undefined>) {
+    const expectedToken = process.env.INTERNAL_SERVICE_TOKEN ?? 'internal-dev-token';
+    const actualToken = headers['x-internal-token'];
+    const normalizedToken = Array.isArray(actualToken) ? actualToken[0] : actualToken;
+    if (normalizedToken !== expectedToken) {
+      throw new ForbiddenException('Invalid internal service token');
+    }
+  }
 
   @Post()
   async createOrder(@Req() req: any, @Body() body: any) {
@@ -37,5 +46,14 @@ export class OrderController {
       tracking_number,
       carrier_name,
     });
+  }
+
+  @Get('internal/admin/analytics/shop-sales')
+  getShopSalesAnalytics(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query('timeframe') timeframe: string,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.orderService.getShopSalesAnalytics(timeframe);
   }
 }

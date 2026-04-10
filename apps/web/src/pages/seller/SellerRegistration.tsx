@@ -1,21 +1,41 @@
-import { FC } from 'react';
+import { FC, useState } from 'react';
 import { MarketplaceLayout } from '../../components/layout/MarketplaceLayout';
 import { useNavigate } from 'react-router-dom';
 
 export const SellerRegistration: FC = () => {
   const navigate = useNavigate();
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate shop registration
-    const userStr = localStorage.getItem('c2c_user');
-    if (userStr) {
-      const user = JSON.parse(userStr);
-      // Give them a mock shop object
-      user.shop = { id: Date.now(), name: 'My New Shop' };
-      localStorage.setItem('c2c_user', JSON.stringify(user));
-      // Redirect to seller dashboard
+    setLoading(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem('c2c_token');
+      if (!token) throw new Error("Vui lòng đăng nhập lại");
+      
+      const res = await fetch('http://localhost:3000/api/products/seller/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ name, description })
+      });
+      
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || 'Đăng ký thất bại');
+      }
+      
       navigate('/seller/center');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -31,12 +51,16 @@ export const SellerRegistration: FC = () => {
              <p className="text-[#707882] text-lg">Khởi tạo cửa hàng của bạn trên Serene Marketplace ngay hôm nay.</p>
           </div>
 
+          {error && <div className="mb-6 p-4 bg-red-100 text-red-600 rounded-2xl font-bold">{error}</div>}
+
           <form onSubmit={handleRegister} className="space-y-6">
              <div className="space-y-3">
                <label className="text-xs font-bold uppercase tracking-widest text-[#707882] ml-1">Tên cửa hàng</label>
                <input 
                  type="text" 
                  required
+                 value={name}
+                 onChange={e => setName(e.target.value)}
                  placeholder="Nhập tên cửa hàng của bạn"
                  className="w-full h-14 px-6 bg-[#f5faff] border border-transparent focus:bg-white focus:border-[#00629d]/20 rounded-2xl outline-none transition-all font-bold text-[#0f1d25]"
                />
@@ -46,6 +70,8 @@ export const SellerRegistration: FC = () => {
                <label className="text-xs font-bold uppercase tracking-widest text-[#707882] ml-1">Mô tả ngắn</label>
                <textarea 
                  rows={3}
+                 value={description}
+                 onChange={e => setDescription(e.target.value)}
                  placeholder="Cửa hàng của bạn bán sản phẩm gì?"
                  className="w-full p-6 bg-[#f5faff] border border-transparent focus:bg-white focus:border-[#00629d]/20 rounded-2xl outline-none transition-all resize-none text-[#0f1d25]"
                />
@@ -53,9 +79,10 @@ export const SellerRegistration: FC = () => {
 
              <button 
                type="submit"
-               className="w-full mt-8 h-16 bg-[#00629d] text-white rounded-2xl font-black text-lg transition-all hover:bg-[#004e7c] active:scale-[0.98] shadow-xl shadow-blue-900/20"
+               disabled={loading}
+               className="w-full mt-8 h-16 bg-[#00629d] text-white rounded-2xl font-black text-lg transition-all hover:bg-[#004e7c] active:scale-[0.98] shadow-xl shadow-blue-900/20 disabled:opacity-50"
              >
-               Đăng ký mở Cửa hàng ngay
+               {loading ? 'Đang đăng ký...' : 'Đăng ký mở Cửa hàng ngay'}
              </button>
           </form>
         </div>

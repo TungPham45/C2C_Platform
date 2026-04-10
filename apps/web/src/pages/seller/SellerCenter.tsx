@@ -5,6 +5,7 @@ import { PRODUCT_API_URL } from '../../config/api';
 
 export const SellerCenterPage: FC = () => {
   const [userName, setUserName] = useState('');
+  const [shopStatus, setShopStatus] = useState<string | null>(null);
   const [metrics, setMetrics] = useState({
     activeProducts: 0,
     pendingProducts: 0,
@@ -22,22 +23,30 @@ export const SellerCenterPage: FC = () => {
       } catch (e) {}
     }
 
-    // Fetch live metrics
-    const fetchMetrics = async () => {
+    // Fetch live metrics and context
+    const fetchData = async () => {
       try {
         const token = localStorage.getItem('c2c_token');
-        const res = await fetch(`${PRODUCT_API_URL}/seller/metrics`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const headers = { 'Authorization': `Bearer ${token}` };
+        
+        // Context
+        const ctxRes = await fetch(`${PRODUCT_API_URL}/seller/context`, { headers });
+        if (ctxRes.ok) {
+          const ctxData = await ctxRes.json();
+          if (ctxData.shop) setShopStatus(ctxData.shop.status);
+        }
+
+        // Metrics
+        const res = await fetch(`${PRODUCT_API_URL}/seller/metrics`, { headers });
         if (res.ok) {
           const data = await res.json();
           setMetrics(data);
         }
       } catch (err) {
-        console.error('Metrics fetch error', err);
+        console.error('Fetch error', err);
       }
     };
-    fetchMetrics();
+    fetchData();
   }, []);
 
   return (
@@ -51,26 +60,40 @@ export const SellerCenterPage: FC = () => {
           <p className="text-[#404751] mt-1 font-medium">Đây là tình hình kinh doanh của bạn hôm nay.</p>
         </div>
 
-        <div className="flex items-center gap-4">
-          <Link to="/seller/add-product" className="bg-[#42a5f5] text-white px-5 py-2.5 rounded-full font-bold text-sm flex items-center gap-2 shadow-md shadow-blue-500/20 hover:scale-[1.02] active:scale-95 transition-all">
-            <span className="material-symbols-outlined text-[18px]">add</span>
-            Thêm 1 sản phẩm mới
-          </Link>
-          <div className="bg-[#e9f5ff] rounded-full px-4 py-2 flex items-center gap-2 border border-[#bfc7d3]/20 focus-within:bg-white transition-all w-72 shadow-sm shadow-blue-500/5">
-            <span className="material-symbols-outlined text-slate-400">search</span>
-            <input 
-              type="text" 
-              placeholder="Tìm kiếm mã đơn hàng..." 
-              className="bg-transparent border-none text-sm w-full focus:ring-0 outline-none placeholder:text-slate-400" 
-            />
-          </div>
+        <div className="flex flex-col items-end gap-3">
+          <div className="flex items-center gap-4">
+            {shopStatus !== 'pending' && (
+              <Link to="/seller/add-product" className="bg-[#42a5f5] text-white px-5 py-2.5 rounded-full font-bold text-sm flex items-center gap-2 shadow-md shadow-blue-500/20 hover:scale-[1.02] active:scale-95 transition-all">
+                <span className="material-symbols-outlined text-[18px]">add</span>
+                Thêm 1 sản phẩm mới
+              </Link>
+            )}
+            <div className="bg-[#e9f5ff] rounded-full px-4 py-2 flex items-center gap-2 border border-[#bfc7d3]/20 focus-within:bg-white transition-all w-72 shadow-sm shadow-blue-500/5">
+              <span className="material-symbols-outlined text-slate-400">search</span>
+              <input 
+                type="text" 
+                placeholder="Tìm kiếm mã đơn hàng..." 
+                className="bg-transparent border-none text-sm w-full focus:ring-0 outline-none placeholder:text-slate-400" 
+              />
+            </div>
           
           <button className="relative w-10 h-10 rounded-full bg-[#dbeaf5] flex items-center justify-center text-[#00629d] transition-all hover:bg-[#d6e5ef]">
             <span className="material-symbols-outlined">notifications</span>
             <span className="absolute top-2 right-2 w-2 h-2 bg-[#ba1a1a] rounded-full"></span>
           </button>
         </div>
+        </div>
       </header>
+
+      {shopStatus === 'pending' && (
+        <div className="mb-8 p-6 bg-amber-50 rounded-2xl border border-amber-200 text-amber-800 flex items-start gap-4 shadow-sm">
+          <span className="material-symbols-outlined text-amber-500 text-3xl">hourglass_empty</span>
+          <div>
+            <h3 className="font-bold text-lg mb-1">Cửa hàng đang được xử lý</h3>
+            <p>Hồ sơ đăng ký cửa hàng của bạn đang trong quá trình chờ Ban quản trị duyệt. Bạn vui lòng quay lại sau và có thể bắt đầu đăng bán ngay sau khi được chấp nhận nhé.</p>
+          </div>
+        </div>
+      )}
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
