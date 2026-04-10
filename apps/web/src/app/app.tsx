@@ -5,6 +5,7 @@ import { AddProductPage } from '../pages/seller/AddProduct';
 import { EditProductPage } from '../pages/seller/EditProduct';
 import { SellerOrderManagement } from '../pages/seller/OrderManagement';
 import { SellerOrderDetail } from '../pages/seller/OrderDetail';
+import SellerChat from '../pages/seller/SellerChat';
 import { CheckoutPage } from '../pages/CheckoutPage';
 import { OrderSuccess } from '../pages/OrderSuccess';
 import { MyPurchasesPage } from '../pages/MyPurchases';
@@ -12,6 +13,7 @@ import { BuyerOrderDetail } from '../pages/BuyerOrderDetail';
 import { MarketplaceHomePage } from '../pages/MarketplaceHomePage';
 import { ProductDetailPage } from '../pages/ProductDetail';
 import { AuthPage } from '../pages/auth/AuthPage';
+import { MessagesPage } from '../pages/MessagesPage';
 import AdminDashboard from '../pages/admin/AdminDashboard';
 import ProductModeration from '../pages/admin/ProductModeration';
 import ShopModeration from '../pages/admin/ShopModeration';
@@ -40,6 +42,7 @@ export function App() {
         <Route path="/seller/edit-product/:id" element={<EditProductPage />} />
         <Route path="/seller/orders" element={<SellerOrderManagement />} />
         <Route path="/seller/orders/:id" element={<SellerOrderDetail />} />
+        <Route path="/seller/chat" element={<SellerChat />} />
       </Route>
       
       {/* Order Flow */}
@@ -47,6 +50,7 @@ export function App() {
       <Route path="/order-success" element={<OrderSuccess />} />
       <Route path="/orders" element={<MyPurchasesPage />} />
       <Route path="/orders/:id" element={<BuyerOrderDetail />} />
+      <Route path="/messages" element={<MessagesPage />} />
       
       {/* Admin Routes */}
       <Route path="/admin" element={<AdminDashboard />} />

@@ -21,8 +21,8 @@ export class AdminController {
   }
 
   @Get('analytics/user-growth')
-  getUserGrowthAnalytics() {
-    return this.adminService.getUserGrowthAnalytics();
+  getUserGrowthAnalytics(@Query('timeframe') timeframe: string) {
+    return this.adminService.getUserGrowthAnalytics(timeframe);
   }
 
   @Get('analytics/shop-sales')

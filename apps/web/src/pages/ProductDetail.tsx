@@ -14,6 +14,7 @@ export const ProductDetailPage: FC = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [quantity, setQuantity] = useState(1);
   const [selections, setSelections] = useState<Record<string, string>>({});
+  const [isStartingChat, setIsStartingChat] = useState(false);
 
   useEffect(() => {
     const userStr = localStorage.getItem('c2c_user');
@@ -90,6 +91,39 @@ export const ProductDetailPage: FC = () => {
           quantity
        } 
     });
+  };
+
+  const handleStartChat = async () => {
+    const token = localStorage.getItem('c2c_token');
+    if (!token) {
+      navigate('/login', { state: { from: location.pathname } });
+      return;
+    }
+    
+    if (!product || !product.shop_id || !product.shop?.owner_id) {
+       alert("Shop không khả dụng để chat.");
+       return;
+    }
+
+    try {
+       setIsStartingChat(true);
+       const res = await fetch('/api/chat/conversations', {
+          method: 'POST',
+          headers: {
+             'Content-Type': 'application/json',
+             'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ shop_id: product.shop_id, seller_id: product.shop.owner_id })
+       });
+       
+       if (!res.ok) throw new Error("Could not start chat");
+       const json = await res.json();
+       navigate(`/messages?convId=${json.id}`);
+    } catch (e: any) {
+       alert("Không thể bắt đầu chat lúc này.");
+    } finally {
+       setIsStartingChat(false);
+    }
   };
 
   const getPrice = () => {
@@ -317,6 +351,14 @@ export const ProductDetailPage: FC = () => {
                    </button>
                 ) : (
                    <>
+                      <button 
+                         className="h-14 w-14 bg-white border-2 border-[#00629d] text-[#00629d] rounded-full font-bold flex items-center justify-center transition-all hover:bg-[#f0f7ff] active:scale-[0.98] mr-2"
+                         onClick={handleStartChat}
+                         disabled={isStartingChat}
+                         title="Chat với người bán"
+                      >
+                         <span className={`material-symbols-outlined ${isStartingChat ? 'animate-pulse' : ''}`}>chat</span>
+                      </button>
                       <button className="flex-1 h-14 bg-white border-2 border-[#00629d] text-[#00629d] rounded-full font-bold text-base flex items-center justify-center gap-2 transition-all hover:bg-[#f0f7ff] active:scale-[0.98]">
                          <span className="material-symbols-outlined">shopping_bag</span>
                          Thêm vào giỏ

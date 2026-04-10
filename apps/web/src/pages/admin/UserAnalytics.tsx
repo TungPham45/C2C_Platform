@@ -11,26 +11,26 @@ const UserAnalytics: FC = () => {
   const [data, setData] = useState<GrowthData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [timeframe, setTimeframe] = useState<'all' | 'week' | 'month'>('all');
+
+  const fetchGrowth = async (tf: string) => {
+    try {
+      setLoading(true);
+      const res = await fetch(`/api/admin/analytics/user-growth?timeframe=${tf}`);
+      if (!res.ok) throw new Error('Không thể tải dữ liệu phân tích');
+      const json = await res.json();
+      
+      setData(json);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchGrowth = async () => {
-      try {
-        setLoading(true);
-        const res = await fetch('/api/admin/analytics/user-growth');
-        if (!res.ok) throw new Error('Không thể tải dữ liệu phân tích');
-        const json = await res.json();
-        
-        // Dữ liệu API trả về có thể chưa liên hoàn các ngày (nếu ngày đó không có ai đky)
-        // Việc fill dữ liệu trống nếu cần làm ở backend là tốt nhất, nhưng frontend vẫn vẽ bình thường.
-        setData(json);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchGrowth();
-  }, []);
+    fetchGrowth(timeframe);
+  }, [timeframe]);
 
   return (
     <AdminLayout pageTitle="Phân tích Người dùng">
@@ -44,9 +44,18 @@ const UserAnalytics: FC = () => {
             </div>
             
             <div className="flex bg-white rounded-full p-1 shadow-sm border border-[#e1f0fb]">
-               <button className="px-6 py-2 bg-[#e9f5ff] text-[#00629d] text-xs font-bold rounded-full">Tất cả thời gian</button>
-               <button className="px-6 py-2 text-[#707882] hover:text-[#00629d] text-xs font-bold rounded-full transition-colors opacity-50 cursor-not-allowed">Hôm nay</button>
-               <button className="px-6 py-2 text-[#707882] hover:text-[#00629d] text-xs font-bold rounded-full transition-colors opacity-50 cursor-not-allowed">Tuần này</button>
+               <button 
+                  onClick={() => setTimeframe('all')}
+                  className={`px-6 py-2 text-xs font-bold rounded-full transition-colors ${timeframe === 'all' ? 'bg-[#e9f5ff] text-[#00629d]' : 'text-[#707882] hover:text-[#00629d]'}`}
+               >Toàn thời gian</button>
+               <button 
+                  onClick={() => setTimeframe('month')}
+                  className={`px-6 py-2 text-xs font-bold rounded-full transition-colors ${timeframe === 'month' ? 'bg-[#e9f5ff] text-[#00629d]' : 'text-[#707882] hover:text-[#00629d]'}`}
+               >Tháng này</button>
+               <button 
+                  onClick={() => setTimeframe('week')}
+                  className={`px-6 py-2 text-xs font-bold rounded-full transition-colors ${timeframe === 'week' ? 'bg-[#e9f5ff] text-[#00629d]' : 'text-[#707882] hover:text-[#00629d]'}`}
+               >Tuần này</button>
             </div>
         </div>
 

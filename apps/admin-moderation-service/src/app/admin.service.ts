@@ -76,9 +76,10 @@ export class AdminService {
     );
   }
 
-  async getUserGrowthAnalytics() {
+  async getUserGrowthAnalytics(timeframe?: string) {
+    const query = timeframe && timeframe !== 'all' ? `?timeframe=${timeframe}` : '';
     return this.requestJson<Array<{ date: string; newUsers: number }>>(
-      `${this.authBaseUrl}/internal/admin/analytics/user-growth`
+      `${this.authBaseUrl}/internal/admin/analytics/user-growth${query}`
     );
   }
 

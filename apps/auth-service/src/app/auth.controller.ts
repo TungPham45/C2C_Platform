@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UnauthorizedException, Inject, Get, Headers, ForbiddenException, Put, Param } from '@nestjs/common';
+import { Controller, Post, Body, UnauthorizedException, Inject, Get, Headers, ForbiddenException, Put, Param, Query } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
 @Controller('auth')
@@ -67,8 +67,11 @@ export class AuthController {
   }
 
   @Get('internal/admin/analytics/user-growth')
-  getUserGrowthAnalytics(@Headers() headers: Record<string, string | string[] | undefined>) {
+  getUserGrowthAnalytics(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query('timeframe') timeframe?: string
+  ) {
     this.requireInternalAccess(headers);
-    return this.authService.getUserGrowthAnalytics();
+    return this.authService.getUserGrowthAnalytics(timeframe);
   }
 }

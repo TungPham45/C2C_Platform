@@ -188,10 +188,22 @@ export class AuthService {
     });
   }
 
-  async getUserGrowthAnalytics() {
+  async getUserGrowthAnalytics(timeframe?: string) {
+    const whereClause: any = { created_at: { not: null } };
+    
+    if (timeframe === 'week') {
+      const dt = new Date();
+      dt.setDate(dt.getDate() - 7);
+      whereClause.created_at = { gte: dt, not: null };
+    } else if (timeframe === 'month') {
+      const dt = new Date();
+      dt.setMonth(dt.getMonth() - 1);
+      whereClause.created_at = { gte: dt, not: null };
+    }
+
     const users = await this.prisma.user.findMany({
       select: { created_at: true },
-      where: { created_at: { not: null } },
+      where: whereClause,
       orderBy: { created_at: 'asc' }
     });
 

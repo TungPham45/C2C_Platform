@@ -77,10 +77,15 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
             
             <div className="flex items-center gap-4">
               {currentUser?.role !== 'admin' && (
+                <>
+                <Link to="/messages" className="relative w-10 h-10 flex items-center justify-center text-[#0f1d25] hover:bg-white/50 rounded-xl transition-colors" title="Tin nhắn">
+                  <span className="material-symbols-outlined">chat</span>
+                </Link>
                 <button className="relative w-10 h-10 flex items-center justify-center text-[#0f1d25] hover:bg-white/50 rounded-xl transition-colors">
                   <span className="material-symbols-outlined">shopping_bag</span>
                   <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#ba1a1a] text-white text-[10px] flex items-center justify-center rounded-full font-bold">3</span>
                 </button>
+                </>
               )}
               
               {currentUser ? (
