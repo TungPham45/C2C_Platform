@@ -25,6 +25,7 @@ import ShopManagement from '../pages/admin/ShopManagement';
 import AccountManagement from '../pages/admin/AccountManagement';
 import UserAnalytics from '../pages/admin/UserAnalytics';
 import ShopSalesAnalytics from '../pages/admin/ShopSalesAnalytics';
+import { BannersAdminPage } from '../pages/admin/BannersAdminPage';
 import { SellerProtectedRoute } from '../components/auth/SellerProtectedRoute';
 import { SellerRegistration } from '../pages/seller/SellerRegistration';
 
@@ -65,6 +66,7 @@ export function App() {
       <Route path="/admin/products" element={<ProductModeration />} />
       <Route path="/admin/applications" element={<ShopModeration />} />
       <Route path="/admin/shops" element={<ShopManagement />} />
+      <Route path="/admin/banners" element={<BannersAdminPage />} />
       <Route path="/admin/users" element={<AccountManagement />} />
       <Route path="/admin/analytics/users" element={<UserAnalytics />} />
       <Route path="/admin/analytics/shop-sales" element={<ShopSalesAnalytics />} />

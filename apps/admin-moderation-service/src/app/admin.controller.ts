@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Query } from '@nestjs/common';
 import { AdminService } from './admin.service';
 
 @Controller('admin')
@@ -63,5 +63,32 @@ export class AdminController {
   @Put('products/:id/reject')
   rejectProduct(@Param('id') id: string, @Body('reason') reason: string) {
     return this.adminService.rejectProduct(+id, reason);
+  }
+
+  // --- Banners ---
+
+  @Get('public/banners')
+  getActiveBanners() {
+    return this.adminService.getActiveBanners();
+  }
+
+  @Get('banners')
+  getAllBanners() {
+    return this.adminService.getAllBanners();
+  }
+
+  @Post('banners')
+  createBanner(@Body() body: any) {
+    return this.adminService.createBanner(body);
+  }
+
+  @Put('banners/:id')
+  updateBanner(@Param('id') id: string, @Body() body: any) {
+    return this.adminService.updateBanner(+id, body);
+  }
+
+  @Delete('banners/:id')
+  deleteBanner(@Param('id') id: string) {
+    return this.adminService.deleteBanner(+id);
   }
 }
