@@ -26,6 +26,7 @@ import AccountManagement from '../pages/admin/AccountManagement';
 import UserAnalytics from '../pages/admin/UserAnalytics';
 import ShopSalesAnalytics from '../pages/admin/ShopSalesAnalytics';
 import { SellerProtectedRoute } from '../components/auth/SellerProtectedRoute';
+import { BuyerProtectedRoute } from '../components/auth/BuyerProtectedRoute';
 import { SellerRegistration } from '../pages/seller/SellerRegistration';
 
 export function App() {
@@ -52,13 +53,15 @@ export function App() {
       </Route>
       
       {/* Order Flow */}
-      <Route path="/cart" element={<CartPage />} />
-      <Route path="/checkout" element={<CheckoutPage />} />
-      <Route path="/order-success" element={<OrderSuccess />} />
-      <Route path="/orders" element={<MyPurchasesPage />} />
-      <Route path="/orders/:id" element={<BuyerOrderDetail />} />
+      <Route element={<BuyerProtectedRoute />}>
+        <Route path="/cart" element={<CartPage />} />
+        <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/order-success" element={<OrderSuccess />} />
+        <Route path="/orders" element={<MyPurchasesPage />} />
+        <Route path="/orders/:id" element={<BuyerOrderDetail />} />
+        <Route path="/messages" element={<MessagesPage />} />
+      </Route>
       <Route path="/profile" element={<ProfilePage />} />
-      <Route path="/messages" element={<MessagesPage />} />
       
       {/* Admin Routes */}
       <Route path="/admin" element={<AdminDashboard />} />
