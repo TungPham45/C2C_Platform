@@ -15,6 +15,10 @@ import { AuthPage } from '../pages/auth/AuthPage';
 import AdminDashboard from '../pages/admin/AdminDashboard';
 import ProductModeration from '../pages/admin/ProductModeration';
 import ShopModeration from '../pages/admin/ShopModeration';
+import ShopManagement from '../pages/admin/ShopManagement';
+import AccountManagement from '../pages/admin/AccountManagement';
+import UserAnalytics from '../pages/admin/UserAnalytics';
+import ShopSalesAnalytics from '../pages/admin/ShopSalesAnalytics';
 import { SellerProtectedRoute } from '../components/auth/SellerProtectedRoute';
 import { SellerRegistration } from '../pages/seller/SellerRegistration';
 
@@ -48,6 +52,10 @@ export function App() {
       <Route path="/admin" element={<AdminDashboard />} />
       <Route path="/admin/products" element={<ProductModeration />} />
       <Route path="/admin/applications" element={<ShopModeration />} />
+      <Route path="/admin/shops" element={<ShopManagement />} />
+      <Route path="/admin/users" element={<AccountManagement />} />
+      <Route path="/admin/analytics/users" element={<UserAnalytics />} />
+      <Route path="/admin/analytics/shop-sales" element={<ShopSalesAnalytics />} />
 
     </Routes>
   );

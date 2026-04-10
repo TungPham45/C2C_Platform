@@ -443,6 +443,40 @@ export class ProductService {
     });
   }
 
+  async getAllShops() {
+    return this.prisma.shop.findMany({
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        owner_id: true,
+        status: true,
+        created_at: true,
+      },
+      orderBy: { created_at: 'desc' },
+    });
+  }
+
+  async updateShopStatus(id: number, status: string) {
+    const shop = await this.prisma.shop.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!shop) {
+      throw new NotFoundException('Shop not found');
+    }
+
+    return this.prisma.shop.update({
+      where: { id },
+      data: { status },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+  }
+
   // =====================
   // PUBLIC CONTEXT
   // =====================
@@ -500,6 +534,20 @@ export class ProductService {
         options: { orderBy: { sort_order: 'asc' } }
       },
       orderBy: { sort_order: 'asc' }
+    });
+  }
+
+  async getShopsByIds(ids: number[]) {
+    return this.prisma.shop.findMany({
+      where: {
+        id: { in: ids }
+      },
+      select: {
+        id: true,
+        name: true,
+        logo_url: true,
+        slug: true
+      }
     });
   }
 }

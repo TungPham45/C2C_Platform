@@ -40,7 +40,11 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children, pageTitle = 'Seren
           </NavLink>
           
           <NavLink to="/admin/applications" className={getNavLinkClass}>
-            <span className="material-symbols-outlined">storefront</span> Đăng ký mở shop
+            <span className="material-symbols-outlined">how_to_reg</span> Đăng ký mở shop
+          </NavLink>
+          
+          <NavLink to="/admin/shops" className={getNavLinkClass}>
+            <span className="material-symbols-outlined">storefront</span> Quản lý Shop
           </NavLink>
           
           <NavLink 
@@ -56,9 +60,17 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children, pageTitle = 'Seren
           
           <div className="pt-4 pb-2 px-4 text-[10px] font-bold text-[#707882] uppercase tracking-widest opacity-50">Hệ thống</div>
           
-          <a href="#" className="flex items-center gap-3 px-4 py-3 text-[#707882] opacity-50 cursor-not-allowed">
-            <span className="material-symbols-outlined">group</span> Quản lý người dùng
-          </a>
+          <NavLink to="/admin/users" className={getNavLinkClass}>
+            <span className="material-symbols-outlined">switch_account</span> Quản lý Người Dùng
+          </NavLink>
+          
+          <NavLink to="/admin/analytics/users" className={getNavLinkClass}>
+            <span className="material-symbols-outlined">insights</span> Phân tích tăng trưởng
+          </NavLink>
+          
+          <NavLink to="/admin/analytics/shop-sales" className={getNavLinkClass}>
+            <span className="material-symbols-outlined">query_stats</span> Báo cáo hiệu suất
+          </NavLink>
           
           <a href="#" className="flex items-center gap-3 px-4 py-3 text-[#707882] opacity-50 cursor-not-allowed">
             <span className="material-symbols-outlined">settings</span> Cài đặt hệ thống
