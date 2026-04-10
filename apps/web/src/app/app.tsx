@@ -15,6 +15,7 @@ import { ProductDetailPage } from '../pages/ProductDetail';
 import { BuyerOrderDetail } from '../pages/BuyerOrderDetail';
 import { ShopPage } from '../pages/ShopPage';
 import { CartPage } from '../pages/CartPage';
+import { ProfilePage } from '../pages/ProfilePage';
 import { AuthPage } from '../pages/auth/AuthPage';
 import { MessagesPage } from '../pages/MessagesPage';
 import AdminDashboard from '../pages/admin/AdminDashboard';
@@ -56,6 +57,7 @@ export function App() {
       <Route path="/order-success" element={<OrderSuccess />} />
       <Route path="/orders" element={<MyPurchasesPage />} />
       <Route path="/orders/:id" element={<BuyerOrderDetail />} />
+      <Route path="/profile" element={<ProfilePage />} />
       <Route path="/messages" element={<MessagesPage />} />
       
       {/* Admin Routes */}

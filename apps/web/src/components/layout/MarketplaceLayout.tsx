@@ -1,7 +1,7 @@
 import { FC, ReactNode, useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '../../hooks/useCart';
-
+import { FaFacebookF, FaInstagram, FaTwitter, FaYoutube } from "react-icons/fa";
 interface MarketplaceLayoutProps {
   children: ReactNode;
 }
@@ -17,7 +17,7 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
     if (userStr) {
       try {
         setCurrentUser(JSON.parse(userStr));
-      } catch (e) {}
+      } catch (e) { }
     }
   }, []);
 
@@ -62,8 +62,8 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
           {/* Search Bar */}
           <div className="hidden md:flex items-center flex-1 max-w-xl mx-12">
             <div className="w-full relative group">
-              <input 
-                type="text" 
+              <input
+                type="text"
                 placeholder="Tìm kiếm sản phẩm, cửa hàng..."
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
@@ -91,24 +91,24 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
               </Link>
             )}
             <div className="w-px h-6 bg-[#00629d]/10 hidden lg:block"></div>
-            
+
             <div className="flex items-center gap-4">
               {currentUser?.role !== 'admin' && (
                 <>
-                <Link to="/messages" className="relative w-10 h-10 flex items-center justify-center text-[#0f1d25] hover:bg-white/50 rounded-xl transition-colors" title="Tin nhắn">
-                  <span className="material-symbols-outlined">chat</span>
-                </Link>
-                <Link to="/cart" className="relative w-10 h-10 flex items-center justify-center text-[#0f1d25] hover:bg-white/50 rounded-xl transition-colors">
-                  <span className="material-symbols-outlined">shopping_bag</span>
-                  {totalCartItems > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-[#ba1a1a] text-white text-[10px] flex items-center justify-center rounded-full font-bold">
-                      {totalCartItems}
-                    </span>
-                  )}
-                </Link>
+                  <Link to="/messages" className="relative w-10 h-10 flex items-center justify-center text-[#0f1d25] hover:bg-white/50 rounded-xl transition-colors" title="Tin nhắn">
+                    <span className="material-symbols-outlined">chat</span>
+                  </Link>
+                  <Link to="/cart" className="relative w-10 h-10 flex items-center justify-center text-[#0f1d25] hover:bg-white/50 rounded-xl transition-colors">
+                    <span className="material-symbols-outlined">shopping_bag</span>
+                    {totalCartItems > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-[#ba1a1a] text-white text-[10px] flex items-center justify-center rounded-full font-bold">
+                        {totalCartItems}
+                      </span>
+                    )}
+                  </Link>
                 </>
               )}
-              
+
               {currentUser ? (
                 <div className="relative group">
                   <button className="px-6 py-2.5 bg-[#00629d] text-white rounded-full hover:bg-[#004e7c] transition-all shadow-md shadow-blue-500/20 flex items-center gap-2">
@@ -164,9 +164,12 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
                 Nền tảng thương mại điện tử C2C cao cấp. Tinh tế và đẳng cấp.
               </p>
               <div className="flex gap-4">
-                {['facebook', 'instagram', 'twitter', 'youtube'].map(s => (
-                  <button key={s} className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
-                    <span className="material-symbols-outlined text-lg">{s}</span>
+                {[FaFacebookF, FaInstagram, FaTwitter, FaYoutube].map((Icon, i) => (
+                  <button
+                    key={i}
+                    className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
+                  >
+                    <Icon className="text-white text-lg" />
                   </button>
                 ))}
               </div>
@@ -212,7 +215,7 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
             </div>
           </div>
         </div>
-      </footer>
-    </div>
+      </footer >
+    </div >
   );
 };
