@@ -53,6 +53,13 @@ async function bootstrap() {
     changeOrigin: true,
   }));
 
+  // Proxy Cart (part of Order Service)
+  const orderBaseUrl = orderServiceUrl.replace(/\/api\/orders\/?$/, '');
+  app.use('/api/cart', createProxyMiddleware({
+    target: `${orderBaseUrl}/api/cart`,
+    changeOrigin: true,
+  }));
+
   // Proxy product uploads so the browser only needs the gateway's public URL.
   app.use('/uploads', createProxyMiddleware({
     target: productPublicUrl,

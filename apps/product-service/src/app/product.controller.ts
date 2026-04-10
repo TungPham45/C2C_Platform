@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Headers, UnauthorizedException, Inject, UseInterceptors, UploadedFile, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Headers, UnauthorizedException, Inject, UseInterceptors, UploadedFile, BadRequestException, ForbiddenException, Query } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ProductService } from './product.service';
 
@@ -130,6 +130,11 @@ export class ProductController {
 
   // --- PUBLIC ROUTES (TAXONOMY MUST BE BEFORE :id) ---
 
+  @Get('shop/:shopId')
+  getShopDetail(@Param('shopId') shopId: string) {
+    return this.productService.getPublicShopDetail(+shopId);
+  }
+
   @Get('categories/all')
   getCategories() {
     return this.productService.getCategories();
@@ -141,8 +146,8 @@ export class ProductController {
   }
 
   @Get()
-  getAllActiveProducts() {
-    return this.productService.getActiveProducts();
+  getAllActiveProducts(@Query('q') query?: string) {
+    return this.productService.getActiveProducts(query);
   }
 
   @Get(':id')

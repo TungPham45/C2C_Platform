@@ -413,16 +413,48 @@ export class ProductService {
   // PUBLIC CONTEXT
   // =====================
 
+  async getPublicShopDetail(shopId: number) {
+    const shop = await this.prisma.shop.findUnique({
+      where: { id: shopId, status: 'active' },
+      include: {
+        _count: {
+          select: { products: { where: { status: 'active' } } }
+        }
+      }
+    });
+
+    if (!shop) {
+      throw new NotFoundException('Shop not found or not active');
+    }
+
+    const products = await this.prisma.product.findMany({
+      where: { shop_id: shop.id, status: 'active' },
+      include: {
+        images: { where: { is_primary: true } },
+        shop: { select: { name: true, rating: true } }
+      },
+      orderBy: { created_at: 'desc' }
+    });
+
+    return { ...shop, products };
+  }
+
   // Homepage / Discovery: List all 'active' products
-  async getActiveProducts() {
+  async getActiveProducts(searchQuery?: string) {
+    const where: any = { status: 'active' };
+    
+    if (searchQuery && searchQuery.trim() !== '') {
+      where.name = { contains: searchQuery.trim(), mode: 'insensitive' };
+    }
+
     return this.prisma.product.findMany({
-      where: { status: 'active' },
+      where,
       include: { 
         shop: { select: { name: true, logo_url: true, rating: true } }, 
         images: { where: { is_primary: true } } 
       },
       orderBy: { created_at: 'desc' },
-      take: 20
+      take: 40 // Tăng limit lên 40 cho ProductsPage hiển thị nhiều hơn
     });
   }
 

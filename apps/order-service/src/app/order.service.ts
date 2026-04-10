@@ -45,6 +45,16 @@ export class OrderService {
       createdOrders.push(created);
     }
 
+    // 3. Clear Cart if requested
+    if (data.cart_item_ids && Array.isArray(data.cart_item_ids) && data.cart_item_ids.length > 0) {
+      await this.prisma.cartItem.deleteMany({
+        where: {
+          id: { in: data.cart_item_ids },
+          cart_id: userId, // verify ownership
+        }
+      });
+    }
+
     return {
       id: checkoutSession.id,
       total_payment: checkoutSession.total_payment,
