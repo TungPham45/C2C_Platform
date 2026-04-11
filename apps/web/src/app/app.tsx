@@ -25,11 +25,8 @@ import ShopManagement from '../pages/admin/ShopManagement';
 import AccountManagement from '../pages/admin/AccountManagement';
 import UserAnalytics from '../pages/admin/UserAnalytics';
 import ShopSalesAnalytics from '../pages/admin/ShopSalesAnalytics';
-<<<<<<< HEAD
 import CategoryManagement from '../pages/admin/CategoryManagement';
-=======
 import { BannersAdminPage } from '../pages/admin/BannersAdminPage';
->>>>>>> af1293104c89741514a9b8f3f2720f993d6c8ff8
 import { SellerProtectedRoute } from '../components/auth/SellerProtectedRoute';
 import { BuyerProtectedRoute } from '../components/auth/BuyerProtectedRoute';
 import { SellerRegistration } from '../pages/seller/SellerRegistration';
@@ -39,6 +36,7 @@ export function App() {
     <Routes>
       <Route path="/" element={<MarketplaceHomePage />} />
       <Route path="/products" element={<ProductsPage />} />
+      <Route path="/category/:slug" element={<ProductsPage />} />
       <Route path="/product/:id" element={<ProductDetailPage />} />
       <Route path="/shop/:id" element={<ShopPage />} />
       <Route path="/login" element={<AuthPage />} />

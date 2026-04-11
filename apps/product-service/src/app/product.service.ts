@@ -29,6 +29,43 @@ export class ProductService {
     return lineage;
   }
 
+  private async getCategoryDescendantIds(categoryId: number) {
+    const categories = await this.prisma.category.findMany({
+      where: { is_active: true },
+      select: { id: true, parent_id: true },
+    });
+
+    const childrenByParent = new Map<number, number[]>();
+    for (const category of categories) {
+      if (category.parent_id == null) {
+        continue;
+      }
+
+      const children = childrenByParent.get(category.parent_id) ?? [];
+      children.push(category.id);
+      childrenByParent.set(category.parent_id, children);
+    }
+
+    const descendantIds: number[] = [];
+    const visited = new Set<number>();
+    const queue = [categoryId];
+
+    while (queue.length > 0) {
+      const currentCategoryId = queue.shift();
+      if (!currentCategoryId || visited.has(currentCategoryId)) {
+        continue;
+      }
+
+      visited.add(currentCategoryId);
+      descendantIds.push(currentCategoryId);
+
+      const childIds = childrenByParent.get(currentCategoryId) ?? [];
+      queue.push(...childIds);
+    }
+
+    return descendantIds;
+  }
+
   private async findActiveSellerShop(userId: number) {
     return this.prisma.shop.findFirst({
       where: {
@@ -670,8 +707,25 @@ export class ProductService {
   }
 
   // Homepage / Discovery: List all 'active' products
-  async getActiveProducts(searchQuery?: string) {
+  async getActiveProducts(searchQuery?: string, categorySlug?: string) {
     const where: any = { status: 'active' };
+
+    if (categorySlug && categorySlug.trim() !== '') {
+      const category = await this.prisma.category.findFirst({
+        where: {
+          slug: categorySlug.trim(),
+          is_active: true,
+        },
+        select: { id: true },
+      });
+
+      if (!category) {
+        throw new NotFoundException('Category not found');
+      }
+
+      const categoryIds = await this.getCategoryDescendantIds(category.id);
+      where.category_id = { in: categoryIds };
+    }
     
     if (searchQuery && searchQuery.trim() !== '') {
       where.name = { contains: searchQuery.trim(), mode: 'insensitive' };

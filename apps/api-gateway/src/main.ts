@@ -34,10 +34,7 @@ async function bootstrap() {
   app.use('/api/auth', createReverseProxy(authServiceUrl));
 
   // Proxy Chat Service
-  app.use('/api/chat', createProxyMiddleware({
-    target: chatServiceUrl,
-    changeOrigin: true,
-  }));
+  app.use('/api/chat', createReverseProxy(chatServiceUrl));
 
   // Proxy Product Service
   app.use('/api/products', createReverseProxy(productServiceUrl));
@@ -50,10 +47,7 @@ async function bootstrap() {
 
   // Proxy Cart (part of Order Service)
   const orderBaseUrl = orderServiceUrl.replace(/\/api\/orders\/?$/, '');
-  app.use('/api/cart', createProxyMiddleware({
-    target: `${orderBaseUrl}/api/cart`,
-    changeOrigin: true,
-  }));
+  app.use('/api/cart', createReverseProxy(`${orderBaseUrl}/api/cart`));
 
   // Proxy product uploads so the browser only needs the gateway's public URL.
   app.use('/uploads', createReverseProxy(productPublicUrl));

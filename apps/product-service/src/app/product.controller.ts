@@ -293,8 +293,11 @@ export class ProductController {
   }
 
   @Get()
-  getAllActiveProducts(@Query('q') query?: string) {
-    return this.productService.getActiveProducts(query);
+  getAllActiveProducts(
+    @Query('q') query?: string,
+    @Query('categorySlug') categorySlug?: string,
+  ) {
+    return this.productService.getActiveProducts(query, categorySlug);
   }
 
   @Get(':id')
