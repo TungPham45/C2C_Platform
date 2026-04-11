@@ -5,6 +5,30 @@ import { PrismaService } from './prisma.service';
 export class ProductService {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
+  private async getCategoryLineageIds(categoryId: number) {
+    const lineage: number[] = [];
+    const visited = new Set<number>();
+    let currentCategoryId: number | null = categoryId;
+
+    while (currentCategoryId && !visited.has(currentCategoryId)) {
+      visited.add(currentCategoryId);
+
+      const category = await this.prisma.category.findUnique({
+        where: { id: currentCategoryId },
+        select: { id: true, parent_id: true },
+      });
+
+      if (!category) {
+        break;
+      }
+
+      lineage.unshift(category.id);
+      currentCategoryId = category.parent_id ?? null;
+    }
+
+    return lineage;
+  }
+
   private async findActiveSellerShop(userId: number) {
     return this.prisma.shop.findFirst({
       where: {
@@ -330,17 +354,155 @@ export class ProductService {
   // =====================
 
   async getAdminStats() {
-    const [activeShops, pendingApplications, pendingProducts] = await Promise.all([
+    const [activeShops, pendingApplications, pendingProducts, totalCategories, rootCategories] = await Promise.all([
       this.prisma.shop.count({ where: { status: 'active' } }),
       this.prisma.shop.count({ where: { status: 'pending' } }),
       this.prisma.product.count({ where: { status: 'pending_approval' } }),
+      this.prisma.category.count(),
+      this.prisma.category.count({ where: { level: 1 } }),
     ]);
+
+    // Get max attributes in a single category
+    const categoriesWithAtts = await this.prisma.category.findMany({
+      include: { _count: { select: { attribute_defs: true } } }
+    });
+    const maxAttributes = categoriesWithAtts.reduce((max, cat) => Math.max(max, cat._count.attribute_defs), 0);
 
     return {
       activeShops,
       pendingApplications,
       pendingProducts,
+      totalCategories,
+      rootCategories,
+      maxAttributes,
     };
+  }
+
+  async getAdminCategories() {
+    return this.prisma.category.findMany({
+      orderBy: [{ level: 'asc' }, { sort_order: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  async getAdminCategoryById(id: number) {
+    const category = await this.prisma.category.findUnique({
+      where: { id },
+      include: {
+        attribute_defs: {
+          include: { options: { orderBy: { sort_order: 'asc' } } },
+          orderBy: { sort_order: 'asc' }
+        }
+      }
+    });
+    if (!category) throw new NotFoundException('Category not found');
+    return category;
+  }
+
+  async createCategory(data: any) {
+    const slug = data.slug || this.generateSlug(data.name);
+    return this.prisma.category.create({
+      data: {
+        name: data.name,
+        slug: slug,
+        parent_id: data.parent_id ? Number(data.parent_id) : null,
+        icon_url: data.icon_url || null,
+        level: data.level ? Number(data.level) : 1,
+        sort_order: data.sort_order ? Number(data.sort_order) : 0,
+        is_active: data.is_active !== undefined ? Boolean(data.is_active) : true,
+      },
+    });
+  }
+
+  async updateCategory(id: number, data: any) {
+    return this.prisma.category.update({
+      where: { id },
+      data: {
+        name: data.name,
+        slug: data.slug,
+        parent_id: data.parent_id !== undefined ? (data.parent_id ? Number(data.parent_id) : null) : undefined,
+        icon_url: data.icon_url,
+        level: data.level ? Number(data.level) : undefined,
+        sort_order: data.sort_order !== undefined ? Number(data.sort_order) : undefined,
+        is_active: data.is_active !== undefined ? Boolean(data.is_active) : undefined,
+      },
+    });
+  }
+
+  async deleteCategory(id: number) {
+    // Check if category has children
+    const childrenCount = await this.prisma.category.count({ where: { parent_id: id } });
+    if (childrenCount > 0) {
+      throw new BadRequestException('Cannot delete category with sub-categories');
+    }
+    // Check if category has products
+    const productCount = await this.prisma.product.count({ where: { category_id: id } });
+    if (productCount > 0) {
+      throw new BadRequestException('Cannot delete category with assigned products');
+    }
+
+    return this.prisma.category.delete({ where: { id } });
+  }
+
+  async getAdminCategoryAttributes(categoryId: number) {
+    return this.prisma.attributeDefinition.findMany({
+      where: { category_id: categoryId },
+      include: {
+        options: { orderBy: { sort_order: 'asc' } }
+      },
+      orderBy: { sort_order: 'asc' }
+    });
+  }
+
+  async createAttributeDefinition(categoryId: number, data: any) {
+    return this.prisma.attributeDefinition.create({
+      data: {
+        category_id: categoryId,
+        name: data.name,
+        input_type: data.input_type || 'text',
+        is_required: Boolean(data.is_required),
+        sort_order: data.sort_order ? Number(data.sort_order) : 0,
+      },
+    });
+  }
+
+  async updateAttributeDefinition(id: number, data: any) {
+    return this.prisma.attributeDefinition.update({
+      where: { id },
+      data: {
+        name: data.name,
+        input_type: data.input_type,
+        is_required: data.is_required !== undefined ? Boolean(data.is_required) : undefined,
+        sort_order: data.sort_order !== undefined ? Number(data.sort_order) : undefined,
+      },
+    });
+  }
+
+  async deleteAttributeDefinition(id: number) {
+    return this.prisma.attributeDefinition.delete({ where: { id } });
+  }
+
+  async createAttributeOption(attributeId: number, data: any) {
+    return this.prisma.attributeOption.create({
+      data: {
+        attribute_id: attributeId,
+        value_name: data.value_name,
+        sort_order: data.sort_order ? Number(data.sort_order) : 0,
+      },
+    });
+  }
+
+  async updateAttributeOption(id: number, data: any) {
+    return this.prisma.attributeOption.update({
+      where: { id },
+      data: {
+        value_name: data.value_name,
+        sort_order: data.sort_order !== undefined ? Number(data.sort_order) : undefined,
+      },
+    });
+  }
+
+  async deleteAttributeOption(id: number) {
+    return this.prisma.attributeOption.delete({ where: { id } });
   }
 
   async getPendingProducts() {
@@ -528,12 +690,40 @@ export class ProductService {
   }
 
   async getCategoryAttributes(categoryId: number) {
-    return this.prisma.attributeDefinition.findMany({
-      where: { category_id: categoryId },
+    const categoryIds = await this.getCategoryLineageIds(categoryId);
+    if (categoryIds.length === 0) {
+      return [];
+    }
+
+    const categoryOrder = new Map(categoryIds.map((id, index) => [id, index]));
+    const attributes = await this.prisma.attributeDefinition.findMany({
+      where: {
+        category_id: { in: categoryIds },
+      },
       include: {
         options: { orderBy: { sort_order: 'asc' } }
       },
-      orderBy: { sort_order: 'asc' }
+      orderBy: [
+        { sort_order: 'asc' },
+        { name: 'asc' },
+      ]
+    });
+
+    return attributes.sort((left, right) => {
+      const leftCategoryOrder = categoryOrder.get(left.category_id) ?? Number.MAX_SAFE_INTEGER;
+      const rightCategoryOrder = categoryOrder.get(right.category_id) ?? Number.MAX_SAFE_INTEGER;
+
+      if (leftCategoryOrder !== rightCategoryOrder) {
+        return leftCategoryOrder - rightCategoryOrder;
+      }
+
+      const leftSortOrder = left.sort_order ?? 0;
+      const rightSortOrder = right.sort_order ?? 0;
+      if (leftSortOrder !== rightSortOrder) {
+        return leftSortOrder - rightSortOrder;
+      }
+
+      return left.name.localeCompare(right.name);
     });
   }
 

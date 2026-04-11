@@ -48,7 +48,14 @@ export class AdminService {
   async getStats() {
     const [authStats, productStats] = await Promise.all([
       this.requestJson<{ activeUsers: number }>(`${this.authBaseUrl}/internal/admin/stats`),
-      this.requestJson<{ activeShops: number; pendingApplications: number; pendingProducts: number }>(
+      this.requestJson<{ 
+        activeShops: number; 
+        pendingApplications: number; 
+        pendingProducts: number;
+        totalCategories: number;
+        rootCategories: number;
+        maxAttributes: number;
+      }>(
         `${this.productBaseUrl}/internal/admin/stats`,
       ),
     ]);
@@ -58,6 +65,9 @@ export class AdminService {
       activeShops: productStats.activeShops,
       pendingApplications: productStats.pendingApplications,
       pendingProducts: productStats.pendingProducts,
+      totalCategories: productStats.totalCategories,
+      rootCategories: productStats.rootCategories,
+      maxAttributes: productStats.maxAttributes,
     };
   }
 
@@ -167,6 +177,88 @@ export class AdminService {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reason }),
+    });
+  }
+
+  // --- CATEGORIES ---
+
+  async getCategories() {
+    return this.requestJson<Array<any>>(`${this.productBaseUrl}/internal/admin/categories`);
+  }
+
+  async getCategoryById(id: number) {
+    return this.requestJson<any>(`${this.productBaseUrl}/internal/admin/categories/${id}`);
+  }
+
+  async createCategory(data: any) {
+    return this.requestJson<any>(`${this.productBaseUrl}/internal/admin/categories`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCategory(id: number, data: any) {
+    return this.requestJson<any>(`${this.productBaseUrl}/internal/admin/categories/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteCategory(id: number) {
+    return this.requestJson<any>(`${this.productBaseUrl}/internal/admin/categories/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // --- ATTRIBUTES ---
+
+  async getCategoryAttributes(categoryId: number) {
+    return this.requestJson<Array<any>>(`${this.productBaseUrl}/internal/admin/categories/${categoryId}/attributes`);
+  }
+
+  async createAttribute(categoryId: number, data: any) {
+    return this.requestJson<any>(`${this.productBaseUrl}/internal/admin/categories/${categoryId}/attributes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateAttribute(id: number, data: any) {
+    return this.requestJson<any>(`${this.productBaseUrl}/internal/admin/attributes/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteAttribute(id: number) {
+    return this.requestJson<any>(`${this.productBaseUrl}/internal/admin/attributes/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async createAttributeOption(attributeId: number, data: any) {
+    return this.requestJson<any>(`${this.productBaseUrl}/internal/admin/attributes/${attributeId}/options`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateAttributeOption(id: number, data: any) {
+    return this.requestJson<any>(`${this.productBaseUrl}/internal/admin/attribute-options/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteAttributeOption(id: number) {
+    return this.requestJson<any>(`${this.productBaseUrl}/internal/admin/attribute-options/${id}`, {
+      method: 'DELETE',
     });
   }
 }

@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Param, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Query } from '@nestjs/common';
 import { AdminService } from './admin.service';
 
 @Controller('admin')
@@ -63,5 +63,69 @@ export class AdminController {
   @Put('products/:id/reject')
   rejectProduct(@Param('id') id: string, @Body('reason') reason: string) {
     return this.adminService.rejectProduct(+id, reason);
+  }
+
+  // --- CATEGORIES ---
+
+  @Get('categories')
+  getCategories() {
+    return this.adminService.getCategories();
+  }
+
+  @Get('categories/:id')
+  getCategoryById(@Param('id') id: string) {
+    return this.adminService.getCategoryById(+id);
+  }
+
+  @Post('categories')
+  createCategory(@Body() data: any) {
+    return this.adminService.createCategory(data);
+  }
+
+  @Put('categories/:id')
+  updateCategory(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateCategory(+id, data);
+  }
+
+  @Delete('categories/:id')
+  deleteCategory(@Param('id') id: string) {
+    return this.adminService.deleteCategory(+id);
+  }
+
+  // --- ATTRIBUTES ---
+
+  @Get('categories/:id/attributes')
+  getCategoryAttributes(@Param('id') id: string) {
+    return this.adminService.getCategoryAttributes(+id);
+  }
+
+  @Post('categories/:id/attributes')
+  createAttribute(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.createAttribute(+id, data);
+  }
+
+  @Put('attributes/:id')
+  updateAttribute(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateAttribute(+id, data);
+  }
+
+  @Delete('attributes/:id')
+  deleteAttribute(@Param('id') id: string) {
+    return this.adminService.deleteAttribute(+id);
+  }
+
+  @Post('attributes/:id/options')
+  createAttributeOption(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.createAttributeOption(+id, data);
+  }
+
+  @Put('attribute-options/:id')
+  updateAttributeOption(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateAttributeOption(+id, data);
+  }
+
+  @Delete('attribute-options/:id')
+  deleteAttributeOption(@Param('id') id: string) {
+    return this.adminService.deleteAttributeOption(+id);
   }
 }

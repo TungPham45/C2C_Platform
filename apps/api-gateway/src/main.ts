@@ -1,8 +1,8 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 import { Logger } from '@nestjs/common';
-import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as jwt from 'jsonwebtoken';
+import { createReverseProxy } from './app/reverse-proxy';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -30,34 +30,19 @@ async function bootstrap() {
   });
 
   // Proxy Auth Service
-  app.use('/api/auth', createProxyMiddleware({
-    target: authServiceUrl,
-    changeOrigin: true,
-  }));
+  app.use('/api/auth', createReverseProxy(authServiceUrl));
 
   // Proxy Product Service
-  app.use('/api/products', createProxyMiddleware({
-    target: productServiceUrl,
-    changeOrigin: true,
-  }));
+  app.use('/api/products', createReverseProxy(productServiceUrl));
 
   // Proxy Admin Service
-  app.use('/api/admin', createProxyMiddleware({
-    target: adminServiceUrl,
-    changeOrigin: true,
-  }));
+  app.use('/api/admin', createReverseProxy(adminServiceUrl));
 
   // Proxy Order Service
-  app.use('/api/orders', createProxyMiddleware({
-    target: orderServiceUrl,
-    changeOrigin: true,
-  }));
+  app.use('/api/orders', createReverseProxy(orderServiceUrl));
 
   // Proxy product uploads so the browser only needs the gateway's public URL.
-  app.use('/uploads', createProxyMiddleware({
-    target: productPublicUrl,
-    changeOrigin: true,
-  }));
+  app.use('/uploads', createReverseProxy(productPublicUrl));
 
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix); // Won't apply to raw .use middlewares above without rewriting. 

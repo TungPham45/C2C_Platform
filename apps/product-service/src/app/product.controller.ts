@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Headers, UnauthorizedException, Inject, UseInterceptors, UploadedFile, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Headers, UnauthorizedException, Inject, UseInterceptors, UploadedFile, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ProductService } from './product.service';
 
@@ -134,6 +134,120 @@ export class ProductController {
     if (!ids) return [];
     const idArray = ids.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
     return this.productService.getShopsByIds(idArray);
+  }
+
+  // --- CATEGORY MANAGEMENT ---
+
+  @Get('internal/admin/categories')
+  getAdminCategories(@Headers() headers: Record<string, string | string[] | undefined>) {
+    this.requireInternalAccess(headers);
+    return this.productService.getAdminCategories();
+  }
+
+  @Get('internal/admin/categories/:id')
+  getAdminCategoryById(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Param('id') id: string,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.productService.getAdminCategoryById(+id);
+  }
+
+  @Post('internal/admin/categories')
+  createCategory(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Body() data: any,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.productService.createCategory(data);
+  }
+
+  @Put('internal/admin/categories/:id')
+  updateCategory(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Param('id') id: string,
+    @Body() data: any,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.productService.updateCategory(+id, data);
+  }
+
+  @Delete('internal/admin/categories/:id')
+  deleteCategory(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Param('id') id: string,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.productService.deleteCategory(+id);
+  }
+
+  // --- ATTRIBUTE MANAGEMENT ---
+
+  @Get('internal/admin/categories/:id/attributes')
+  getAdminCategoryAttributes(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Param('id') id: string,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.productService.getAdminCategoryAttributes(+id);
+  }
+
+  @Post('internal/admin/categories/:categoryId/attributes')
+  createAttributeDefinition(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Param('categoryId') categoryId: string,
+    @Body() data: any,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.productService.createAttributeDefinition(+categoryId, data);
+  }
+
+  @Put('internal/admin/attributes/:id')
+  updateAttributeDefinition(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Param('id') id: string,
+    @Body() data: any,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.productService.updateAttributeDefinition(+id, data);
+  }
+
+  @Delete('internal/admin/attributes/:id')
+  deleteAttributeDefinition(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Param('id') id: string,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.productService.deleteAttributeDefinition(+id);
+  }
+
+  @Post('internal/admin/attributes/:attributeId/options')
+  createAttributeOption(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Param('attributeId') attributeId: string,
+    @Body() data: any,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.productService.createAttributeOption(+attributeId, data);
+  }
+
+  @Put('internal/admin/attribute-options/:id')
+  updateAttributeOption(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Param('id') id: string,
+    @Body() data: any,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.productService.updateAttributeOption(+id, data);
+  }
+
+  @Delete('internal/admin/attribute-options/:id')
+  deleteAttributeOption(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Param('id') id: string,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.productService.deleteAttributeOption(+id);
   }
 
   @Get('internal/admin/pending-products')
