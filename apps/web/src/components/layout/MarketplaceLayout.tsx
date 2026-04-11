@@ -1,6 +1,7 @@
 import { FC, ReactNode, useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-
+import { useCart } from '../../hooks/useCart';
+import { FaFacebookF, FaInstagram, FaTwitter, FaYoutube } from "react-icons/fa";
 interface MarketplaceLayoutProps {
   children: ReactNode;
 }
@@ -16,9 +17,19 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
     if (userStr) {
       try {
         setCurrentUser(JSON.parse(userStr));
-      } catch (e) {}
+      } catch (e) { }
     }
   }, []);
+
+  const { cartItems, fetchCartItems } = useCart();
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchCartItems();
+    }
+  }, [currentUser, fetchCartItems]);
+
+  const totalCartItems = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
   const handleLogout = () => {
     localStorage.removeItem('c2c_token');
@@ -51,9 +62,15 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
           {/* Search Bar */}
           <div className="hidden md:flex items-center flex-1 max-w-xl mx-12">
             <div className="w-full relative group">
-              <input 
-                type="text" 
-                placeholder="Tìm kiếm sản phẩm, cửa hàng..." 
+              <input
+                type="text"
+                placeholder="Tìm kiếm sản phẩm, cửa hàng..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const val = e.currentTarget.value.trim();
+                    if (val) navigate(`/products?q=${encodeURIComponent(val)}`);
+                  }
+                }}
                 className="w-full h-11 pl-12 pr-4 bg-[#f5faff]/50 border border-transparent focus:bg-white focus:border-[#00629d]/10 rounded-2xl text-sm outline-none transition-all placeholder:text-[#707882]/50"
               />
               <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#707882] group-focus-within:text-[#00629d] transition-colors">search</span>
@@ -74,15 +91,24 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
               </Link>
             )}
             <div className="w-px h-6 bg-[#00629d]/10 hidden lg:block"></div>
-            
+
             <div className="flex items-center gap-4">
               {currentUser?.role !== 'admin' && (
-                <button className="relative w-10 h-10 flex items-center justify-center text-[#0f1d25] hover:bg-white/50 rounded-xl transition-colors">
-                  <span className="material-symbols-outlined">shopping_bag</span>
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#ba1a1a] text-white text-[10px] flex items-center justify-center rounded-full font-bold">3</span>
-                </button>
+                <>
+                  <Link to="/messages" className="relative w-10 h-10 flex items-center justify-center text-[#0f1d25] hover:bg-white/50 rounded-xl transition-colors" title="Tin nhắn">
+                    <span className="material-symbols-outlined">chat</span>
+                  </Link>
+                  <Link to="/cart" className="relative w-10 h-10 flex items-center justify-center text-[#0f1d25] hover:bg-white/50 rounded-xl transition-colors">
+                    <span className="material-symbols-outlined">shopping_bag</span>
+                    {totalCartItems > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-[#ba1a1a] text-white text-[10px] flex items-center justify-center rounded-full font-bold">
+                        {totalCartItems}
+                      </span>
+                    )}
+                  </Link>
+                </>
               )}
-              
+
               {currentUser ? (
                 <div className="relative group">
                   <button className="px-6 py-2.5 bg-[#00629d] text-white rounded-full hover:bg-[#004e7c] transition-all shadow-md shadow-blue-500/20 flex items-center gap-2">
@@ -92,14 +118,33 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
                   {/* Dropdown Menu */}
                   <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-[#dbeaf5] rounded-2xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right group-hover:translate-y-0 translate-y-2 z-50 overflow-hidden">
                     <div className="py-2">
-                      <Link to="/profile" className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]">
-                        <span className="material-symbols-outlined text-[#00629d] text-lg">manage_accounts</span>
-                        Hồ sơ của tôi
-                      </Link>
-                      <Link to="/orders" className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]">
-                        <span className="material-symbols-outlined text-[#00629d] text-lg">receipt_long</span>
-                        Đơn mua
-                      </Link>
+                      {currentUser.role === 'admin' ? (
+                        <>
+                          <Link to="/admin" className="flex items-center gap-3 px-5 py-3 hover:bg-purple-50 transition-colors text-sm font-bold text-[#0f1d25]">
+                            <span className="material-symbols-outlined text-purple-600 text-lg">admin_panel_settings</span>
+                            Bảng quản trị
+                          </Link>
+                          <Link to="/admin/products" className="flex items-center gap-3 px-5 py-3 hover:bg-purple-50 transition-colors text-sm font-bold text-[#0f1d25]">
+                            <span className="material-symbols-outlined text-purple-600 text-lg">inventory_2</span>
+                            Duyệt sản phẩm
+                          </Link>
+                          <Link to="/admin/users" className="flex items-center gap-3 px-5 py-3 hover:bg-purple-50 transition-colors text-sm font-bold text-[#0f1d25]">
+                            <span className="material-symbols-outlined text-purple-600 text-lg">group</span>
+                            Quản lý người dùng
+                          </Link>
+                        </>
+                      ) : (
+                        <>
+                          <Link to="/profile" className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]">
+                            <span className="material-symbols-outlined text-[#00629d] text-lg">manage_accounts</span>
+                            Hồ sơ của tôi
+                          </Link>
+                          <Link to="/orders" className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]">
+                            <span className="material-symbols-outlined text-[#00629d] text-lg">receipt_long</span>
+                            Đơn mua
+                          </Link>
+                        </>
+                      )}
                       <div className="border-t border-[#e9f5ff] my-1"></div>
                       <button onClick={handleLogout} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-red-50 hover:text-red-600 transition-colors text-sm font-bold text-[#707882] text-left">
                         <span className="material-symbols-outlined text-lg">logout</span>
@@ -138,11 +183,30 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
                 Nền tảng thương mại điện tử C2C cao cấp. Tinh tế và đẳng cấp.
               </p>
               <div className="flex gap-4">
-                {['facebook', 'instagram', 'twitter', 'youtube'].map(s => (
-                  <button key={s} className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
-                    <span className="material-symbols-outlined text-lg">{s}</span>
-                  </button>
-                ))}
+                <button className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
+                  <a href="https://www.facebook.com/" target="_blank" rel="noopener noreferrer">
+                    <FaFacebookF className="text-white text-lg" />
+                  </a>
+                </button>
+
+                <button className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
+                  <a href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer">
+                    <FaYoutube className="text-white text-lg" />
+                  </a>
+                </button>
+
+                <button className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
+                  <a href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer">
+                    <FaInstagram className="text-white text-lg" />
+                  </a>
+                </button>
+
+                <button className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
+                  <a href="https://www.twitter.com/" target="_blank" rel="noopener noreferrer">
+                    <FaTwitter className="text-white text-lg" />
+                  </a>
+                </button>
+
               </div>
             </div>
 
@@ -186,7 +250,7 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
             </div>
           </div>
         </div>
-      </footer>
-    </div>
+      </footer >
+    </div >
   );
 };

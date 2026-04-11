@@ -51,6 +51,10 @@ export const SellerLayout: FC<SellerLayoutProps> = ({ children, pageTitle = 'Ser
             <span className="material-symbols-outlined">inventory_2</span> Sản phẩm
           </NavLink>
           
+          <NavLink to="/seller/chat" className={getNavLinkClass}>
+            <span className="material-symbols-outlined">chat</span> Tin nhắn
+          </NavLink>
+          
           <a href="#" className="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-60">
             <span className="material-symbols-outlined">layers</span> Kho hàng
           </a>

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UnauthorizedException, Inject, Get, Headers, ForbiddenException, Put, Param } from '@nestjs/common';
+import { Controller, Post, Body, UnauthorizedException, Inject, Get, Headers, ForbiddenException, Put, Param, Query } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
 @Controller('auth')
@@ -19,7 +19,10 @@ export class AuthController {
     const { email, password } = body;
     const user = await this.authService.validateUser(email, password);
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ');
+    }
+    if (user.status === 'suspended' || user.status === 'banned') {
+      throw new ForbiddenException('Tài khoản của bạn đã bị đình chỉ hoặc khoá. Vui lòng liên hệ bộ phận hỗ trợ.');
     }
     return this.authService.login(user);
   }
@@ -67,8 +70,22 @@ export class AuthController {
   }
 
   @Get('internal/admin/analytics/user-growth')
-  getUserGrowthAnalytics(@Headers() headers: Record<string, string | string[] | undefined>) {
+  getUserGrowthAnalytics(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query('timeframe') timeframe?: string
+  ) {
     this.requireInternalAccess(headers);
-    return this.authService.getUserGrowthAnalytics();
+    return this.authService.getUserGrowthAnalytics(timeframe);
+  }
+
+  @Get('internal/users-by-ids')
+  getUsersByIds(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query('ids') ids: string,
+  ) {
+    this.requireInternalAccess(headers);
+    if (!ids) return [];
+    const idArray = ids.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
+    return this.authService.getUsersByIds(idArray);
   }
 }

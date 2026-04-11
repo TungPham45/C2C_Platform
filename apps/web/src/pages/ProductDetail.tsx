@@ -2,6 +2,7 @@ import { FC, useEffect, useState, useMemo } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useProducts } from '../hooks/useProducts';
+import { useCart } from '../hooks/useCart';
 
 export const ProductDetailPage: FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -14,6 +15,11 @@ export const ProductDetailPage: FC = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [quantity, setQuantity] = useState(1);
   const [selections, setSelections] = useState<Record<string, string>>({});
+  const [isStartingChat, setIsStartingChat] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+
+  const { addToCart } = useCart();
 
   useEffect(() => {
     const userStr = localStorage.getItem('c2c_user');
@@ -92,6 +98,86 @@ export const ProductDetailPage: FC = () => {
     });
   };
 
+  const handleStartChat = async () => {
+    const token = localStorage.getItem('c2c_token');
+    if (!token) {
+      navigate('/login', { state: { from: location.pathname } });
+      return;
+    }
+    
+    if (!product || !product.shop_id || !product.shop?.owner_id) {
+       alert("Shop không khả dụng để chat.");
+       return;
+    }
+
+    try {
+       setIsStartingChat(true);
+       const res = await fetch('/api/chat/conversations', {
+          method: 'POST',
+          headers: {
+             'Content-Type': 'application/json',
+             'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ shop_id: product.shop_id, seller_id: product.shop.owner_id })
+       });
+       
+       if (!res.ok) throw new Error("Could not start chat");
+       const json = await res.json();
+       navigate(`/messages?convId=${json.id}`);
+    } catch (e: any) {
+       alert("Không thể bắt đầu chat lúc này.");
+    } finally {
+       setIsStartingChat(false);
+    }
+  };
+
+  const handleAddToCart = async () => {
+    const token = localStorage.getItem('c2c_token');
+    if (!token) {
+      navigate('/login', { state: { from: location.pathname } });
+      return;
+    }
+
+    if (!selectedVariant) return;
+    
+    const success = await addToCart(product.shop_id, selectedVariant.id, quantity);
+    if (success) {
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } else {
+      alert('Có lỗi xảy ra khi thêm vào giỏ hàng.');
+    }
+  };
+
+  const handleAdminRejectProduct = async () => {
+    const reason = window.prompt('Nhập lý do gỡ sản phẩm (sẽ gửi cho người bán):');
+    if (!reason) return;
+    
+    try {
+      setIsRejecting(true);
+      const token = localStorage.getItem('c2c_token');
+      const response = await fetch(`/api/admin/products/${product.id}/reject`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ reason })
+      });
+      
+      if (response.ok) {
+        alert('Đã gỡ sản phẩm thành công');
+        navigate('/admin/products');
+      } else {
+        alert('Có lỗi xảy ra. Không thể gỡ sản phẩm.');
+      }
+    } catch (error) {
+      alert('Có lỗi hệ thống.');
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
   const getPrice = () => {
     let rawPrice = selectedVariant?.price;
     if (rawPrice === undefined || rawPrice === null) {
@@ -101,7 +187,11 @@ export const ProductDetailPage: FC = () => {
     return isNaN(numPrice) ? 0 : numPrice;
   };
 
-  const images = [product.thumbnail_url, ...(product.images || [])].filter(Boolean);
+  const allImages = [
+    product.thumbnail_url,
+    ...(product.images || []).map((img: any) => img.image_url)
+  ].filter(Boolean);
+  const images = Array.from(new Set(allImages));
 
 
 
@@ -305,30 +395,51 @@ export const ProductDetailPage: FC = () => {
                 </div>
               </div>
 
-              {/* Actions */}
+               {/* Actions */}
               <div className="flex items-center gap-4 mt-auto">
-                {currentUser?.shop && String(currentUser.shop.id) === String(product.shop_id) ? (
-                   <button 
-                      onClick={() => navigate(`/seller/edit-product/${product.id}`)}
-                      className="w-full h-14 bg-[#fff8ec] text-[#e09110] rounded-full font-bold text-base flex items-center justify-center gap-2 hover:bg-[#ffeecb] transition-all"
-                   >
-                      <span className="material-symbols-outlined">edit_square</span>
-                      Chỉnh sửa sản phẩm
-                   </button>
-                ) : (
-                   <>
-                      <button className="flex-1 h-14 bg-white border-2 border-[#00629d] text-[#00629d] rounded-full font-bold text-base flex items-center justify-center gap-2 transition-all hover:bg-[#f0f7ff] active:scale-[0.98]">
-                         <span className="material-symbols-outlined">shopping_bag</span>
-                         Thêm vào giỏ
-                      </button>
-                      <button 
-                         onClick={handleBuyNow}
-                         className="flex-1 h-14 bg-[#00629d] text-white rounded-full font-bold text-base transition-all hover:bg-[#004e7c] active:scale-[0.98] shadow-lg shadow-blue-500/20"
-                      >
-                         Mua ngay
-                      </button>
-                   </>
-                )}
+                  {currentUser?.role === 'admin' ? (
+                     <button 
+                        onClick={handleAdminRejectProduct}
+                        disabled={isRejecting}
+                        className="w-full h-14 bg-red-50 text-red-600 rounded-full font-bold text-base flex items-center justify-center gap-2 hover:bg-red-100 transition-all disabled:opacity-50"
+                     >
+                        <span className="material-symbols-outlined">delete_forever</span>
+                        {isRejecting ? 'Đang gỡ...' : 'Gỡ sản phẩm (Bản quyền/Vi phạm)'}
+                     </button>
+                  ) : currentUser?.shop && String(currentUser.shop.id) === String(product.shop_id) ? (
+                     <button 
+                        onClick={() => navigate(`/seller/edit-product/${product.id}`)}
+                        className="w-full h-14 bg-[#fff8ec] text-[#e09110] rounded-full font-bold text-base flex items-center justify-center gap-2 hover:bg-[#ffeecb] transition-all"
+                     >
+                        <span className="material-symbols-outlined">edit_square</span>
+                        Chỉnh sửa sản phẩm
+                     </button>
+                  ) : (
+                     <>
+                        <button 
+                           className="h-14 w-14 bg-white border-2 border-[#00629d] text-[#00629d] rounded-full font-bold flex items-center justify-center transition-all hover:bg-[#f0f7ff] active:scale-[0.98] mr-2"
+                           onClick={handleStartChat}
+                           disabled={isStartingChat}
+                           title="Chat với người bán"
+                        >
+                           <span className={`material-symbols-outlined ${isStartingChat ? 'animate-pulse' : ''}`}>chat</span>
+                        </button>
+                        <button 
+                           onClick={handleAddToCart}
+                           className="flex-1 h-14 bg-white border-2 border-[#00629d] text-[#00629d] rounded-full font-bold text-base flex items-center justify-center gap-2 transition-all hover:bg-[#f0f7ff] active:scale-[0.98]"
+                        >
+                           <span className="material-symbols-outlined">shopping_bag</span>
+                           Thêm vào giỏ
+                        </button>
+                        <button 
+                           onClick={handleBuyNow}
+                           className="flex-1 h-14 bg-[#00629d] text-white rounded-full font-bold text-base transition-all hover:bg-[#004e7c] active:scale-[0.98] shadow-lg shadow-blue-500/20"
+                        >
+                           <span className="material-symbols-outlined">shopping_bag</span>
+                           Mua ngay
+                        </button>
+                     </>
+                  )}
               </div>
             </div>
           </div>
@@ -363,9 +474,9 @@ export const ProductDetailPage: FC = () => {
                   </div>
                 </div>
 
-                <button className="w-full py-3 bg-[#e4e9f0] hover:bg-[#dbeaf5] text-[#00629d] rounded-xl font-bold transition-colors">
+                <Link to={`/shop/${product.shop_id}`} className="w-full py-3 bg-[#e4e9f0] hover:bg-[#dbeaf5] text-[#00629d] rounded-xl font-bold transition-colors block text-center mt-6">
                   Xem cửa hàng
-                </button>
+                </Link>
               </div>
             </div>
 
@@ -487,6 +598,20 @@ export const ProductDetailPage: FC = () => {
 
         </div>
       </div>
+
+      {/* Toast Notification */}
+      <div 
+        className={`fixed bottom-8 left-1/2 -translate-x-1/2 bg-[#0f1d25] text-white px-8 py-4 rounded-full shadow-2xl shadow-black/20 flex items-center gap-4 transition-all duration-300 z-50 ${
+          showToast ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'
+        }`}
+      >
+        <span className="material-symbols-outlined text-[#4caf50]">check_circle</span>
+        <span className="font-semibold text-sm">Đã thêm vào giỏ hàng thành công!</span>
+        <Link to="/cart" className="ml-4 text-xs font-bold text-[#42a5f5] uppercase tracking-wider hover:opacity-80">
+          Xem Giỏ
+        </Link>
+      </div>
+
     </MarketplaceLayout>
   );
 };

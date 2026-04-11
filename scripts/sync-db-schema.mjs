@@ -27,7 +27,7 @@ function run(command, args, stepName) {
   const result = spawnSync(command, args, {
     cwd: repoRoot,
     stdio: 'inherit',
-    shell: false,
+    shell: isWindows,
     env: process.env,
   });
 
@@ -94,8 +94,8 @@ async function main() {
   for (const schemaFile of schemaFiles) {
     run(
       npxCommand,
-      ['prisma', 'migrate', 'deploy', `--schema=${schemaFile}`],
-      `Applying pending migrations for ${schemaFile}`
+      ['prisma', 'db', 'push', `--schema=${schemaFile}`, '--accept-data-loss'],
+      `Applying db push for ${schemaFile}`
     );
   }
 

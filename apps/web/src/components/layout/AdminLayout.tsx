@@ -51,6 +51,10 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children, pageTitle = 'Seren
             <span className="material-symbols-outlined">category</span> Quản lý Danh mục
           </NavLink>
           
+          <NavLink to="/admin/banners" className={getNavLinkClass}>
+            <span className="material-symbols-outlined">view_carousel</span> Quản lý Banner
+          </NavLink>
+          
           <NavLink 
             to="/admin/products" 
             className={() => `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${

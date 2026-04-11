@@ -4,7 +4,7 @@ import { ProductService } from './product.service';
 
 @Controller('products')
 export class ProductController {
-  constructor(@Inject(ProductService) private readonly productService: ProductService) {}
+  constructor(@Inject(ProductService) private readonly productService: ProductService) { }
 
   // Seller context is derived from the authenticated user id in product-service.
   private getProviderUserId(headers: any): number {
@@ -277,6 +277,11 @@ export class ProductController {
 
   // --- PUBLIC ROUTES (TAXONOMY MUST BE BEFORE :id) ---
 
+  @Get('shop/:shopId')
+  getShopDetail(@Param('shopId') shopId: string) {
+    return this.productService.getPublicShopDetail(+shopId);
+  }
+
   @Get('categories/all')
   getCategories() {
     return this.productService.getCategories();
@@ -288,8 +293,8 @@ export class ProductController {
   }
 
   @Get()
-  getAllActiveProducts() {
-    return this.productService.getActiveProducts();
+  getAllActiveProducts(@Query('q') query?: string) {
+    return this.productService.getActiveProducts(query);
   }
 
   @Get(':id')

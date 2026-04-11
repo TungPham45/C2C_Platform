@@ -5,6 +5,7 @@ export const API_BASE_URL = rawApiBaseUrl.replace(/\/+$/, '') || '/api';
 export const AUTH_API_URL = `${API_BASE_URL}/auth`;
 export const PRODUCT_API_URL = `${API_BASE_URL}/products`;
 export const ORDER_API_URL = `${API_BASE_URL}/orders`;
+export const CART_API_URL = `${API_BASE_URL}/cart`;
 
 const LOCAL_ASSET_HOSTS = new Set(['localhost', '127.0.0.1']);
 

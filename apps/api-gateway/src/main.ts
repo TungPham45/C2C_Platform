@@ -11,6 +11,7 @@ async function bootstrap() {
   const productServiceUrl = process.env.PRODUCT_SERVICE_URL ?? 'http://localhost:3001/api/products';
   const adminServiceUrl = process.env.ADMIN_SERVICE_URL ?? 'http://localhost:3005/api/admin';
   const orderServiceUrl = process.env.ORDER_SERVICE_URL ?? 'http://localhost:3004/api/orders';
+  const chatServiceUrl = process.env.CHAT_SERVICE_URL ?? 'http://localhost:3006/api/chat';
   const productPublicUrl = process.env.PRODUCT_PUBLIC_URL ?? 'http://localhost:3001/uploads';
   
   // Custom middleware to extract JWT and append headers safely downstream
@@ -32,6 +33,12 @@ async function bootstrap() {
   // Proxy Auth Service
   app.use('/api/auth', createReverseProxy(authServiceUrl));
 
+  // Proxy Chat Service
+  app.use('/api/chat', createProxyMiddleware({
+    target: chatServiceUrl,
+    changeOrigin: true,
+  }));
+
   // Proxy Product Service
   app.use('/api/products', createReverseProxy(productServiceUrl));
 
@@ -40,6 +47,13 @@ async function bootstrap() {
 
   // Proxy Order Service
   app.use('/api/orders', createReverseProxy(orderServiceUrl));
+
+  // Proxy Cart (part of Order Service)
+  const orderBaseUrl = orderServiceUrl.replace(/\/api\/orders\/?$/, '');
+  app.use('/api/cart', createProxyMiddleware({
+    target: `${orderBaseUrl}/api/cart`,
+    changeOrigin: true,
+  }));
 
   // Proxy product uploads so the browser only needs the gateway's public URL.
   app.use('/uploads', createReverseProxy(productPublicUrl));
