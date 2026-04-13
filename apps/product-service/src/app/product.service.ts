@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException, Inject, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, Inject, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 
 @Injectable()
@@ -66,6 +66,23 @@ export class ProductService {
     return descendantIds;
   }
 
+  private async findSellerShopAnyStatus(userId: number) {
+    return this.prisma.shop.findFirst({
+      where: { owner_id: userId },
+      select: {
+        id: true,
+        owner_id: true,
+        name: true,
+        slug: true,
+        description: true,
+        logo_url: true,
+        rating: true,
+        status: true,
+        created_at: true,
+      },
+    });
+  }
+
   private async findActiveSellerShop(userId: number) {
     return this.prisma.shop.findFirst({
       where: {
@@ -96,12 +113,47 @@ export class ProductService {
   // SELLER CONTEXT (CRUD)
   // =====================
 
+  // Update shop profile (name, description, logo)
+  async updateShop(userId: number, data: { name?: string; description?: string; logo_url?: string }) {
+    const shop = await this.findSellerShopAnyStatus(userId);
+    if (!shop) {
+      throw new UnauthorizedException('No seller shop found for this user');
+    }
+
+    const updateData: any = {};
+    if (data.name !== undefined) {
+      const trimmedName = data.name.trim();
+      if (!trimmedName) throw new BadRequestException('Tên shop không được để trống');
+      if (trimmedName.length > 255) throw new BadRequestException('Tên shop quá dài (tối đa 255 ký tự)');
+      updateData.name = trimmedName;
+    }
+    
+    // We can also let the user clear the description, or max length it if needed. Prisma Text type is huge so length isn't a hard limit crash here.
+    if (data.description !== undefined) {
+      updateData.description = data.description.trim();
+    }
+    
+    if (data.logo_url !== undefined) updateData.logo_url = data.logo_url;
+
+    return this.prisma.shop.update({
+      where: { id: shop.id },
+      data: updateData,
+    });
+  }
+
   // Get aggregated dashboard metrics
   async getSellerMetrics(userId: number) {
     const shop = await this.requireActiveSellerShop(userId);
+    // "Chờ duyệt" historically used different statuses across modules.
+    // Count all non-active states that represent moderation queue.
     const [active, pending] = await Promise.all([
       this.prisma.product.count({ where: { shop_id: shop.id, status: 'active' } }),
-      this.prisma.product.count({ where: { shop_id: shop.id, status: 'draft' } })
+      this.prisma.product.count({
+        where: {
+          shop_id: shop.id,
+          status: { in: ['draft', 'pending_approval', 'pending'] },
+        },
+      }),
     ]);
     
     return {
@@ -109,6 +161,95 @@ export class ProductService {
       pendingProducts: pending,
       totalRevenue: '0.00', // Mock data pending Phase 5 Order Service
       pendingOrders: 0      // Mock data pending Phase 5 Order Service
+    };
+  }
+
+  // Get deep analytics data (combining product views + remote order revenue)
+  async getSellerAnalytics(userId: number, days: number = 10) {
+    const shop = await this.requireActiveSellerShop(userId);
+
+    // 1. Fetch Product Metrics (totalViews, topProducts)
+    const [viewAgg, topProducts] = await Promise.all([
+      this.prisma.product.aggregate({
+        where: { shop_id: shop.id },
+        _sum: { view_count: true },
+      }),
+      this.prisma.product.findMany({
+        where: { shop_id: shop.id },
+        orderBy: { sold_count: 'desc' },
+        take: 5,
+        select: { name: true, sold_count: true }
+      })
+    ]);
+
+    const totalViews = viewAgg._sum.view_count || 0;
+    const topProductsData = topProducts.map(p => ({
+      name: p.name,
+      sales: p.sold_count || 0
+    }));
+
+    if (topProductsData.length === 0) {
+      topProductsData.push({ name: 'Chưa có sản phẩm', sales: 0 });
+    }
+
+    // 2. Fetch Order Metrics from order-service
+    let totalOrders = 0;
+    let totalRevenue = 0;
+    let trendData: Array<{ date: string; views: number; revenue: number; orders: number }> = [];
+
+    try {
+      const orderUrl = process.env.ORDER_SERVICE_URL || 'http://localhost:3004/api/orders';
+      const token = process.env.INTERNAL_SERVICE_TOKEN || 'internal-dev-token';
+      const res = await fetch(`${orderUrl}/internal/seller-analytics?shopId=${shop.id}&days=${days}`, {
+        headers: { 'x-internal-token': token }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        totalOrders = data.totalOrders || 0;
+        totalRevenue = data.totalRevenue || 0;
+        
+        // Spread views evenly as approximation, since we only track a total counter natively
+        const avgViews = totalViews > 0 ? Math.round(totalViews / days) : 0;
+        trendData = (data.trendData || []).map((t: any) => ({
+          date: t.date,
+          orders: t.orders,
+          revenue: t.revenue,
+          views: avgViews
+        }));
+      } else {
+        console.error('[product-service] Order analytics API failed', res.status);
+      }
+    } catch (e: any) {
+      console.error('[product-service] Failed to fetch order analytics (Network error)', e.message);
+    }
+
+    // Fallback if order service is down
+    if (trendData.length === 0) {
+      const today = new Date();
+      for (let i = days - 1; i >= 0; i--) {
+        const iterDate = new Date(today);
+        iterDate.setDate(iterDate.getDate() - i);
+        const key = `${iterDate.getDate()}/${iterDate.getMonth() + 1}`;
+        trendData.push({
+          date: key,
+          orders: 0,
+          revenue: 0,
+          views: Math.round(totalViews / days) || 0
+        });
+      }
+    }
+
+    // Calculate real conversion rate 
+    // unique visitors would be ideal, but we use views as proxy.
+    const conversionRate = totalViews > 0 ? ((totalOrders / totalViews) * 100).toFixed(1) : '0';
+
+    return {
+      totalViews,
+      totalOrders,
+      totalRevenue,
+      conversionRate,
+      topProductsData,
+      trendData
     };
   }
 
@@ -317,44 +458,45 @@ export class ProductService {
 
   // Get a single product for seller editing (no status filter, all relations)
   async getSellerContext(userId: number) {
-    const shop = await this.prisma.shop.findFirst({
-      where: { owner_id: userId },
-      select: {
-        id: true,
-        owner_id: true,
-        name: true,
-        slug: true,
-        logo_url: true,
-        rating: true,
-        status: true
-      }
-    });
-
+    const shop = await this.findSellerShopAnyStatus(userId);
     return {
-      isSeller: !!shop && shop.status === 'active',
+      isSeller: !!shop,
       shop
     };
   }
 
   async registerShop(userId: number, data: any) {
-    const existingShop = await this.prisma.shop.findFirst({
-      where: { owner_id: userId }
-    });
-
+    const existingShop = await this.findSellerShopAnyStatus(userId);
     if (existingShop) {
       throw new BadRequestException('You have already registered a shop');
     }
 
-    const slug = this.generateSlug(data.name || 'shop');
+    const name = String(data?.name || '').trim();
+    if (!name) {
+      throw new BadRequestException('Shop name is required');
+    }
+
+    const slug = this.generateSlug(name || 'shop');
     return this.prisma.shop.create({
       data: {
         owner_id: userId,
-        name: data.name,
-        slug: slug,
-        description: data.description || '',
-        logo_url: data.logo_url || null,
-        status: 'pending'
-      }
+        name,
+        slug,
+        description: String(data?.description || ''),
+        logo_url: data?.logo_url || null,
+        status: 'pending',
+      },
+      select: {
+        id: true,
+        owner_id: true,
+        name: true,
+        slug: true,
+        description: true,
+        logo_url: true,
+        rating: true,
+        status: true,
+        created_at: true,
+      },
     });
   }
 
@@ -644,6 +786,7 @@ export class ProductService {
 
   async getAllShops() {
     return this.prisma.shop.findMany({
+      orderBy: { created_at: 'desc' },
       select: {
         id: true,
         name: true,
@@ -651,60 +794,31 @@ export class ProductService {
         owner_id: true,
         status: true,
         created_at: true,
-      },
-      orderBy: { created_at: 'desc' },
+        rating: true,
+      }
     });
   }
 
   async updateShopStatus(id: number, status: string) {
-    const shop = await this.prisma.shop.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-
-    if (!shop) {
-      throw new NotFoundException('Shop not found');
-    }
-
+    const shop = await this.prisma.shop.findUnique({ where: { id } });
+    if (!shop) throw new NotFoundException('Shop not found');
     return this.prisma.shop.update({
       where: { id },
       data: { status },
-      select: {
-        id: true,
-        status: true,
-      },
+      select: { id: true, status: true }
+    });
+  }
+
+  async getShopsByIds(ids: number[]) {
+    return this.prisma.shop.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true, logo_url: true }
     });
   }
 
   // =====================
   // PUBLIC CONTEXT
   // =====================
-
-  async getPublicShopDetail(shopId: number) {
-    const shop = await this.prisma.shop.findUnique({
-      where: { id: shopId, status: 'active' },
-      include: {
-        _count: {
-          select: { products: { where: { status: 'active' } } }
-        }
-      }
-    });
-
-    if (!shop) {
-      throw new NotFoundException('Shop not found or not active');
-    }
-
-    const products = await this.prisma.product.findMany({
-      where: { shop_id: shop.id, status: 'active' },
-      include: {
-        images: { where: { is_primary: true } },
-        shop: { select: { name: true, rating: true } }
-      },
-      orderBy: { created_at: 'desc' }
-    });
-
-    return { ...shop, products };
-  }
 
   // Homepage / Discovery: List all 'active' products
   async getActiveProducts(searchQuery?: string, categorySlug?: string) {
@@ -726,7 +840,6 @@ export class ProductService {
       const categoryIds = await this.getCategoryDescendantIds(category.id);
       where.category_id = { in: categoryIds };
     }
-    
     if (searchQuery && searchQuery.trim() !== '') {
       where.name = { contains: searchQuery.trim(), mode: 'insensitive' };
     }
@@ -738,7 +851,7 @@ export class ProductService {
         images: { where: { is_primary: true } } 
       },
       orderBy: { created_at: 'desc' },
-      take: 40 // Tăng limit lên 40 cho ProductsPage hiển thị nhiều hơn
+      take: 40
     });
   }
 
@@ -761,7 +874,75 @@ export class ProductService {
       }
     });
     if (!product || product.status !== 'active') throw new NotFoundException('Product not available');
+
+    await this.prisma.product.update({
+      where: { id },
+      data: { view_count: { increment: 1 } }
+    });
+    product.view_count = (product.view_count || 0) + 1;
+
     return product;
+  }
+
+  // =====================
+  // PUBLIC SHOP STOREFRONT
+  // =====================
+
+  async getPublicShopById(shopId: number) {
+    const shop = await this.prisma.shop.findUnique({
+      where: { id: shopId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        logo_url: true,
+        rating: true,
+        status: true,
+        created_at: true,
+        _count: {
+          select: {
+            products: { where: { status: 'active' } },
+          },
+        },
+      },
+    });
+
+    if (!shop || shop.status !== 'active') {
+      throw new NotFoundException('Shop not available');
+    }
+
+    return shop;
+  }
+
+  async getPublicShopProducts(shopId: number) {
+    const shop = await this.prisma.shop.findUnique({
+      where: { id: shopId },
+      select: { id: true, status: true },
+    });
+
+    if (!shop || shop.status !== 'active') {
+      throw new NotFoundException('Shop not available');
+    }
+
+    return this.prisma.product.findMany({
+      where: { shop_id: shopId, status: 'active' },
+      select: {
+        id: true,
+        shop_id: true,
+        name: true,
+        thumbnail_url: true,
+        base_price: true,
+        rating: true,
+        sold_count: true,
+        created_at: true,
+        category: { select: { name: true } },
+        images: { where: { is_primary: true }, select: { image_url: true, is_primary: true } },
+        variants: { select: { id: true, price_override: true, stock_quantity: true } },
+      },
+      orderBy: { created_at: 'desc' },
+      take: 60,
+    });
   }
 
   // =====================
@@ -813,17 +994,255 @@ export class ProductService {
     });
   }
 
-  async getShopsByIds(ids: number[]) {
-    return this.prisma.shop.findMany({
-      where: {
-        id: { in: ids }
-      },
-      select: {
-        id: true,
-        name: true,
-        logo_url: true,
-        slug: true
-      }
+  // =====================
+  // REVIEWS
+  // =====================
+
+  async getProductReviews(productId: number, page = 1, limit = 10) {
+    const product = await this.prisma.product.findUnique({ where: { id: productId }, select: { id: true, status: true } });
+    if (!product) throw new NotFoundException('Product not found');
+
+    const skip = (page - 1) * limit;
+
+    const [reviews, total] = await Promise.all([
+      this.prisma.review.findMany({
+        where: { product_id: productId },
+        orderBy: { created_at: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.review.count({ where: { product_id: productId } }),
+    ]);
+
+    // Rating distribution
+    const distribution = await this.prisma.review.groupBy({
+      by: ['rating'],
+      where: { product_id: productId },
+      _count: { id: true },
     });
+
+    const ratingDist: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    distribution.forEach(d => { ratingDist[d.rating] = d._count.id; });
+
+    const avg = total > 0
+      ? distribution.reduce((sum, d) => sum + d.rating * d._count.id, 0) / total
+      : 0;
+
+    return {
+      reviews,
+      total,
+      page,
+      limit,
+      avg_rating: Math.round(avg * 10) / 10,
+      rating_distribution: ratingDist,
+    };
+  }
+
+  async createReview(userId: number, productId: number, data: { rating: number; comment?: string; media_urls?: string[]; shop_order_id: number }) {
+    const product = await this.prisma.product.findUnique({ where: { id: productId }, select: { id: true, shop_id: true } });
+    if (!product) throw new NotFoundException('Product not found');
+
+    // 1. Cross-service integrity check (Order verification)
+    try {
+      const orderUrl = process.env.ORDER_SERVICE_URL || 'http://localhost:3004/api/orders';
+      const res = await fetch(`${orderUrl}/${data.shop_order_id}`);
+      if (res.ok) {
+         const orderData = await res.json();
+         const checkoutSession = orderData.checkout_session;
+         if (!checkoutSession || checkoutSession.user_id !== userId) {
+           throw new ForbiddenException('Bạn không phải chủ nhân của đơn hàng này');
+         }
+         if (orderData.status?.toLowerCase() !== 'delivered') {
+           throw new BadRequestException('Bạn chỉ được đánh giá các đơn hàng đã được giao thành công');
+         }
+      }
+    } catch (err: any) {
+       if (err instanceof ForbiddenException || err instanceof BadRequestException) throw err;
+       console.error('[ProductService] Lỗi kết nối liên dịch vụ (OrderService):', err.message);
+    }
+
+    if (!data.rating || data.rating < 1 || data.rating > 5) {
+      throw new BadRequestException('Rating must be between 1 and 5');
+    }
+
+    // Check duplicate
+    const existing = await this.prisma.review.findUnique({
+      where: {
+        user_id_product_id_shop_order_id: {
+          user_id: userId,
+          product_id: productId,
+          shop_order_id: data.shop_order_id,
+        },
+      },
+    });
+    if (existing) {
+      throw new BadRequestException('Bạn đã đánh giá sản phẩm này cho đơn hàng này rồi');
+    }
+
+    const review = await this.prisma.review.create({
+      data: {
+        user_id: userId,
+        product_id: productId,
+        shop_order_id: data.shop_order_id,
+        rating: data.rating,
+        comment: data.comment || null,
+        media_urls: data.media_urls || [],
+      },
+    });
+
+    // Recalculate product rating
+    const agg = await this.prisma.review.aggregate({
+      where: { product_id: productId },
+      _avg: { rating: true },
+    });
+    const newRating = Math.round((agg._avg.rating || 0) * 100) / 100;
+    await this.prisma.product.update({
+      where: { id: productId },
+      data: { rating: newRating },
+    });
+
+    // Recalculate shop rating (Trung bình của tất cả review sản phẩm trong Shop)
+    const allShopReviews = await this.prisma.review.aggregate({
+      where: { product: { shop_id: product.shop_id } },
+      _count: { id: true },
+      _avg: { rating: true },
+    });
+    
+    if (allShopReviews._count.id > 0) {
+      await this.prisma.shop.update({
+        where: { id: product.shop_id },
+        data: { rating: Math.round((allShopReviews._avg.rating || 0) * 100) / 100 },
+      });
+    }
+
+    return review;
+  }
+
+  async getShopReviews(userId: number, filters?: { rating?: number; status?: string }) {
+    const shop = await this.requireActiveSellerShop(userId);
+    const where: any = { product: { shop_id: shop.id } };
+    
+    if (filters?.rating) {
+      where.rating = filters.rating;
+    }
+    if (filters?.status === 'replied') {
+      where.seller_reply = { not: null };
+    } else if (filters?.status === 'unreplied') {
+      where.seller_reply = null;
+    }
+
+    return this.prisma.review.findMany({
+      where,
+      include: {
+        product: { select: { id: true, name: true, thumbnail_url: true } },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+  }
+
+  async getMyReviews(userId: number) {
+    const reviews = await this.prisma.review.findMany({
+      where: { user_id: userId },
+      select: { id: true, shop_order_id: true, product_id: true, rating: true, comment: true, media_urls: true }
+    });
+    return reviews;
+  }
+  async replyToReview(userId: number, reviewId: number, reply: string) {
+    const shop = await this.requireActiveSellerShop(userId);
+    const review = await this.prisma.review.findUnique({
+      where: { id: reviewId },
+      include: { product: { select: { shop_id: true } } },
+    });
+    if (!review) throw new NotFoundException('Review not found');
+    if (review.product.shop_id !== shop.id) {
+      throw new BadRequestException('Bạn không có quyền phản hồi đánh giá này');
+    }
+
+    return this.prisma.review.update({
+      where: { id: reviewId },
+      data: {
+        seller_reply: reply,
+        replied_at: new Date(),
+      },
+    });
+  }
+
+  async updateReview(userId: number, reviewId: number, data: { rating?: number; comment?: string; media_urls?: string[] }) {
+    const review = await this.prisma.review.findUnique({ where: { id: reviewId }, include: { product: true } });
+    if (!review) throw new NotFoundException('Review not found');
+    if (review.user_id !== userId) throw new ForbiddenException('Bạn không có quyền sửa đánh giá này');
+
+    if (data.rating && (data.rating < 1 || data.rating > 5)) {
+      throw new BadRequestException('Rating must be between 1 and 5');
+    }
+
+    const updated = await this.prisma.review.update({
+      where: { id: reviewId },
+      data: {
+        rating: data.rating ?? review.rating,
+        comment: data.comment !== undefined ? data.comment : review.comment,
+        media_urls: data.media_urls !== undefined ? data.media_urls : review.media_urls,
+      },
+    });
+
+    if (data.rating && data.rating !== review.rating) {
+      // Recalculate product rating
+      const agg = await this.prisma.review.aggregate({
+        where: { product_id: review.product_id },
+        _avg: { rating: true },
+      });
+      const newRating = Math.round((agg._avg.rating || 0) * 100) / 100;
+      await this.prisma.product.update({
+        where: { id: review.product_id },
+        data: { rating: newRating },
+      });
+
+      // Recalculate shop rating
+      const allShopReviews = await this.prisma.review.aggregate({
+        where: { product: { shop_id: review.product.shop_id } },
+        _count: { id: true },
+        _avg: { rating: true },
+      });
+      if (allShopReviews._count.id > 0) {
+        await this.prisma.shop.update({
+          where: { id: review.product.shop_id },
+          data: { rating: Math.round((allShopReviews._avg.rating || 0) * 100) / 100 },
+        });
+      }
+    }
+    return updated;
+  }
+
+  async deleteReview(userId: number, reviewId: number) {
+    const review = await this.prisma.review.findUnique({ where: { id: reviewId }, include: { product: true } });
+    if (!review) throw new NotFoundException('Review not found');
+    if (review.user_id !== userId) throw new ForbiddenException('Bạn không có quyền xóa đánh giá này');
+
+    await this.prisma.review.delete({ where: { id: reviewId } });
+
+    // Recalculate product rating
+    const agg = await this.prisma.review.aggregate({
+      where: { product_id: review.product_id },
+      _avg: { rating: true },
+    });
+    const newRating = Math.round((agg._avg.rating || 0) * 100) / 100;
+    await this.prisma.product.update({
+      where: { id: review.product_id },
+      data: { rating: newRating },
+    });
+
+    // Recalculate shop rating
+    const allShopReviews = await this.prisma.review.aggregate({
+      where: { product: { shop_id: review.product.shop_id } },
+      _count: { id: true },
+      _avg: { rating: true },
+    });
+    const shopAvg = allShopReviews._count.id > 0 ? (allShopReviews._avg.rating || 0) : 0;
+    await this.prisma.shop.update({
+      where: { id: review.product.shop_id },
+      data: { rating: Math.round(shopAvg * 100) / 100 },
+    });
+
+    return { success: true };
   }
 }

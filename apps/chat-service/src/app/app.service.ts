@@ -4,8 +4,8 @@ import { PrismaService } from './prisma.service';
 @Injectable()
 export class AppService {
   private readonly logger = new Logger(AppService.name);
-  private readonly authServiceUrl = process.env.AUTH_SERVICE_URL ?? 'http://localhost:3002/api/auth';
-  private readonly productServiceUrl = process.env.PRODUCT_SERVICE_URL ?? 'http://localhost:3001/api/products';
+  private readonly authServiceUrl = process.env.AUTH_SERVICE_URL ?? 'http://127.0.0.1:3002/api/auth';
+  private readonly productServiceUrl = process.env.PRODUCT_SERVICE_URL ?? 'http://127.0.0.1:3001/api/products';
   private readonly internalToken = process.env.INTERNAL_SERVICE_TOKEN ?? 'internal-dev-token';
 
   constructor(private readonly prisma: PrismaService) {}

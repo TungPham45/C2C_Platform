@@ -37,6 +37,8 @@ export class AuthService {
         email: user.email,
         full_name: user.full_name,
         role: user.role,
+        phone: user.phone,
+        avatar_url: user.avatar_url,
         shop: null
       }
     };
@@ -186,6 +188,31 @@ export class AuthService {
       data: { status },
       select: { id: true, status: true },
     });
+  }
+
+  async updateProfile(userId: number, data: { full_name?: string; phone?: string; avatar_url?: string }) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const updateData: any = {};
+    if (data.full_name !== undefined) updateData.full_name = data.full_name;
+    if (data.phone !== undefined) {
+      const phoneVal = data.phone?.trim() || null;
+      // Check if phone is already used by another user
+      if (phoneVal) {
+        const existing = await this.prisma.user.findFirst({ where: { phone: phoneVal, id: { not: userId } } });
+        if (existing) throw new BadRequestException('Số điện thoại này đã được sử dụng bởi tài khoản khác');
+      }
+      updateData.phone = phoneVal;
+    }
+    if (data.avatar_url !== undefined) updateData.avatar_url = data.avatar_url;
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: { id: true, email: true, full_name: true, phone: true, avatar_url: true, role: true },
+    });
+    return updated;
   }
 
   async getUserGrowthAnalytics(timeframe?: string) {

@@ -1,69 +1,138 @@
-import { FC, useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { FC, useEffect, useMemo, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
+import { PRODUCT_API_URL, resolveAssetUrl, normalizeProductAssetUrls } from '../config/api';
 
-interface ShopDetail {
+/** Primary blue & page tint — aligned with storefront mock */
+const SHOP_BLUE = '#2b82c9';
+const SHOP_BG = '#f0f7ff';
+
+type PublicShop = {
   id: number;
+  name?: string | null;
+  slug?: string | null;
+  description?: string | null;
+  logo_url?: string | null;
+  rating?: any;
+  _count?: { products?: number };
+};
+
+type PublicProduct = {
+  id: number;
+  shop_id: number;
   name: string;
-  logo_url: string;
-  rating: number | null;
+  logo_url?: string;
+  rating?: any;
   description?: string;
   slug?: string;
-  _count: { products: number };
-  products: Array<{
-    id: number;
-    name: string;
-    base_price: string;
-    thumbnail_url: string;
-    images: Array<{ image_url: string }>;
-    shop: { name: string; rating: number | null };
-    category?: { name: string };
-    created_at?: string;
-  }>;
-}
+  _count?: { products: number };
+  products?: Array<any>;
+  thumbnail_url?: string | null;
+  base_price?: any;
+  sold_count?: number | null;
+  category?: { name: string } | null;
+  images?: Array<{ image_url: string }>;
+};
 
+const formatCompact = (value: number) => {
+  if (!isFinite(value)) return '0';
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
+  return String(value);
+};
 type TabKey = 'home' | 'all' | 'new';
 
 export const ShopPage: FC = () => {
   const { id } = useParams<{ id: string }>();
-  const [shopDetail, setShopDetail] = useState<ShopDetail | null>(null);
+  const shopId = useMemo(() => Number(id), [id]);
+
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabKey>('home');
   const [isFollowing, setIsFollowing] = useState(false);
+  const [shop, setShop] = useState<PublicShop | null>(null);
+  const [products, setProducts] = useState<PublicProduct[]>([]);
+  const [tab, setTab] = useState<'home' | 'all' | 'new'>('home');
+  const [shopQuery, setShopQuery] = useState('');
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    const fetchShopDetail = async () => {
+  }, [shopId]);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!shopId || Number.isNaN(shopId)) return;
       try {
-        const response = await fetch(`/api/products/shop/${id}`);
-        if (response.ok) {
-          const data = await response.json();
-          setShopDetail(data);
-        } else {
-          setShopDetail(null);
-        }
-      } catch (err) {
-        console.error('Failed to fetch shop', err);
+        setLoading(true);
+        const [shopRes, productsRes] = await Promise.all([
+          fetch(`${PRODUCT_API_URL}/shops/${shopId}`),
+          fetch(`${PRODUCT_API_URL}/shops/${shopId}/products`),
+        ]);
+
+        if (!shopRes.ok) throw new Error('Failed to fetch shop');
+        if (!productsRes.ok) throw new Error('Failed to fetch shop products');
+
+        const shopData = await shopRes.json();
+        const productData = await productsRes.json();
+
+        setShop({
+          ...shopData,
+          logo_url: resolveAssetUrl(shopData?.logo_url),
+        });
+        setProducts(Array.isArray(productData) ? productData.map(normalizeProductAssetUrls) : []);
       } finally {
         setLoading(false);
       }
     };
-    if (id) {
-      fetchShopDetail();
+    load();
+  }, [shopId]);
+
+  const tabProducts = useMemo(() => {
+    if (!Array.isArray(products)) return [];
+    let list = tab === 'new' ? [...products].slice(0, 12) : [...products];
+    if (tab === 'home' || tab === 'all') {
+      list.sort((a, b) => Number(b.sold_count ?? 0) - Number(a.sold_count ?? 0));
     }
-  }, [id]);
+    const q = shopQuery.trim().toLowerCase();
+    if (q) list = list.filter((p) => p.name.toLowerCase().includes(q));
+    return list;
+  }, [products, tab, shopQuery]);
+
+  const heroName = shop?.name || `Shop #${shopId}`;
+  const rating = Number(shop?.rating ?? 4.9);
+  const productCount = Number(shop?._count?.products ?? products.length ?? 0);
+
+  const searchSlot = (
+    <div className="w-full relative group max-w-xl">
+      <input
+        type="text"
+        value={shopQuery}
+        onChange={(e) => setShopQuery(e.target.value)}
+        placeholder="Search in this shop..."
+        className="w-full h-11 pl-12 pr-4 bg-[#E8EEF5] border border-transparent focus:bg-white focus:border-[#2b82c9]/25 rounded-full text-sm outline-none transition-all placeholder:text-[#6b7c8f]/70 text-[#111827]"
+      />
+      <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#6b7c8f] group-focus-within:text-[#2b82c9] transition-colors text-[20px]">
+        search
+      </span>
+    </div>
+  );
 
   if (loading) {
     return (
-      <MarketplaceLayout>
-        <div className="flex flex-col items-center justify-center py-40 min-h-screen bg-[#f5faff]">
-          <div className="w-12 h-12 border-4 border-[#00629d]/20 border-t-[#00629d] rounded-full animate-spin"></div>
+      <MarketplaceLayout storefrontHeader searchSlot={searchSlot}>
+        <div
+          className="flex flex-col items-center justify-center py-40 min-h-screen"
+          style={{ backgroundColor: SHOP_BG }}
+        >
+          <div
+            className="w-12 h-12 border-4 rounded-full animate-spin"
+            style={{ borderColor: `${SHOP_BLUE}33`, borderTopColor: SHOP_BLUE }}
+          />
         </div>
       </MarketplaceLayout>
     );
   }
 
-  if (!shopDetail) {
+  if (!loading && !shop) {
     return (
       <MarketplaceLayout>
         <div className="bg-[#f5faff] min-h-screen flex flex-col items-center justify-center py-40">
@@ -78,279 +147,276 @@ export const ShopPage: FC = () => {
     );
   }
 
-  const { products } = shopDetail;
-  const productCount = shopDetail._count.products;
-  const shopRating = shopDetail.rating || 4.9;
-
-  // Filter products based on active tab
-  const filteredProducts = activeTab === 'new'
-    ? [...products].sort((a, b) => {
-        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-        return dateB - dateA;
-      }).slice(0, 8)
-    : products;
-
-  // Mock vouchers for the shop (static display)
-  const vouchers = [
-    { discount: '10% OFF', condition: 'Đơn tối thiểu 200K', expires: 'CÒN 2 NGÀY', code: 'SHOP10', color: '#00629d' },
-    { discount: '15% OFF', condition: 'Sản phẩm mới', expires: 'SỐ LƯỢNG CÓ HẠN', code: 'NEW15OFF', color: '#00629d' },
-    { discount: '5% OFF', condition: 'Không giới hạn', expires: 'MỖI NGÀY', code: 'DAILY5', color: '#00629d' },
-  ];
-
-  // Stats
-  const stats = [
-    { value: productCount >= 1000 ? `${(productCount / 1000).toFixed(1)}k` : String(productCount), label: 'SẢN PHẨM' },
-    { value: '48.5k', label: 'NGƯỜI THEO DÕI' },
-    { value: '99%', label: 'PHẢN HỒI' },
-    { value: `${shopRating} ★`, label: 'ĐÁNH GIÁ' },
-  ];
-
-  const tabs: { key: TabKey; label: string }[] = [
-    { key: 'home', label: 'Trang chủ' },
-    { key: 'all', label: 'Tất cả sản phẩm' },
-    { key: 'new', label: 'Sản phẩm mới' },
-  ];
-
   return (
-    <MarketplaceLayout>
-      <div className="bg-[#f5faff] min-h-screen pb-24 font-['Inter']">
-        {/* ==================== SHOP BANNER ==================== */}
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-8">
-          <div className="relative">
-            {/* Banner Background */}
-            <div
-              className="w-full h-[200px] sm:h-[240px] rounded-2xl overflow-hidden relative"
-              style={{
-                background: 'linear-gradient(135deg, #0077b6 0%, #0096c7 30%, #48cae4 60%, #90e0ef 100%)',
-              }}
-            >
-              {/* Decorative shapes */}
-              <div className="absolute inset-0 overflow-hidden">
-                <div className="absolute -top-10 -right-10 w-[200px] h-[200px] bg-white/5 rounded-full"></div>
-                <div className="absolute top-10 right-[30%] w-[120px] h-[120px] bg-white/5 rounded-full"></div>
-                <div className="absolute -bottom-10 left-[20%] w-[160px] h-[160px] bg-white/5 rounded-full"></div>
-                <div className="absolute top-[-30px] left-[-20px] w-[100px] h-[100px] bg-white/8 rounded-full"></div>
+    <MarketplaceLayout storefrontHeader searchSlot={searchSlot}>
+      <div className="min-h-screen pb-24 font-['Inter']" style={{ backgroundColor: SHOP_BG }}>
+        <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+          {/* Storefront header: ~70% cover + ~30% info bar; avatar centered on seam (half blue / half pale) */}
+          <div className="rounded-[28px] overflow-hidden bg-[#f0f7ff] shadow-[0_10px_40px_rgba(43,130,201,0.14)] ring-1 ring-[#d9e8f5]">
+            {/* Cover — medium blue, subtle vertical “panels” */}
+            <div className="relative h-[168px] sm:h-[188px] lg:h-[208px] rounded-t-[28px] overflow-hidden bg-[#2b82c9]">
+              <div className="absolute inset-0 flex">
+                <div className="flex-1 bg-[#2a7fbd]" />
+                <div className="flex-1 bg-[#2b82c9] border-x border-black/[0.07]" />
+                <div className="flex-1 bg-[#2986c5]" />
               </div>
+              <div
+                className="absolute inset-0 pointer-events-none opacity-100"
+                style={{
+                  background:
+                    'linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 40%, rgba(0,0,0,0.04) 100%)',
+                }}
+              />
             </div>
 
-            {/* Shop Info Overlay */}
-            <div className="absolute bottom-0 left-0 right-0 translate-y-1/2 px-6 sm:px-10">
-              <div className="flex items-end gap-5 sm:gap-6">
-                {/* Shop Logo */}
-                <div className="w-[100px] h-[100px] sm:w-[110px] sm:h-[110px] bg-white rounded-full flex items-center justify-center overflow-hidden shadow-xl border-4 border-white shrink-0">
-                  {shopDetail.logo_url ? (
-                    <img
-                      src={shopDetail.logo_url.startsWith('http') ? shopDetail.logo_url : `http://localhost:3000${shopDetail.logo_url}`}
-                      alt="Logo"
-                      className="w-full h-full object-cover rounded-full"
-                    />
-                  ) : (
-                    <div className="w-full h-full rounded-full bg-gradient-to-br from-[#e0efff] to-[#c8e0ff] flex items-center justify-center">
-                      <span className="material-symbols-outlined text-4xl sm:text-5xl text-[#00629d]">storefront</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Shop Name + Actions */}
-                <div className="flex-1 flex flex-col sm:flex-row sm:items-end justify-between gap-3 pb-1">
-                  <div>
-                    <h1 className="text-xl sm:text-2xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25] tracking-tight leading-tight">
-                      {shopDetail.name}
-                    </h1>
-                    <p className="text-[13px] text-[#707882] mt-1">
-                      {shopDetail.description || 'Curated Living for the Modern Sanctuary'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => setIsFollowing(!isFollowing)}
-                      className={`px-5 py-2.5 rounded-full font-bold text-sm transition-all duration-300 ${
-                        isFollowing
-                          ? 'bg-[#e0efff] text-[#00629d] hover:bg-[#d0e5ff]'
-                          : 'bg-[#00629d] text-white hover:bg-[#004e7c] shadow-md shadow-blue-200/50'
-                      }`}
-                    >
-                      {isFollowing ? 'Đang theo dõi' : 'Theo dõi'}
-                    </button>
-                    <button className="px-5 py-2.5 rounded-full font-bold text-sm border-2 border-[#dbeaf5] text-[#0f1d25] bg-white hover:bg-[#f5faff] transition-all">
-                      Chat
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ==================== STATS BAR ==================== */}
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-8 mt-20 sm:mt-20">
-          <div className="bg-white rounded-2xl border border-[#e4e9f0] shadow-sm">
-            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-[#eef2f6]">
-              {stats.map((stat, i) => (
-                <div
-                  key={i}
-                  className="flex flex-col items-center justify-center py-5 sm:py-6 gap-1 hover:bg-[#f5faff] transition-colors"
-                >
-                  <span className="text-xl sm:text-2xl font-black font-['Plus_Jakarta_Sans'] text-[#00629d]">
-                    {stat.value}
-                  </span>
-                  <span className="text-[10px] sm:text-[11px] font-bold text-[#707882] uppercase tracking-[0.15em]">
-                    {stat.label}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ==================== TAB NAVIGATION ==================== */}
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-8 mt-8">
-          <div className="flex items-center gap-1 border-b border-[#eef2f6]">
-            {tabs.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`px-5 py-3.5 text-sm font-bold transition-all relative ${
-                  activeTab === tab.key
-                    ? 'text-[#00629d]'
-                    : 'text-[#707882] hover:text-[#0f1d25]'
-                }`}
+            {/* Bottom info bar — pale blue; flex; avatar overlaps top edge */}
+            <div className="relative flex min-h-[92px] sm:min-h-[96px] sm:h-[96px] items-center justify-between gap-3 sm:gap-4 bg-[#f0f7ff] px-4 sm:px-8 lg:px-10 py-3 sm:py-0 border-t border-white/70">
+              <div
+                className="absolute left-5 sm:left-8 lg:left-10 top-0 z-10 size-[88px] sm:size-[96px] -translate-y-1/2 rounded-full bg-white overflow-hidden border-[5px] border-white ring-1 ring-black/[0.04]"
+                style={{ boxShadow: '0 10px 32px rgba(43, 130, 201, 0.35), 0 4px 12px rgba(0,0,0,0.08)' }}
               >
-                {tab.label}
-                {activeTab === tab.key && (
-                  <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-[#00629d] rounded-full"></div>
+                {shop?.logo_url ? (
+                  <img src={shop.logo_url} alt={heroName} className="size-full object-cover" />
+                ) : (
+                  <div className="size-full flex items-center justify-center bg-white" aria-hidden>
+                    <span
+                      className="material-symbols-outlined text-[48px] sm:text-[52px]"
+                      style={{ color: SHOP_BLUE }}
+                    >
+                      local_cafe
+                    </span>
+                  </div>
                 )}
-              </button>
-            ))}
-          </div>
-        </div>
+              </div>
 
-        {/* ==================== SHOP VOUCHERS ==================== */}
-        {activeTab === 'home' && (
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-8 mt-8">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg sm:text-xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">
-                Mã giảm giá của Shop
-              </h2>
-              <button className="text-sm font-bold text-[#00629d] hover:underline">Xem tất cả</button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {vouchers.map((v, i) => (
-                <div
-                  key={i}
-                  className="bg-white border border-[#e4e9f0] rounded-2xl p-5 flex items-center justify-between hover:shadow-md hover:border-[#00629d]/20 transition-all group relative overflow-hidden"
+              <div className="min-w-0 flex flex-col justify-center pl-[calc(88px+16px)] sm:pl-[calc(96px+20px)] pr-2">
+                <h1 className="text-lg sm:text-xl lg:text-[22px] font-bold text-black leading-tight tracking-tight line-clamp-2 md:line-clamp-none">
+                  {heroName}
+                </h1>
+                <p className="text-xs sm:text-sm text-[#5c6570] font-normal mt-0.5 sm:mt-1 line-clamp-2 leading-snug max-w-xl">
+                  {shop?.description || 'Curated Living for the Modern Sanctuary'}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsFollowing(!isFollowing)}
+                  className="h-9 sm:h-10 px-5 sm:px-7 rounded-full text-xs sm:text-sm font-bold transition hover:brightness-105 active:scale-[0.98] shadow-[0_4px_14px_rgba(43,130,201,0.45)]"
+                  style={isFollowing ? { backgroundColor: '#e0efff', color: SHOP_BLUE } : { backgroundColor: SHOP_BLUE, color: 'white' }}
                 >
-                  {/* Left dashed border decoration */}
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#00629d] to-[#42a5f5] rounded-l-2xl"></div>
+                  {isFollowing ? 'Following' : 'Follow'}
+                </button>
+                <button
+                  type="button"
+                  className="h-9 sm:h-10 px-5 sm:px-7 rounded-full text-xs sm:text-sm font-semibold text-[#3d4f5f] bg-white/65 backdrop-blur-sm border border-white/90 hover:bg-white/90 transition active:scale-[0.98] shadow-sm"
+                >
+                  Chat
+                </button>
+              </div>
+            </div>
 
-                  <div className="pl-3 flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="text-lg font-black text-[#00629d] font-['Plus_Jakarta_Sans']">{v.discount}</span>
-                      <button className="px-3 py-1 bg-[#00629d] text-white text-xs font-bold rounded-full hover:bg-[#004e7c] transition-colors shadow-sm">
-                        Lưu
-                      </button>
+            <div className="px-5 sm:px-8 lg:px-10 pb-8 pt-6 bg-[#f0f7ff]">
+              {/* Stats — equal-width white cards */}
+              <div className="flex flex-wrap lg:flex-nowrap gap-3 sm:gap-4">
+                {[
+                  { value: formatCompact(productCount), label: 'PRODUCTS' },
+                  { value: '48.5k', label: 'FOLLOWERS' },
+                  { value: '99%', label: 'RESPONSE' },
+                  {
+                    value: (
+                      <span className="inline-flex items-center gap-1 justify-center">
+                        {rating.toFixed(1)}
+                        <span className="text-[#eab308] material-symbols-outlined text-[22px] fill-current leading-none">
+                          star
+                        </span>
+                      </span>
+                    ),
+                    label: 'RATINGS',
+                  },
+                ].map((stat) => (
+                  <div
+                    key={stat.label}
+                    className="flex-1 min-w-[calc(50%-0.375rem)] lg:min-w-0 bg-white rounded-[18px] border border-[#e3eef8] py-4 px-2 sm:px-3 text-center shadow-[0_2px_14px_rgba(43,130,201,0.08)]"
+                  >
+                    <div
+                      className="font-black text-lg sm:text-xl font-['Inter',system-ui,sans-serif] leading-none"
+                      style={{ color: SHOP_BLUE }}
+                    >
+                      {stat.value}
                     </div>
-                    <p className="text-xs text-[#707882]">{v.condition}</p>
-                    <div className="flex items-center justify-between mt-3">
-                      <span className="text-[10px] font-bold text-[#a0aab5] uppercase tracking-wider">{v.expires}</span>
-                      <span className="text-[11px] font-black text-[#00629d] tracking-wider">{v.code}</span>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#9ca3af] mt-2.5">
+                      {stat.label}
                     </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Tabs */}
+              <div className="mt-8 flex items-center gap-8 sm:gap-10 text-sm font-bold text-[#8b9bab] border-b border-[#e8f0fb]">
+                {(
+                  [
+                    ['home', 'Home'],
+                    ['all', 'All Products'],
+                    ['new', 'New Products'],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setTab(key as 'home' | 'all' | 'new')}
+                    className={`pb-3 -mb-px border-b-[3px] transition-colors ${
+                      tab === key ? 'text-[#1a2b3c] border-[#2b82c9]' : 'border-transparent hover:text-[#1a2b3c]'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Vouchers */}
+          <div className="mt-10">
+            <div className="flex items-center justify-between mb-5 px-1">
+              <h2 className="text-lg sm:text-xl font-black font-['Plus_Jakarta_Sans'] text-[#1a2b3c]">Shop Vouchers</h2>
+              <button type="button" className="text-sm font-bold text-[#2b82c9] hover:opacity-80 transition-opacity">
+                View All
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { title: '$10 OFF', sub: 'Min. spend $100', code: 'LUMINA10', exp: 'EXPIRES IN 2 DAYS' },
+                { title: '15% OFF', sub: 'New Arrivals Only', code: 'FRESH15', exp: 'EXPIRES IN 5 DAYS' },
+                { title: '$5 OFF', sub: 'No min. spend', code: 'DAILY5', exp: 'EXPIRES IN 1 DAY' },
+              ].map((v) => (
+                <div
+                  key={v.code}
+                  className="rounded-[22px] p-5 sm:p-6 border border-white/80 shadow-[0_4px_20px_rgba(43,120,197,0.08)] bg-gradient-to-br from-[#d4e9ff] via-[#EBF4FF] to-[#f5f9ff]"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[#1a4a7a] font-black text-2xl font-['Plus_Jakarta_Sans'] leading-tight">{v.title}</div>
+                      <div className="text-sm text-[#5c6b7a] font-semibold mt-1">{v.sub}</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="h-9 px-4 rounded-full text-white text-xs font-black uppercase tracking-wider shrink-0 hover:brightness-110 transition"
+                      style={{ backgroundColor: '#1a2b3c' }}
+                    >
+                      Save
+                    </button>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-[#2b82c9]/10 flex flex-wrap items-center justify-between gap-2 text-[10px] font-black uppercase tracking-[0.15em] text-[#6b7c8f]">
+                    <span className="text-[#c45c5c]">{v.exp}</span>
+                    <span>
+                      Code: <span className="text-[#2b82c9]">{v.code}</span>
+                    </span>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-        )}
 
-        {/* ==================== PRODUCTS SECTION ==================== */}
-        <div className="max-w-[1200px] mx-auto px-4 sm:px-8 mt-10">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg sm:text-xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">
-              {activeTab === 'home' ? 'Sản phẩm bán chạy' : activeTab === 'new' ? 'Sản phẩm mới' : `Tất cả sản phẩm`}
-            </h2>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-[#a0aab5] font-bold uppercase tracking-wider">Sắp xếp:</span>
-              <button className="px-3 py-1.5 bg-white border border-[#dbeaf5] rounded-full text-[#0f1d25] font-bold hover:bg-[#f5faff] transition-colors">
-                Phổ biến
-              </button>
+          {/* Best Sellers */}
+          <div className="mt-12">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-7 px-1">
+              <h2 className="text-lg sm:text-xl font-black font-['Plus_Jakarta_Sans'] text-[#1a2b3c]">
+                {tab === 'new' ? 'New Arrivals' : tab === 'all' ? 'All Products' : 'Best Sellers'}
+              </h2>
+              <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-[#8b9bab] uppercase tracking-wide">
+                <span>Filter by:</span>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 h-9 px-4 rounded-full bg-white border border-[#e0e8f0] text-[#1a2b3c] text-sm font-bold normal-case tracking-normal hover:border-[#2b82c9]/30 transition-colors shadow-sm"
+                >
+                  Popularity
+                  <span className="material-symbols-outlined text-[18px] text-[#6b7c8f]">expand_more</span>
+                </button>
+              </div>
             </div>
-          </div>
 
-          {filteredProducts.length === 0 ? (
-            <div className="bg-white rounded-3xl shadow-sm border border-[#e4e9f0] p-6 lg:p-10 min-h-[400px] flex flex-col items-center justify-center">
-              <span className="material-symbols-outlined text-6xl text-[#dbeaf5] mb-4">inventory_2</span>
-              <h3 className="text-xl font-bold text-[#0f1d25] mb-2">Cửa hàng chưa có sản phẩm nào</h3>
-              <p className="text-[#707882]">Xin hãy quay lại sau.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-8">
-              {filteredProducts.map((product) => {
-                const image = product.images?.[0]?.image_url || product.thumbnail_url || 'https://via.placeholder.com/600x600?text=Product';
-                const displayImage = image.startsWith('http') ? image : `http://localhost:3000${image}`;
-                const categoryName = product.category?.name || product.shop?.name || 'SHOP';
-
-                return (
-                  <div key={product.id} className="group relative">
-                    <Link to={`/product/${product.id}`} className="flex flex-col">
-                      {/* Image Container */}
-                      <div className="relative overflow-hidden rounded-2xl bg-[#f0f3f8] aspect-[4/5] mb-3.5">
-                        <img
-                          src={displayImage}
-                          alt={product.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                        />
-
-                        {/* Wishlist Heart */}
+            {tabProducts.length === 0 ? (
+              <div className="bg-white border border-[#e8f0fb] rounded-[28px] p-12 text-center text-[#6b7c8f] font-semibold shadow-sm">
+                {shopQuery.trim() ? 'Không tìm thấy sản phẩm trong cửa hàng.' : 'Shop chưa có sản phẩm nào.'}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
+                {tabProducts.map((p, idx) => {
+                  const img = p.images?.[0]?.image_url || p.thumbnail_url || '';
+                  const fetchImg = String(img).startsWith('http') ? img : `http://localhost:3000${img}`;
+                  const cat = (p.category?.name || 'Shop').toUpperCase();
+                  const showSale = idx % 3 === 0;
+                  return (
+                    <Link
+                      key={p.id}
+                      to={`/product/${p.id}`}
+                      className="group bg-white border border-[#e8f0fb] rounded-[22px] overflow-hidden shadow-[0_4px_24px_rgba(43,120,197,0.07)] hover:shadow-[0_16px_48px_rgba(43,120,197,0.14)] transition-all duration-300"
+                    >
+                      <div className="relative aspect-[4/5] bg-[#eef2f7] overflow-hidden">
+                        {img ? (
+                          <img
+                            src={fetchImg}
+                            alt={p.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-[1200ms]"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-[#2b82c9]/25">
+                            <span className="material-symbols-outlined text-7xl">image</span>
+                          </div>
+                        )}
+                        {showSale && (
+                          <span className="absolute bottom-3 left-3 px-2.5 py-1 rounded-lg bg-[#1a2b3c] text-white text-[10px] font-black uppercase tracking-wider">
+                            Sale
+                          </span>
+                        )}
                         <button
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                          className="absolute top-3 right-3 w-9 h-9 bg-white/80 backdrop-blur-md rounded-full flex items-center justify-center shadow-sm hover:bg-white hover:shadow-md transition-all group/heart"
+                          type="button"
+                          onClick={(e) => e.preventDefault()}
+                          className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white shadow-md border border-white/90 flex items-center justify-center text-[#2b82c9] hover:scale-105 transition-transform"
+                          aria-label="Wishlist"
                         >
-                          <span className="material-symbols-outlined text-[20px] text-[#00629d] group-hover/heart:scale-110 transition-transform">
+                          <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: '"FILL" 1' }}>
                             favorite
                           </span>
                         </button>
-
-                        {/* Sale badge for some products */}
-                        {Number(product.base_price) > 100000 && (
-                          <div className="absolute bottom-3 left-3">
-                            <span className="px-2.5 py-1 bg-[#00629d] text-white text-[10px] font-bold rounded-md uppercase shadow-sm">
-                              Sale
-                            </span>
-                          </div>
-                        )}
                       </div>
-
-                      {/* Product Info */}
-                      <div className="px-0.5">
-                        <p className="text-[10px] font-bold text-[#00629d] uppercase tracking-[0.12em] mb-1.5">
-                          {categoryName}
-                        </p>
-                        <h4 className="font-bold text-[14px] leading-snug text-[#0f1d25] group-hover:text-[#00629d] transition-colors line-clamp-2 min-h-[40px]">
-                          {product.name}
-                        </h4>
-                        <div className="flex items-center justify-between mt-2">
-                          <p className="text-[15px] font-black text-[#0f1d25] font-['Plus_Jakarta_Sans']">
-                            {Number(product.base_price).toLocaleString('vi-VN')} ₫
-                          </p>
-                          <div className="flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[14px] text-[#d99000]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                              star
-                            </span>
-                            <span className="text-xs font-bold text-[#707882]">
-                              {product.shop.rating || '4.8'}
-                            </span>
-                          </div>
+                      <div className="p-4 sm:p-5">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8b9bab] mb-1.5">{cat}</p>
+                        <h3 className="text-[#1a2b3c] font-bold text-[15px] leading-snug line-clamp-2 group-hover:text-[#2b82c9] transition-colors min-h-[2.5rem]">
+                          {p.name}
+                        </h3>
+                        <div className="mt-3 flex items-center justify-between gap-2">
+                          <span className="text-[#1a2b3c] font-black font-['Plus_Jakarta_Sans'] text-base">
+                            {Number(p.base_price).toLocaleString('vi-VN')} ₫
+                          </span>
+                          <span className="inline-flex items-center gap-0.5 text-sm font-bold text-[#1a2b3c]">
+                            <span className="material-symbols-outlined text-[18px] text-[#f5b301] fill-current">star</span>
+                            {Number(p.rating ?? 4.9).toFixed(1)}
+                          </span>
                         </div>
                       </div>
                     </Link>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-14 flex justify-center">
+            <Link
+              to="/"
+              className="px-8 h-12 rounded-full bg-white border-2 font-bold flex items-center justify-center transition-colors shadow-sm hover:bg-[#f4f8fc]"
+              style={{ borderColor: SHOP_BLUE, color: SHOP_BLUE }}
+            >
+              Quay lại trang chủ
+            </Link>
+          </div>
         </div>
       </div>
     </MarketplaceLayout>
   );
 };
+
+export default ShopPage;

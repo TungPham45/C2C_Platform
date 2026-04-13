@@ -62,6 +62,12 @@ export class ProductController {
     return this.productService.getShopProducts(userId);
   }
 
+  @Put('seller/shop')
+  updateShop(@Headers() headers: any, @Body() data: any) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.updateShop(userId, data);
+  }
+
   @Put('seller/:id')
   updateProduct(@Headers() headers: any, @Param('id') id: string, @Body() data: any) {
     const userId = this.getProviderUserId(headers);
@@ -78,6 +84,33 @@ export class ProductController {
   getSellerContext(@Headers() headers: any) {
     const userId = this.getProviderUserId(headers);
     return this.productService.getSellerContext(userId);
+  }
+
+  @Get('seller/analytics')
+  getSellerAnalytics(@Headers() headers: any, @Query('days') days?: string) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.getSellerAnalytics(userId, days ? +days : 10);
+  }
+
+  // --- SELLER REVIEW ROUTES ---
+
+  @Get('seller/reviews')
+  getShopReviews(
+    @Headers() headers: any,
+    @Query('rating') rating?: string,
+    @Query('status') status?: string,
+  ) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.getShopReviews(userId, {
+      rating: rating ? parseInt(rating) : undefined,
+      status
+    });
+  }
+
+  @Post('seller/reviews/:id/reply')
+  replyToReview(@Headers() headers: any, @Param('id') id: string, @Body('reply') reply: string) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.replyToReview(userId, +id, reply);
   }
 
   @Get('seller/:id')
@@ -249,7 +282,6 @@ export class ProductController {
     this.requireInternalAccess(headers);
     return this.productService.deleteAttributeOption(+id);
   }
-
   @Get('internal/admin/pending-products')
   getPendingProducts(@Headers() headers: Record<string, string | string[] | undefined>) {
     this.requireInternalAccess(headers);
@@ -277,9 +309,16 @@ export class ProductController {
 
   // --- PUBLIC ROUTES (TAXONOMY MUST BE BEFORE :id) ---
 
-  @Get('shop/:shopId')
-  getShopDetail(@Param('shopId') shopId: string) {
-    return this.productService.getPublicShopDetail(+shopId);
+  // --- PUBLIC SHOP STOREFRONT ---
+
+  @Get('shops/:id')
+  getPublicShop(@Param('id') id: string) {
+    return this.productService.getPublicShopById(+id);
+  }
+
+  @Get('shops/:id/products')
+  getPublicShopProducts(@Param('id') id: string) {
+    return this.productService.getPublicShopProducts(+id);
   }
 
   @Get('categories/all')
@@ -298,6 +337,44 @@ export class ProductController {
     @Query('categorySlug') categorySlug?: string,
   ) {
     return this.productService.getActiveProducts(query, categorySlug);
+  }
+
+  // --- PUBLIC REVIEW ROUTES (must be before :id catch-all) ---
+
+  @Get('reviews/me')
+  getMyReviews(@Headers() headers: any) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.getMyReviews(userId);
+  }
+
+  @Get(':id/reviews')
+  getProductReviews(@Param('id') id: string, @Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.productService.getProductReviews(+id, page ? +page : 1, limit ? +limit : 10);
+  }
+
+  @Post(':id/reviews')
+  createReview(@Headers() headers: any, @Param('id') id: string, @Body() data: any) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.createReview(userId, +id, data);
+  }
+
+  @Put(':id/reviews/:reviewId')
+  updateReview(
+    @Headers() headers: any,
+    @Param('reviewId') reviewId: string,
+    @Body() data: { rating?: number; comment?: string; media_urls?: string[] }
+  ) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.updateReview(userId, +reviewId, data);
+  }
+
+  @Delete(':id/reviews/:reviewId')
+  deleteReview(
+    @Headers() headers: any,
+    @Param('reviewId') reviewId: string
+  ) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.deleteReview(userId, +reviewId);
   }
 
   @Get(':id')

@@ -9,6 +9,82 @@ export class OrderService {
     private productPrisma: ProductPrismaService
   ) {}
 
+  private async attachProductAssetsToOrders<T extends { items?: any[] }>(orders: T[]): Promise<T[]> {
+    const allItems = orders.flatMap(o => (Array.isArray(o.items) ? o.items : []));
+    const variantIds = Array.from(
+      new Set(
+        allItems
+          .map((it: any) => Number(it?.product_variant_id))
+          .filter((id: number) => Number.isFinite(id) && id > 0)
+      )
+    );
+
+    if (variantIds.length === 0) return orders;
+
+    const variants = await this.productPrisma.productVariant.findMany({
+      where: { id: { in: variantIds } },
+      select: {
+        id: true,
+        product_id: true,
+        product: {
+          select: {
+            thumbnail_url: true,
+            images: {
+              where: { is_primary: true },
+              take: 1,
+              select: { image_url: true },
+            },
+          },
+        },
+      },
+    });
+
+    const variantMap = new Map<number, { product_id?: number | null; product_thumbnail_url?: string | null; product_image_url?: string | null }>();
+    for (const v of variants as any[]) {
+      variantMap.set(v.id, {
+        product_id: v?.product_id ?? null,
+        product_thumbnail_url: v?.product?.thumbnail_url ?? null,
+        product_image_url: v?.product?.images?.[0]?.image_url ?? null,
+      });
+    }
+
+    // Fallback: For any items that failed to match a variant, try matching by product_name
+    const missingItems = allItems.filter(it => !variantMap.has(Number(it?.product_variant_id)));
+    const missingProductNames = Array.from(new Set(missingItems.map(it => it.product_name).filter(Boolean)));
+    const productNameMap = new Map<string, { product_id?: number | null; product_thumbnail_url?: string | null }>();
+    
+    if (missingProductNames.length > 0) {
+      const fallbackProducts = await this.productPrisma.product.findMany({
+        where: { name: { in: missingProductNames } },
+        select: { id: true, name: true, thumbnail_url: true }
+      });
+      for (const p of fallbackProducts) {
+        productNameMap.set(p.name, {
+          product_id: p.id,
+          product_thumbnail_url: p.thumbnail_url
+        });
+      }
+    }
+
+    return orders.map((o: any) => ({
+      ...o,
+      items: Array.isArray(o.items)
+        ? o.items.map((it: any) => {
+            const vid = Number(it?.product_variant_id);
+            const assets = variantMap.get(vid);
+            const fallback = (!assets || !assets.product_id) ? productNameMap.get(it?.product_name || '') : null;
+            
+            return {
+              ...it,
+              product_id: assets?.product_id ?? fallback?.product_id ?? null,
+              product_thumbnail_url: assets?.product_thumbnail_url ?? fallback?.product_thumbnail_url ?? null,
+              product_image_url: assets?.product_image_url ?? null,
+            };
+          })
+        : o.items,
+    }));
+  }
+
   async createOrder(userId: number, data: any) {
     // ============================================================
     // STEP 0: Validate stock availability for ALL items FIRST
@@ -86,10 +162,10 @@ export class OrderService {
     }
 
     // ============================================================
-    // STEP 3: Deduct stock for each purchased variant
+    // STEP 3: Deduct stock and increment sold_count for each purchased variant
     // ============================================================
     for (const item of allItems) {
-      await this.productPrisma.productVariant.update({
+      const variant = await this.productPrisma.productVariant.update({
         where: { id: item.product_variant_id },
         data: {
           stock_quantity: {
@@ -97,6 +173,17 @@ export class OrderService {
           },
         },
       });
+
+      if (variant.product_id) {
+        await this.productPrisma.product.update({
+          where: { id: variant.product_id },
+          data: {
+            sold_count: {
+              increment: item.quantity,
+            }
+          }
+        });
+      }
     }
 
     // ============================================================
@@ -120,7 +207,7 @@ export class OrderService {
   }
 
   async getBuyerOrders(userId: number) {
-    return this.prisma.shopOrder.findMany({
+    const orders = await this.prisma.shopOrder.findMany({
       where: {
         checkout_session: {
           user_id: userId,
@@ -133,10 +220,11 @@ export class OrderService {
         created_at: 'desc',
       },
     });
+    return this.attachProductAssetsToOrders(orders as any);
   }
 
   async getSellerOrders(shopId: number) {
-    return this.prisma.shopOrder.findMany({
+    const orders = await this.prisma.shopOrder.findMany({
       where: {
         shop_id: shopId,
       },
@@ -147,6 +235,7 @@ export class OrderService {
         created_at: 'desc',
       },
     });
+    return this.attachProductAssetsToOrders(orders as any);
   }
 
   async getOrderDetail(orderId: number) {
@@ -162,7 +251,8 @@ export class OrderService {
       throw new NotFoundException(`Order with ID ${orderId} not found`);
     }
 
-    return order;
+    const [enriched] = await this.attachProductAssetsToOrders([order as any]);
+    return enriched ?? order;
   }
 
   async updateOrderStatus(orderId: number, status: string, trackingInfo?: { tracking_number?: string; carrier_name?: string }) {
@@ -197,25 +287,30 @@ export class OrderService {
     });
 
     // 4. Stock Adjustment Logic
+    // NOTE: Stock is already deducted at order creation time (createOrder),
+    // so we do NOT deduct again when the seller confirms.
+    // We only need to RESTOCK when an order is cancelled.
     try {
-      // Case A: Approving Order -> Decrease Stock
-      if (prevStatus !== 'confirmed' && nextStatus === 'confirmed') {
-        console.log(`[STOCKS] Decreasing stock for order #${orderId}`);
-        for (const item of order.items) {
-          await this.productPrisma.productVariant.update({
-            where: { id: item.product_variant_id },
-            data: { stock_quantity: { decrement: item.quantity } }
-          });
-        }
-      }
-      // Case B: Cancelling Order from a Confirmed/Shipped state -> Increase Stock (Restock)
-      else if ((prevStatus === 'confirmed' || prevStatus === 'shipped') && nextStatus === 'cancelled') {
-        console.log(`[STOCKS] Restocking for order #${orderId}`);
+      if ((prevStatus === 'pending' || prevStatus === 'confirmed' || prevStatus === 'shipped') && nextStatus === 'cancelled') {
+        console.log(`[STOCKS] Restocking for cancelled order #${orderId}`);
         for (const item of order.items) {
           await this.productPrisma.productVariant.update({
             where: { id: item.product_variant_id },
             data: { stock_quantity: { increment: item.quantity } }
           });
+
+          // Also revert sold_count
+          if (item.quantity > 0) {
+            await this.productPrisma.product.updateMany({
+              where: {
+                id: (await this.productPrisma.productVariant.findUnique({
+                  where: { id: item.product_variant_id },
+                  select: { product_id: true }
+                }))?.product_id ?? -1,
+              },
+              data: { sold_count: { decrement: item.quantity } },
+            });
+          }
         }
       }
     } catch (stockError: any) {
@@ -263,5 +358,61 @@ export class OrderService {
       total_revenue: item._sum.subtotal ? item._sum.subtotal.toNumber() : 0,
       total_orders: item._count.id,
     }));
+  }
+
+  async getSingleShopAnalytics(shopId: number, days: number = 10) {
+    const dt = new Date();
+    dt.setDate(dt.getDate() - days);
+
+    // Get all orders not cancelled in the last `days`
+    const orders = await this.prisma.shopOrder.findMany({
+      where: {
+        shop_id: shopId,
+        status: { not: 'cancelled' },
+        created_at: { gte: dt }
+      },
+      select: {
+        id: true,
+        subtotal: true,
+        created_at: true
+      }
+    });
+
+    let totalOrders = orders.length;
+    let totalRevenue = 0;
+    
+    // Initialize trend data mapping (last N days)
+    const trendMap = new Map<string, { orders: number; revenue: number }>();
+    const today = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+      const iterDate = new Date(today);
+      iterDate.setDate(iterDate.getDate() - i);
+      const key = `${iterDate.getDate()}/${iterDate.getMonth() + 1}`;
+      trendMap.set(key, { orders: 0, revenue: 0 });
+    }
+
+    for (const o of orders) {
+      const revenue = Number(o.subtotal) || 0;
+      totalRevenue += revenue;
+      
+      const oDate = new Date(o.created_at || new Date());
+      const key = `${oDate.getDate()}/${oDate.getMonth() + 1}`;
+      
+      if (trendMap.has(key)) {
+        const current = trendMap.get(key)!;
+        trendMap.set(key, {
+          orders: current.orders + 1,
+          revenue: current.revenue + revenue
+        });
+      }
+    }
+
+    const trendData = Array.from(trendMap.entries()).map(([date, data]) => ({
+      date,
+      orders: data.orders,
+      revenue: data.revenue
+    }));
+
+    return { totalOrders, totalRevenue, trendData };
   }
 }

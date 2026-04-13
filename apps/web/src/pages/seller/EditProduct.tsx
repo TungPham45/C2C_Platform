@@ -31,6 +31,7 @@ export const EditProductPage: FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingCount, setUploadingCount] = useState(0);
+  const [activeSection, setActiveSection] = useState<'basic' | 'desc' | 'sales' | 'ship'>('basic');
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -188,6 +189,33 @@ export const EditProductPage: FC = () => {
     if (id) fetchProduct();
   }, [id, navigate]);
 
+  useEffect(() => {
+    const sectionIds: Array<'basic' | 'desc' | 'sales' | 'ship'> = ['basic', 'desc', 'sales', 'ship'];
+    const onScroll = () => {
+      let closest: { id: 'basic' | 'desc' | 'sales' | 'ship'; top: number } | null = null;
+      for (const id of sectionIds) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        const topDistance = Math.abs(rect.top - 130);
+        if (!closest || topDistance < closest.top) closest = { id, top: topDistance };
+      }
+      if (closest) setActiveSection(closest.id);
+    };
+
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const scrollToSection = (id: 'basic' | 'desc' | 'sales' | 'ship') => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const y = el.getBoundingClientRect().top + window.scrollY - 110;
+    window.scrollTo({ top: y, behavior: 'smooth' });
+    setActiveSection(id);
+  };
+
   const handleSubmit = async () => {
     let finalBasePrice = formData.base_price;
     if (hasVariants && variantsMap.length > 0) {
@@ -272,10 +300,50 @@ export const EditProductPage: FC = () => {
         <section className="col-span-6 space-y-8">
           {/* Sticky Anchor Menu */}
           <nav className="sticky top-[4.5rem] z-30 flex gap-8 bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-sm border border-[#dbeaf5] mx-auto w-fit">
-            <a href="#basic" className="px-4 py-2 rounded-full text-sm font-semibold bg-[#00629d] text-white shadow-md">Thông tin cơ bản</a>
-            <a href="#desc" className="px-4 py-2 rounded-full text-sm font-medium text-[#707882] hover:text-[#00629d] transition-colors">Mô tả</a>
-            <a href="#sales" className="px-4 py-2 rounded-full text-sm font-medium text-[#707882] hover:text-[#00629d] transition-colors">Bán hàng</a>
-            <a href="#ship" className="px-4 py-2 rounded-full text-sm font-medium text-[#707882] hover:text-[#00629d] transition-colors">Vận chuyển</a>
+            <button
+              type="button"
+              onClick={() => scrollToSection('basic')}
+              className={`px-4 py-2 rounded-full text-sm transition-colors ${
+                activeSection === 'basic'
+                  ? 'font-semibold bg-[#00629d] text-white shadow-md'
+                  : 'font-medium text-[#707882] hover:text-[#00629d]'
+              }`}
+            >
+              Thông tin cơ bản
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSection('desc')}
+              className={`px-4 py-2 rounded-full text-sm transition-colors ${
+                activeSection === 'desc'
+                  ? 'font-semibold bg-[#00629d] text-white shadow-md'
+                  : 'font-medium text-[#707882] hover:text-[#00629d]'
+              }`}
+            >
+              Mô tả bài đăng
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSection('sales')}
+              className={`px-4 py-2 rounded-full text-sm transition-colors ${
+                activeSection === 'sales'
+                  ? 'font-semibold bg-[#00629d] text-white shadow-md'
+                  : 'font-medium text-[#707882] hover:text-[#00629d]'
+              }`}
+            >
+              Bán hàng
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSection('ship')}
+              className={`px-4 py-2 rounded-full text-sm transition-colors ${
+                activeSection === 'ship'
+                  ? 'font-semibold bg-[#00629d] text-white shadow-md'
+                  : 'font-medium text-[#707882] hover:text-[#00629d]'
+              }`}
+            >
+              Vận chuyển
+            </button>
           </nav>
 
           {/* Card 1: Basic Info */}
@@ -423,10 +491,88 @@ export const EditProductPage: FC = () => {
               <span className="w-2 h-8 bg-[#ffb952] rounded-full"></span>
               <h2 className="text-xl font-bold font-['Plus_Jakarta_Sans']">Vận chuyển</h2>
             </div>
-            <div className="h-32 border-2 border-dashed border-[#bfc7d3]/30 rounded-xl bg-[#e9f5ff] flex items-center justify-center">
-              <div className="text-center">
-                <span className="material-symbols-outlined text-[#707882] text-4xl mb-2">local_shipping</span>
-                <p className="text-sm text-[#707882] font-medium">Cấu hình vận chuyển tĩnh (Giao hàng tiết kiệm)</p>
+
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-[#404751] mb-2">Cân nặng (gram)</label>
+                  <input
+                    type="number"
+                    defaultValue={500}
+                    min={1}
+                    className="w-full bg-[#e9f5ff] border-none rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#00629d]/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[#404751] mb-2">Thời gian chuẩn bị hàng</label>
+                  <select className="w-full bg-[#e9f5ff] border-none rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#00629d]/20">
+                    <option>Chuẩn bị trong ngày</option>
+                    <option>1 ngày</option>
+                    <option>2 ngày</option>
+                    <option>3 ngày</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-[#404751] mb-2">Kích thước gói hàng (cm)</label>
+                <div className="grid grid-cols-3 gap-3">
+                  <input
+                    type="number"
+                    defaultValue={20}
+                    min={1}
+                    placeholder="Dài"
+                    className="w-full bg-[#e9f5ff] border-none rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#00629d]/20"
+                  />
+                  <input
+                    type="number"
+                    defaultValue={12}
+                    min={1}
+                    placeholder="Rộng"
+                    className="w-full bg-[#e9f5ff] border-none rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#00629d]/20"
+                  />
+                  <input
+                    type="number"
+                    defaultValue={6}
+                    min={1}
+                    placeholder="Cao"
+                    className="w-full bg-[#e9f5ff] border-none rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#00629d]/20"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-[#e9f5ff] border border-[#dbeaf5] rounded-xl p-4 space-y-3">
+                <p className="text-sm font-bold text-[#0f1d25] flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#00629d]">local_shipping</span>
+                  Đơn vị vận chuyển áp dụng
+                </p>
+                <div className="grid grid-cols-2 gap-3 text-sm text-[#404751]">
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" defaultChecked className="rounded text-[#00629d] focus:ring-[#00629d]" />
+                    Giao hàng tiết kiệm
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" defaultChecked className="rounded text-[#00629d] focus:ring-[#00629d]" />
+                    Giao hàng nhanh
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" className="rounded text-[#00629d] focus:ring-[#00629d]" />
+                    J&T Express
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" className="rounded text-[#00629d] focus:ring-[#00629d]" />
+                    Viettel Post
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-[#404751] mb-2">Ghi chú vận chuyển</label>
+                <textarea
+                  rows={4}
+                  placeholder="Ví dụ: Sản phẩm dễ vỡ, cần dán cảnh báo khi đóng gói..."
+                  className="w-full bg-[#e9f5ff] border-none rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#00629d]/20 placeholder:text-[#707882]/60"
+                />
               </div>
             </div>
           </div>

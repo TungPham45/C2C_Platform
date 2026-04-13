@@ -2,6 +2,7 @@ import { FC, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useOrders } from '../hooks/useOrders';
+import { useReviews } from '../hooks/useReviews';
 
 const ORDER_STEPS = [
   { key: 'pending',   label: 'Đã đặt hàng',  icon: 'receipt_long' },
@@ -21,8 +22,16 @@ const statusLabel: Record<string, string> = {
 export const BuyerOrderDetail: FC = () => {
   const { id } = useParams<{ id: string }>();
   const { fetchOrderDetail, updateOrderStatus, loading } = useOrders();
+  const { submitReview, updateReview, error: reviewError } = useReviews();
   const [order, setOrder] = useState<any>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [reviewModal, setReviewModal] = useState<{ open: boolean; item: any | null }>({ open: false, item: null });
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [localReviewError, setLocalReviewError] = useState<string | null>(null);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewedItems, setReviewedItems] = useState<Map<number, any>>(new Map());
+  const [reviewSuccess, setReviewSuccess] = useState(false);
 
   useEffect(() => {
     const loadOrder = async () => {
@@ -34,6 +43,31 @@ export const BuyerOrderDetail: FC = () => {
     loadOrder();
   }, [id, fetchOrderDetail]);
   
+  useEffect(() => {
+    const fetchReviews = async () => {
+      if (!order) return;
+      try {
+        const token = localStorage.getItem('c2c_token');
+        const res = await fetch('http://localhost:3000/api/products/reviews/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const orderReviews = data.filter((r: any) => r.shop_order_id === order.id);
+          const rMap = new Map<number, any>();
+          order.items?.forEach((item: any) => {
+            const rev = orderReviews.find((r: any) => r.product_id === item.product_id);
+            if (rev) {
+              rMap.set(item.id, rev);
+            }
+          });
+          setReviewedItems(prev => new Map([...prev, ...rMap]));
+        }
+      } catch (e) {}
+    };
+    fetchReviews();
+  }, [order?.id]);
+  
   const handleConfirmReceipt = async () => {
     if (!id || !order) return;
     setIsUpdating(true);
@@ -42,6 +76,61 @@ export const BuyerOrderDetail: FC = () => {
       setOrder({ ...order, status: 'delivered' });
     }
     setIsUpdating(false);
+  };
+
+  const handleOpenReviewModal = (item: any) => {
+    const existing = reviewedItems.get(item.id);
+    setReviewModal({ open: true, item });
+    if (existing) {
+      setReviewRating(existing.rating);
+      setReviewComment(existing.comment || '');
+    } else {
+      setReviewRating(5);
+      setReviewComment('');
+    }
+    setLocalReviewError(null);
+    setReviewSuccess(false);
+  };
+
+  const handleSubmitReview = async () => {
+    if (!reviewModal.item || !order) return;
+    
+    if (!reviewModal.item.product_id) {
+      setLocalReviewError('Không thể đánh giá vì sản phẩm này đã không còn tồn tại trên hệ thống (bị xóa hoặc gỡ bỏ).');
+      return;
+    }
+
+    setLocalReviewError(null);
+    setReviewSubmitting(true);
+    
+    const existing = reviewedItems.get(reviewModal.item.id);
+    let result;
+
+    if (existing) {
+      result = await updateReview(reviewModal.item.product_id, existing.id, {
+        rating: reviewRating,
+        comment: reviewComment || undefined,
+      });
+    } else {
+      result = await submitReview(reviewModal.item.product_id, {
+        rating: reviewRating,
+        comment: reviewComment || undefined,
+        shop_order_id: order.id,
+      });
+    }
+
+    if (result) {
+      setReviewedItems(prev => {
+         const newMap = new Map(prev);
+         newMap.set(reviewModal.item.id, result);
+         return newMap;
+      });
+      setReviewSuccess(true);
+      setTimeout(() => {
+        setReviewModal({ open: false, item: null });
+      }, 1500);
+    }
+    setReviewSubmitting(false);
   };
 
   if (loading && !order) {
@@ -215,8 +304,24 @@ export const BuyerOrderDetail: FC = () => {
                       <p className="font-black text-[#0f1d25] text-base">
                         {Number(item.price_at_purchase).toLocaleString('vi-VN')} VND
                       </p>
-                      {order.status?.toLowerCase() === 'delivered' && (
-                        <button className="text-[#00629d] text-xs font-bold mt-2 hover:underline">Đánh giá</button>
+                      {order.status?.toLowerCase() === 'delivered' && !reviewedItems.has(item.id) && (
+                        <button
+                          onClick={() => handleOpenReviewModal(item)}
+                          className="text-[#00629d] text-xs font-bold mt-2 hover:underline"
+                        >
+                          Đánh giá
+                        </button>
+                      )}
+                      {reviewedItems.has(item.id) && (
+                        <div className="flex flex-col items-end">
+                          <span className="text-emerald-600 text-xs font-bold mt-2 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-sm">check_circle</span>
+                            Đã đánh giá
+                          </span>
+                          <button onClick={() => handleOpenReviewModal(item)} className="text-[#707882] text-xs font-semibold mt-1 hover:text-[#00629d] underline">
+                            Sửa đánh giá
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -232,10 +337,25 @@ export const BuyerOrderDetail: FC = () => {
                 </div>
                 {order.status?.toLowerCase() === 'delivered' && (
                   <div className="flex gap-3">
-                    <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-[#e4e9f0] text-[#0f1d25] rounded-full text-xs font-bold hover:bg-[#f5faff] transition-all">
-                      <span className="material-symbols-outlined text-base">star</span>
-                      Đánh giá
-                    </button>
+                    {reviewedItems.size < (order.items?.length || 0) && (
+                      <button
+                        onClick={() => {
+                          // Find first unreviewed item
+                          const unreviewedItem = order.items?.find((item: any) => !reviewedItems.has(item.id));
+                          if (unreviewedItem) handleOpenReviewModal(unreviewedItem);
+                        }}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-white border border-[#e4e9f0] text-[#0f1d25] rounded-full text-xs font-bold hover:bg-[#f5faff] transition-all"
+                      >
+                        <span className="material-symbols-outlined text-base">star</span>
+                        Đánh giá tiếp
+                      </button>
+                    )}
+                    {reviewedItems.size >= (order.items?.length || 1) && (
+                      <button disabled className="flex items-center gap-2 px-5 py-2.5 bg-[#f5faff] border border-[#e1f0fb] text-[#a0aab5] rounded-full text-xs font-bold cursor-not-allowed">
+                        <span className="material-symbols-outlined text-base fill-current">star</span>
+                        Đã đánh giá
+                      </button>
+                    )}
                     <button className="flex items-center gap-2 px-5 py-2.5 bg-[#00629d] text-white rounded-full text-xs font-bold hover:bg-[#004e7c] transition-all shadow-sm">
                       Mua lại
                     </button>
@@ -346,6 +466,82 @@ export const BuyerOrderDetail: FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Review Modal */}
+        {reviewModal.open && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
+            <div className="bg-white rounded-[2rem] w-full max-w-lg p-8 shadow-2xl relative animate-[fadeIn_0.3s_ease-out]">
+              <button
+                onClick={() => setReviewModal({ open: false, item: null })}
+                className="absolute top-6 right-6 w-8 h-8 rounded-full bg-[#f0f3f8] flex items-center justify-center hover:bg-[#e4e9f0] transition-colors"
+              >
+                <span className="material-symbols-outlined text-lg text-[#707882]">close</span>
+              </button>
+
+              {reviewSuccess ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <span className="material-symbols-outlined text-3xl text-emerald-600">check_circle</span>
+                  </div>
+                  <h3 className="text-xl font-black text-[#0f1d25] mb-2">Cảm ơn bạn!</h3>
+                  <p className="text-sm text-[#707882]">Đánh giá của bạn đã được ghi nhận.</p>
+                </div>
+              ) : (
+                <>
+                  <h3 className="text-xl font-black text-[#0f1d25] mb-2 font-['Plus_Jakarta_Sans']">Đánh giá sản phẩm</h3>
+                  <p className="text-sm text-[#707882] mb-6">{reviewModal.item?.product_name}</p>
+
+                  {/* Star rating */}
+                  <div className="flex items-center gap-2 mb-6">
+                    <span className="text-xs font-bold text-[#707882] uppercase tracking-wider mr-2">Đánh giá:</span>
+                    {[1,2,3,4,5].map(s => (
+                      <button
+                        key={s}
+                        onClick={() => setReviewRating(s)}
+                        className="transition-transform hover:scale-110 active:scale-95"
+                      >
+                        <span className={`material-symbols-outlined text-3xl ${s <= reviewRating ? 'text-[#ffb952]' : 'text-[#e4e9f0]'}`} style={{ fontVariationSettings: s <= reviewRating ? "'FILL' 1" : "'FILL' 0" }}>star</span>
+                      </button>
+                    ))}
+                    <span className="ml-2 text-sm font-bold text-[#0f1d25]">{reviewRating}/5</span>
+                  </div>
+
+                  {/* Comment */}
+                  <div className="mb-6">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-[#707882] mb-2">Nhận xét</label>
+                    <textarea
+                      value={reviewComment}
+                      onChange={e => setReviewComment(e.target.value)}
+                      placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm..."
+                      rows={4}
+                      className="w-full px-4 py-3 rounded-xl border border-[#e4e9f0] bg-[#f9fafc] text-sm text-[#0f1d25] resize-none focus:outline-none focus:ring-2 focus:ring-[#00629d]/20 focus:border-[#00629d] transition-all"
+                    />
+                  </div>
+
+                  {(reviewError || localReviewError) && (
+                    <div className="mb-6 p-3 bg-red-50 text-red-600 rounded-lg text-sm border border-red-100 flex items-start gap-2">
+                      <span className="material-symbols-outlined text-base">error</span>
+                      {reviewError || localReviewError}
+                    </div>
+                  )}
+
+                  {/* Submit */}
+                  <button
+                    onClick={handleSubmitReview}
+                    disabled={reviewSubmitting}
+                    className={`w-full py-3.5 rounded-xl font-bold text-sm text-white transition-all ${
+                      reviewSubmitting
+                        ? 'bg-[#00629d]/60 cursor-wait'
+                        : 'bg-[#00629d] hover:bg-[#004e7c] shadow-lg shadow-blue-500/20'
+                    }`}
+                  >
+                    {reviewSubmitting ? 'Đang gửi...' : 'Gửi đánh giá'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </MarketplaceLayout>
   );

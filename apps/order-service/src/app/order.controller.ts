@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Query, Req, UnauthorizedException, Headers, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Query, Req, UnauthorizedException, Headers, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { OrderService } from './order.service';
 
 @Controller('orders')
@@ -55,5 +55,16 @@ export class OrderController {
   ) {
     this.requireInternalAccess(headers);
     return this.orderService.getShopSalesAnalytics(timeframe);
+  }
+
+  @Get('internal/seller-analytics')
+  getSingleShopAnalytics(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query('shopId') shopId: string,
+    @Query('days') days?: string,
+  ) {
+    this.requireInternalAccess(headers);
+    if (!shopId) throw new BadRequestException('shopId is required');
+    return this.orderService.getSingleShopAnalytics(+shopId, days ? +days : 10);
   }
 }
