@@ -33,6 +33,7 @@ import CategoryManagement from '../pages/admin/CategoryManagement';
 import { BannersAdminPage } from '../pages/admin/BannersAdminPage';
 import { SellerProtectedRoute } from '../components/auth/SellerProtectedRoute';
 import { BuyerProtectedRoute } from '../components/auth/BuyerProtectedRoute';
+import { AdminProtectedRoute } from '../components/auth/AdminProtectedRoute';
 import { SellerRegistration } from '../pages/seller/SellerRegistration';
 
 export function App() {
@@ -47,7 +48,9 @@ export function App() {
       <Route path="/register" element={<AuthPage />} />
 
       {/* Seller Routes */}
-      <Route path="/seller/register" element={<SellerRegistration />} />
+      <Route element={<BuyerProtectedRoute />}>
+        <Route path="/seller/register" element={<SellerRegistration />} />
+      </Route>
       <Route element={<SellerProtectedRoute />}>
         <Route path="/seller" element={<Navigate to="/seller/center" replace />} />
         <Route path="/seller/center" element={<SellerCenterPage />} />
@@ -72,18 +75,22 @@ export function App() {
         <Route path="/orders/:id" element={<BuyerOrderDetail />} />
         <Route path="/messages" element={<MessagesPage />} />
       </Route>
-      <Route path="/profile" element={<ProfilePage />} />
+      <Route element={<BuyerProtectedRoute />}>
+        <Route path="/profile" element={<ProfilePage />} />
+      </Route>
       
       {/* Admin Routes */}
-      <Route path="/admin" element={<AdminDashboard />} />
-      <Route path="/admin/products" element={<ProductModeration />} />
-      <Route path="/admin/applications" element={<ShopModeration />} />
-      <Route path="/admin/shops" element={<ShopManagement />} />
-      <Route path="/admin/banners" element={<BannersAdminPage />} />
-      <Route path="/admin/users" element={<AccountManagement />} />
-      <Route path="/admin/analytics/users" element={<UserAnalytics />} />
-      <Route path="/admin/analytics/shop-sales" element={<ShopSalesAnalytics />} />
-      <Route path="/admin/categories" element={<CategoryManagement />} />
+      <Route element={<AdminProtectedRoute />}>
+        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin/products" element={<ProductModeration />} />
+        <Route path="/admin/applications" element={<ShopModeration />} />
+        <Route path="/admin/shops" element={<ShopManagement />} />
+        <Route path="/admin/banners" element={<BannersAdminPage />} />
+        <Route path="/admin/users" element={<AccountManagement />} />
+        <Route path="/admin/analytics/users" element={<UserAnalytics />} />
+        <Route path="/admin/analytics/shop-sales" element={<ShopSalesAnalytics />} />
+        <Route path="/admin/categories" element={<CategoryManagement />} />
+      </Route>
 
     </Routes>
   );

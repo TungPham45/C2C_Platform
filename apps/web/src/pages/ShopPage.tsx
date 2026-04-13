@@ -276,46 +276,15 @@ export const ShopPage: FC = () => {
             </div>
           </div>
 
-          {/* Vouchers */}
+          {/* Vouchers - Coming Soon */}
           <div className="mt-10">
             <div className="flex items-center justify-between mb-5 px-1">
               <h2 className="text-lg sm:text-xl font-black font-['Plus_Jakarta_Sans'] text-[#1a2b3c]">Shop Vouchers</h2>
-              <button type="button" className="text-sm font-bold text-[#2b82c9] hover:opacity-80 transition-opacity">
-                View All
-              </button>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[
-                { title: '$10 OFF', sub: 'Min. spend $100', code: 'LUMINA10', exp: 'EXPIRES IN 2 DAYS' },
-                { title: '15% OFF', sub: 'New Arrivals Only', code: 'FRESH15', exp: 'EXPIRES IN 5 DAYS' },
-                { title: '$5 OFF', sub: 'No min. spend', code: 'DAILY5', exp: 'EXPIRES IN 1 DAY' },
-              ].map((v) => (
-                <div
-                  key={v.code}
-                  className="rounded-[22px] p-5 sm:p-6 border border-white/80 shadow-[0_4px_20px_rgba(43,120,197,0.08)] bg-gradient-to-br from-[#d4e9ff] via-[#EBF4FF] to-[#f5f9ff]"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-[#1a4a7a] font-black text-2xl font-['Plus_Jakarta_Sans'] leading-tight">{v.title}</div>
-                      <div className="text-sm text-[#5c6b7a] font-semibold mt-1">{v.sub}</div>
-                    </div>
-                    <button
-                      type="button"
-                      className="h-9 px-4 rounded-full text-white text-xs font-black uppercase tracking-wider shrink-0 hover:brightness-110 transition"
-                      style={{ backgroundColor: '#1a2b3c' }}
-                    >
-                      Save
-                    </button>
-                  </div>
-                  <div className="mt-4 pt-3 border-t border-[#2b82c9]/10 flex flex-wrap items-center justify-between gap-2 text-[10px] font-black uppercase tracking-[0.15em] text-[#6b7c8f]">
-                    <span className="text-[#c45c5c]">{v.exp}</span>
-                    <span>
-                      Code: <span className="text-[#2b82c9]">{v.code}</span>
-                    </span>
-                  </div>
-                </div>
-              ))}
+            <div className="rounded-[22px] p-6 border border-[#2b82c9]/10 bg-gradient-to-br from-[#EBF4FF] to-[#f5f9ff] text-center">
+              <span className="material-symbols-outlined text-3xl text-[#2b82c9] mb-2 block">local_offer</span>
+              <p className="text-sm font-bold text-[#5c6b7a]">Tính năng voucher đang được phát triển.</p>
+              <p className="text-xs text-[#8b9bab] mt-1">Theo dõi cửa hàng để nhận ưu đãi sớm nhất!</p>
             </div>
           </div>
 
@@ -343,11 +312,12 @@ export const ShopPage: FC = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
-                {tabProducts.map((p, idx) => {
+                {tabProducts.map((p) => {
                   const img = p.images?.[0]?.image_url || p.thumbnail_url || '';
                   const fetchImg = String(img).startsWith('http') ? img : `http://localhost:3000${img}`;
                   const cat = (p.category?.name || 'Shop').toUpperCase();
-                  const showSale = idx % 3 === 0;
+                  // Only show 'New' badge for recently added products (sold_count 0 means new)
+                  const isNew = !p.sold_count || p.sold_count === 0;
                   return (
                     <Link
                       key={p.id}
@@ -366,9 +336,9 @@ export const ShopPage: FC = () => {
                             <span className="material-symbols-outlined text-7xl">image</span>
                           </div>
                         )}
-                        {showSale && (
-                          <span className="absolute bottom-3 left-3 px-2.5 py-1 rounded-lg bg-[#1a2b3c] text-white text-[10px] font-black uppercase tracking-wider">
-                            Sale
+                        {isNew && tab !== 'new' && (
+                          <span className="absolute bottom-3 left-3 px-2.5 py-1 rounded-lg bg-[#2b82c9] text-white text-[10px] font-black uppercase tracking-wider">
+                            New
                           </span>
                         )}
                         <button

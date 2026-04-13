@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { ProductPrismaService } from './product-prisma.service';
 
@@ -223,17 +223,18 @@ export class OrderService {
     return this.attachProductAssetsToOrders(orders as any);
   }
 
-  async getSellerOrders(shopId: number) {
+  async getSellerOrders(userId: number) {
+    // Resolve the user's own shop first
+    const shop = await this.productPrisma.shop.findFirst({
+      where: { owner_id: userId },
+      select: { id: true },
+    });
+    if (!shop) throw new NotFoundException('Shop not found for this user');
+
     const orders = await this.prisma.shopOrder.findMany({
-      where: {
-        shop_id: shopId,
-      },
-      include: {
-        items: true,
-      },
-      orderBy: {
-        created_at: 'desc',
-      },
+      where: { shop_id: shop.id },
+      include: { items: true },
+      orderBy: { created_at: 'desc' },
     });
     return this.attachProductAssetsToOrders(orders as any);
   }
@@ -255,7 +256,7 @@ export class OrderService {
     return enriched ?? order;
   }
 
-  async updateOrderStatus(orderId: number, status: string, trackingInfo?: { tracking_number?: string; carrier_name?: string }) {
+  async updateOrderStatus(orderId: number, callerId: number, status: string, trackingInfo?: { tracking_number?: string; carrier_name?: string }) {
     // 1. Fetch existing order to check previous status and items
     const order = await this.prisma.shopOrder.findUnique({
       where: { id: orderId },
@@ -264,6 +265,26 @@ export class OrderService {
 
     if (!order) {
       throw new NotFoundException(`Order with ID ${orderId} not found`);
+    }
+
+    // 2. Authorization: verify the caller owns the shop (seller) or is admin
+    // Admins carry role='admin' in JWT, but here we check shop ownership
+    const shop = await this.productPrisma.shop.findFirst({
+      where: { id: order.shop_id, owner_id: callerId },
+      select: { id: true },
+    });
+    // Allow if the caller owns the shop; buyers may only cancel their own orders (checked next)
+    if (!shop) {
+      // Allow buyer to cancel their own order
+      const session = await this.prisma.checkoutSession.findUnique({
+        where: { id: order.checkout_session_id },
+        select: { user_id: true },
+      });
+      const isBuyer = session?.user_id === callerId;
+      const isCancelAttempt = status.toLowerCase() === 'cancelled';
+      if (!isBuyer || !isCancelAttempt) {
+        throw new ForbiddenException('You do not have permission to update this order');
+      }
     }
 
     const prevStatus = order.status?.toLowerCase();

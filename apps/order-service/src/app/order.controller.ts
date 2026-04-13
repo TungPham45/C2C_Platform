@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Query, Req, UnauthorizedException, Headers, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Query, Req, UnauthorizedException, Headers, ForbiddenException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { OrderService } from './order.service';
 
 @Controller('orders')
@@ -22,13 +22,17 @@ export class OrderController {
   }
 
   @Get('buyer')
-  async getBuyerOrders(@Query('userId') userId: string) {
+  async getBuyerOrders(@Req() req: any) {
+    const userId = req.headers['x-user-id'];
+    if (!userId) throw new UnauthorizedException('User not authenticated');
     return this.orderService.getBuyerOrders(parseInt(userId));
   }
 
   @Get('seller')
-  async getSellerOrders(@Query('shopId') shopId: string) {
-    return this.orderService.getSellerOrders(parseInt(shopId));
+  async getSellerOrders(@Req() req: any) {
+    const userId = req.headers['x-user-id'];
+    if (!userId) throw new UnauthorizedException('User not authenticated');
+    return this.orderService.getSellerOrders(parseInt(userId));
   }
 
   @Get(':id')
@@ -38,11 +42,14 @@ export class OrderController {
 
   @Put(':id/status')
   async updateStatus(
+    @Req() req: any,
     @Param('id') id: string,
     @Body() body: { status: string; tracking_number?: string; carrier_name?: string }
   ) {
+    const userId = req.headers['x-user-id'];
+    if (!userId) throw new UnauthorizedException('User not authenticated');
     const { status, tracking_number, carrier_name } = body;
-    return this.orderService.updateOrderStatus(parseInt(id), status, {
+    return this.orderService.updateOrderStatus(parseInt(id), parseInt(userId), status, {
       tracking_number,
       carrier_name,
     });

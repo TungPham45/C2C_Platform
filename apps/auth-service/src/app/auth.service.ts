@@ -1,4 +1,4 @@
-import { Injectable, Inject, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { EmailService } from './email.service';
@@ -119,6 +119,9 @@ export class AuthService {
     await this.verifyOtp(email, code, 'RESET_PASSWORD');
 
     const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) throw new NotFoundException('User not found');
+    if (!newPassword || newPassword.length < 6) throw new BadRequestException('Mật khẩu mới phải có ít nhất 6 ký tự');
+
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     await this.prisma.user.update({
@@ -150,11 +153,14 @@ export class AuthService {
   }
 
   async getAdminStats() {
-    const activeUsers = await this.prisma.user.count({
-      where: { status: 'active' },
-    });
+    const [totalUsers, activeUsers, pendingVerification, suspended] = await Promise.all([
+      this.prisma.user.count(),
+      this.prisma.user.count({ where: { status: 'active' } }),
+      this.prisma.user.count({ where: { status: 'pending_verification' } }),
+      this.prisma.user.count({ where: { status: { in: ['suspended', 'banned'] } } }),
+    ]);
 
-    return { activeUsers };
+    return { totalUsers, activeUsers, pendingVerification, suspended };
   }
 
   async getAllUsers() {

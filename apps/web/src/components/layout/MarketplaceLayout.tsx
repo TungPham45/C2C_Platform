@@ -74,11 +74,10 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({
               </div>
             )}
             <span
-              className={`text-xl font-black font-['Plus_Jakarta_Sans'] tracking-tight ${
-                storefrontHeader
+              className={`text-xl font-black font-['Plus_Jakarta_Sans'] tracking-tight ${storefrontHeader
                   ? 'text-[#2b82c9]'
                   : 'bg-gradient-to-r from-[#00629d] to-[#42a5f5] bg-clip-text text-transparent'
-              }`}
+                }`}
             >
               Serene
             </span>
@@ -151,16 +150,15 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({
                   )}
                   <Link
                     to="/cart"
-                    className={`relative w-10 h-10 flex items-center justify-center transition-colors ${
-                      storefrontHeader
+                    className={`relative w-10 h-10 flex items-center justify-center transition-colors ${storefrontHeader
                         ? 'text-[#1a2b3c] hover:bg-[#EBF4FF] rounded-full'
                         : 'text-[#0f1d25] hover:bg-white/50 rounded-xl'
-                    }`}
+                      }`}
                   >
                     <span className={`material-symbols-outlined ${storefrontHeader ? 'text-[22px]' : ''}`}>
                       {storefrontHeader ? 'shopping_cart' : 'shopping_bag'}
                     </span>
-                  {totalCartItems > 0 && (
+                    {totalCartItems > 0 && (
                       <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-[#ba1a1a] text-white text-[10px] flex items-center justify-center rounded-full font-bold">
                         {totalCartItems}
                       </span>
