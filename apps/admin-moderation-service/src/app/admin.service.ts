@@ -14,6 +14,10 @@ export class AdminService {
   private readonly orderBaseUrl =
     process.env.ORDER_SERVICE_BASE_URL ?? 'http://localhost:3004/api/orders';
 
+  private readonly orderServiceRootUrl = this.orderBaseUrl.replace(/\/api\/orders\/?$/, '');
+
+  private readonly orderVoucherAdminBaseUrl = `${this.orderServiceRootUrl}/api/vouchers/internal/admin`;
+
   private readonly internalServiceToken =
     process.env.INTERNAL_SERVICE_TOKEN ?? 'internal-dev-token';
 
@@ -294,6 +298,38 @@ export class AdminService {
   async deleteBanner(id: number) {
     return this.prisma.banner.delete({
       where: { id },
+    });
+  }
+
+  // --- VOUCHERS ---
+
+  async getAllVouchers() {
+    return this.requestJson<Array<any>>(this.orderVoucherAdminBaseUrl);
+  }
+
+  async getVoucherById(id: number) {
+    return this.requestJson<any>(`${this.orderVoucherAdminBaseUrl}/${id}`);
+  }
+
+  async createVoucher(data: any) {
+    return this.requestJson<any>(this.orderVoucherAdminBaseUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateVoucher(id: number, data: any) {
+    return this.requestJson<any>(`${this.orderVoucherAdminBaseUrl}/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteVoucher(id: number) {
+    return this.requestJson<any>(`${this.orderVoucherAdminBaseUrl}/${id}`, {
+      method: 'DELETE',
     });
   }
 }

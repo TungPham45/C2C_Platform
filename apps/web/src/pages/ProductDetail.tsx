@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useProducts } from '../hooks/useProducts';
 import { useCart } from '../hooks/useCart';
+import { formatVnd, formatPriceRange } from '../utils/currency';
 
 export const ProductDetailPage: FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -308,13 +309,12 @@ export const ProductDetailPage: FC = () => {
                  </div>
               </div>
 
-              {/* Price Banner */}
               <div className="bg-[#f0f7ff] rounded-2xl p-6 mb-8 flex items-baseline gap-4">
                  <span className="text-4xl font-black text-[#00629d] font-['Plus_Jakarta_Sans']">
-                   {getPrice().toLocaleString('vi-VN')} <span className="text-2xl">VND</span>
+                   {selectedVariant ? formatVnd(getPrice()) : formatPriceRange(product.base_price, product.variants)}
                  </span>
                  <span className="text-lg font-semibold text-[#707882] line-through">
-                   {(getPrice() * 1.4).toLocaleString('vi-VN')} ₫
+                   {formatVnd(getPrice() * 1.4)}
                  </span>
                  <span className="text-xs font-bold text-[#d32f2f] uppercase tracking-wider">GIẢM 30%</span>
               </div>

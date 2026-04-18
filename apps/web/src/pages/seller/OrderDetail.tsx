@@ -2,6 +2,8 @@ import { FC, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { SellerLayout } from '../../components/layout/SellerLayout';
 import { useOrders } from '../../hooks/useOrders';
+import { formatVnd } from '../../utils/currency';
+import { getOrderPricing } from '../../utils/orderPricing';
 
 const ORDER_STEPS = [
   { key: 'pending',   label: 'Đã đặt hàng',  icon: 'receipt_long' },
@@ -112,9 +114,10 @@ export const SellerOrderDetail: FC = () => {
   const customerName = addressParts[0] || 'Khách hàng';
   const addressLines = addressParts.slice(1, -1).join(', ');
   const phone = addressParts[addressParts.length - 1] || '';
-  const subtotal = Number(order.subtotal) || 0;
-  const shippingFee = Number(order.shipping_fee) || 0;
-  const totalPaid = subtotal + shippingFee;
+  const pricing = getOrderPricing(order);
+  const subtotal = pricing.itemSubtotal;
+  const shippingFee = pricing.shippingFee;
+  const totalPaid = pricing.finalTotal;
 
   return (
     <SellerLayout pageTitle={`Chi tiết đơn hàng #${id}`}>
@@ -282,14 +285,14 @@ export const SellerOrderDetail: FC = () => {
                       <p className="text-xs text-[#707882] mt-1 font-medium">Số lượng: {item.quantity}</p>
                     </div>
                     <div className="text-right font-black text-[#0f1d25]">
-                      {Number(item.price_at_purchase).toLocaleString('vi-VN')} VND
+                      {formatVnd(item.price_at_purchase)}
                     </div>
                   </div>
                 ))}
               </div>
               <div className="mt-6 pt-6 border-t border-[#e4e9f0] flex items-center justify-between">
                 <p className="text-[10px] text-[#707882] font-bold uppercase tracking-widest">Tổng cộng</p>
-                <p className="text-xl font-black text-[#0f1d25] font-['Plus_Jakarta_Sans']">{totalPaid.toLocaleString('vi-VN')} VND</p>
+                <p className="text-xl font-black text-[#0f1d25] font-['Plus_Jakarta_Sans']">{formatVnd(totalPaid)}</p>
               </div>
             </section>
           </div>
@@ -348,16 +351,22 @@ export const SellerOrderDetail: FC = () => {
               <div className="border-t border-[#e4e9f0] mt-4 pt-4 space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-[#707882]">Tạm tính</span>
-                  <span className="font-bold text-[#0f1d25]">{subtotal.toLocaleString('vi-VN')} VND</span>
+                  <span className="font-bold text-[#0f1d25]">{formatVnd(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-[#707882]">Phí vận chuyển</span>
-                  <span className="font-bold text-[#0f1d25]">{shippingFee.toLocaleString('vi-VN')} VND</span>
+                  <span className="font-bold text-[#0f1d25]">{formatVnd(shippingFee)}</span>
                 </div>
+                {pricing.totalVoucherDiscount > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-[#00629d] font-bold">Voucher</span>
+                    <span className="text-[#00629d] font-bold">-{formatVnd(pricing.totalVoucherDiscount)}</span>
+                  </div>
+                )}
               </div>
               <div className="border-t border-[#e4e9f0] mt-4 pt-4 flex justify-between items-baseline">
                 <span className="text-sm font-bold text-[#0f1d25]">Tổng thanh toán</span>
-                <span className="text-xl font-black text-[#00629d] font-['Plus_Jakarta_Sans']">{totalPaid.toLocaleString('vi-VN')} VND</span>
+                <span className="text-xl font-black text-[#00629d] font-['Plus_Jakarta_Sans']">{formatVnd(totalPaid)}</span>
               </div>
             </section>
 

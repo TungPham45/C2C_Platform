@@ -2,6 +2,7 @@ import { FC, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { SellerLayout } from '../../components/layout/SellerLayout';
 import { useProducts } from '../../hooks/useProducts';
+import { formatPriceRange } from '../../utils/currency';
 
 export const ProductManagementPage: FC = () => {
   const { products, loading, fetchShopProducts, deleteProduct } = useProducts();
@@ -115,6 +116,11 @@ export const ProductManagementPage: FC = () => {
                         {p.status === 'active' ? (p.category?.name || 'Phân loại') : 
                          p.status === 'rejected' ? 'Bị từ chối' : 'Chờ duyệt'}
                       </span>
+                      {p.shop_categories?.map((sc: any) => (
+                        <span key={sc.id} className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-[#e9f5ff] text-[#42a5f5] border border-[#42a5f5]/20">
+                          {sc.name}
+                        </span>
+                      ))}
                       {p.status === 'rejected' && p.moderation_note && (
                         <div className="group/note relative">
                           <span className="material-symbols-outlined text-sm text-[#ba1a1a] cursor-help">info</span>
@@ -127,8 +133,8 @@ export const ProductManagementPage: FC = () => {
                     </div>
                   </div>
                 </div>
-                <div className={`text-center font-bold text-[#0f1d25] text-sm ${p.status !== 'active' ? 'opacity-70' : ''}`}>
-                  {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p.base_price)}
+                <div className={`text-center font-bold text-[#0f1d25] text-xs ${p.status !== 'active' ? 'opacity-70' : ''}`}>
+                  {formatPriceRange(p.base_price, p.variants)}
                 </div>
                 <div className={`text-center ${p.status !== 'active' ? 'opacity-70' : ''}`}>
                   <span className="text-sm font-medium text-[#0f1d25]">{p.variants?.length ? p.variants.reduce((acc: number, v: any) => acc + (v.stock_quantity || 0), 0) : 0}</span>

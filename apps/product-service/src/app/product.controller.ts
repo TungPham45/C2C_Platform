@@ -13,6 +13,13 @@ export class ProductController {
     return parseInt(userId, 10);
   }
 
+  private getOptionalProviderUserId(headers: any): number | null {
+    const userId = headers['x-user-id'];
+    if (!userId) return null;
+    const parsed = parseInt(Array.isArray(userId) ? userId[0] : userId, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
   private requireInternalAccess(headers: Record<string, string | string[] | undefined>) {
     const expectedToken = process.env.INTERNAL_SERVICE_TOKEN ?? 'internal-dev-token';
     const actualToken = headers['x-internal-token'];
@@ -62,6 +69,74 @@ export class ProductController {
     return this.productService.getShopProducts(userId);
   }
 
+  @Get('seller/context')
+  getSellerContext(@Headers() headers: any) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.getSellerContext(userId);
+  }
+
+  @Post('shop/:shopId/follow')
+  followShop(@Headers() headers: any, @Param('shopId') shopId: string) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.followShop(userId, +shopId);
+  }
+
+  @Delete('shop/:shopId/follow')
+  unfollowShop(@Headers() headers: any, @Param('shopId') shopId: string) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.unfollowShop(userId, +shopId);
+  }
+
+  @Get('following')
+  getFollowingShops(@Headers() headers: any) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.getFollowedShops(userId);
+  }
+
+  // --- SELLER CATEGORY ROUTES ---
+
+  @Get('seller/categories')
+  getShopCategories(@Headers() headers: any) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.getShopCategories(userId);
+  }
+
+  @Post('seller/categories')
+  createShopCategory(@Headers() headers: any, @Body() data: any) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.createShopCategory(userId, data);
+  }
+
+  @Put('seller/categories/:id')
+  updateShopCategory(@Headers() headers: any, @Param('id') id: string, @Body() data: any) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.updateShopCategory(userId, +id, data);
+  }
+
+  @Delete('seller/categories/:id')
+  deleteShopCategory(@Headers() headers: any, @Param('id') id: string) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.deleteShopCategory(userId, +id);
+  }
+
+  @Get('seller/categories/:id/products')
+  getCategoryProducts(@Headers() headers: any, @Param('id') id: string) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.getCategoryProducts(userId, +id);
+  }
+
+  @Post('seller/categories/:id/products')
+  syncCategoryProducts(@Headers() headers: any, @Param('id') id: string, @Body() body: { productIds: number[] }) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.syncCategoryProducts(userId, +id, body.productIds);
+  }
+
+  @Get('seller/:id')
+  getSellerProductDetail(@Headers() headers: any, @Param('id') id: string) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.getSellerProductById(userId, +id);
+  }
+
   @Put('seller/:id')
   updateProduct(@Headers() headers: any, @Param('id') id: string, @Body() data: any) {
     const userId = this.getProviderUserId(headers);
@@ -72,18 +147,6 @@ export class ProductController {
   deleteProduct(@Headers() headers: any, @Param('id') id: string) {
     const userId = this.getProviderUserId(headers);
     return this.productService.deleteProduct(userId, +id);
-  }
-
-  @Get('seller/context')
-  getSellerContext(@Headers() headers: any) {
-    const userId = this.getProviderUserId(headers);
-    return this.productService.getSellerContext(userId);
-  }
-
-  @Get('seller/:id')
-  getSellerProductDetail(@Headers() headers: any, @Param('id') id: string) {
-    const userId = this.getProviderUserId(headers);
-    return this.productService.getSellerProductById(userId, +id);
   }
 
   // --- INTERNAL ADMIN ROUTES ---
@@ -278,8 +341,8 @@ export class ProductController {
   // --- PUBLIC ROUTES (TAXONOMY MUST BE BEFORE :id) ---
 
   @Get('shop/:shopId')
-  getShopDetail(@Param('shopId') shopId: string) {
-    return this.productService.getPublicShopDetail(+shopId);
+  getShopDetail(@Headers() headers: any, @Param('shopId') shopId: string) {
+    return this.productService.getPublicShopDetail(+shopId, this.getOptionalProviderUserId(headers));
   }
 
   @Get('categories/all')

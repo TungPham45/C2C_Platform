@@ -1,5 +1,6 @@
 import { FC, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { formatVnd, formatPriceRange } from '../../utils/currency';
 
 interface Product {
   id: number;
@@ -9,6 +10,7 @@ interface Product {
   shop_id?: number;
   shop: { id?: number; name: string; rating: number | null };
   images: Array<{ image_url: string }>;
+  variants?: any[];
 }
 
 export const ProductFeed: FC = () => {
@@ -113,7 +115,7 @@ export const ProductFeed: FC = () => {
                           <p className="text-[10px] font-bold text-amber-500 uppercase tracking-[0.2em]">{product.shop.name} · Cửa hàng của bạn</p>
                         </div>
                         <span className="text-xl font-black text-[#00629d] font-['Plus_Jakarta_Sans'] tracking-tight">
-                          {Number(product.base_price).toLocaleString('vi-VN')} VND
+                          {formatPriceRange(product.base_price, product.variants)}
                         </span>
                       </div>
                     </div>
@@ -157,7 +159,7 @@ export const ProductFeed: FC = () => {
                         <p className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em]">{product.shop.name}</p>
                       </div>
                       <span className="text-xl font-black text-[#00629d] font-['Plus_Jakarta_Sans'] tracking-tight">
-                        {Number(product.base_price).toLocaleString('vi-VN')} VND
+                        {formatPriceRange(product.base_price, product.variants)}
                       </span>
                     </div>
                   </div>

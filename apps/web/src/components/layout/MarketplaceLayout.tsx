@@ -143,6 +143,10 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
                             <span className="material-symbols-outlined text-[#00629d] text-lg">receipt_long</span>
                             Đơn mua
                           </Link>
+                          <Link to="/vouchers" className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]">
+                            <span className="material-symbols-outlined text-[#00629d] text-lg">confirmation_number</span>
+                            Mã giảm giá
+                          </Link>
                         </>
                       )}
                       <div className="border-t border-[#e9f5ff] my-1"></div>

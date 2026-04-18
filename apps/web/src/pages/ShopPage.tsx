@@ -1,14 +1,19 @@
 import { FC, useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
+import { VoucherCard } from '../components/vouchers/VoucherCard';
+import { formatPriceRange } from '../utils/currency';
 
 interface ShopDetail {
   id: number;
+  owner_id?: number | null;
   name: string;
   logo_url: string;
   rating: number | null;
   description?: string;
   slug?: string;
+  follower_count?: number;
+  is_following?: boolean;
   _count: { products: number };
   products: Array<{
     id: number;
@@ -19,26 +24,86 @@ interface ShopDetail {
     shop: { name: string; rating: number | null };
     category?: { name: string };
     created_at?: string;
+    variants?: any[];
+    shop_categories?: Array<{ id: number; name: string }>;
   }>;
+  categories: Array<{ id: number; name: string; slug: string }>;
 }
 
-type TabKey = 'home' | 'all' | 'new';
+type TabKey = 'home' | 'all' | 'new' | 'categories';
+
+const formatFollowerCount = (count: number) =>
+  count >= 1000 ? `${(count / 1000).toFixed(count >= 10000 ? 0 : 1)}k` : String(count);
+
+interface ShopVoucher {
+  id: number;
+  code: string;
+  discount_type: string;
+  discount_value: string;
+  min_spend: string;
+  max_discount?: string;
+  end_date: string;
+  target_type: string;
+  shop_id?: number;
+  isClaimed?: boolean;
+}
 
 export const ShopPage: FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [shopDetail, setShopDetail] = useState<ShopDetail | null>(null);
+  const [shopVouchers, setShopVouchers] = useState<ShopVoucher[]>([]);
   const [loading, setLoading] = useState(true);
+  const [voucherLoading, setVoucherLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>('home');
   const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+
+  const loadShopVouchers = async (shopId = id) => {
+    setVoucherLoading(true);
+
+    try {
+      const userStr = localStorage.getItem('c2c_user');
+      if (!userStr || !shopId) {
+        setShopVouchers([]);
+        return;
+      }
+
+      const user = JSON.parse(userStr);
+      const response = await fetch('/api/vouchers/available', {
+        headers: {
+          'x-user-id': user.id.toString(),
+        },
+      });
+
+      if (!response.ok) {
+        setShopVouchers([]);
+        return;
+      }
+
+      const data = await response.json();
+      setShopVouchers(data.filter((voucher: ShopVoucher) => voucher.shop_id === Number(shopId)));
+    } catch (err) {
+      console.error('Failed to fetch shop vouchers', err);
+      setShopVouchers([]);
+    } finally {
+      setVoucherLoading(false);
+    }
+  };
 
   useEffect(() => {
     window.scrollTo(0, 0);
     const fetchShopDetail = async () => {
       try {
-        const response = await fetch(`/api/products/shop/${id}`);
+        const token = localStorage.getItem('c2c_token');
+        const response = await fetch(`/api/products/shop/${id}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
         if (response.ok) {
           const data = await response.json();
           setShopDetail(data);
+          setIsFollowing(Boolean(data.is_following));
         } else {
           setShopDetail(null);
         }
@@ -48,10 +113,128 @@ export const ShopPage: FC = () => {
         setLoading(false);
       }
     };
+
+    const fetchShopVouchers = async () => {
+      setVoucherLoading(true);
+
+      try {
+        const userStr = localStorage.getItem('c2c_user');
+        if (!userStr || !id) {
+          setShopVouchers([]);
+          return;
+        }
+
+        const user = JSON.parse(userStr);
+        const response = await fetch('/api/vouchers/available', {
+          headers: {
+            'x-user-id': user.id.toString(),
+          },
+        });
+
+        if (!response.ok) {
+          setShopVouchers([]);
+          return;
+        }
+
+        const data = await response.json();
+        setShopVouchers(data.filter((voucher: ShopVoucher) => voucher.shop_id === Number(id)));
+      } catch (err) {
+        console.error('Failed to fetch shop vouchers', err);
+        setShopVouchers([]);
+      } finally {
+        setVoucherLoading(false);
+      }
+    };
+
     if (id) {
       fetchShopDetail();
+      fetchShopVouchers();
     }
   }, [id]);
+
+  const handleClaimVoucher = async (voucherId: number) => {
+    try {
+      const userStr = localStorage.getItem('c2c_user');
+      if (!userStr) return;
+
+      const user = JSON.parse(userStr);
+      const response = await fetch(`/api/vouchers/${voucherId}/claim`, {
+        method: 'POST',
+        headers: {
+          'x-user-id': user.id.toString(),
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        alert(error.message || 'Failed to claim voucher');
+        return;
+      }
+
+      setShopVouchers((prev) =>
+        prev.map((voucher) =>
+          voucher.id === voucherId ? { ...voucher, isClaimed: true } : voucher,
+        ),
+      );
+    } catch (err) {
+      console.error('Failed to claim shop voucher', err);
+    }
+  };
+
+  const handleToggleFollow = async () => {
+    if (!id || !shopDetail || isFollowLoading) return;
+
+    const token = localStorage.getItem('c2c_token');
+    const userStr = localStorage.getItem('c2c_user');
+    const currentUser = userStr ? JSON.parse(userStr) : null;
+
+    if (!token || !currentUser) {
+      navigate('/login', { state: { from: `/shop/${id}` } });
+      return;
+    }
+
+    setIsFollowLoading(true);
+
+    try {
+      const response = await fetch(`/api/products/shop/${id}/follow`, {
+        method: isFollowing ? 'DELETE' : 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        alert(error?.message || 'Failed to update follow status');
+        return;
+      }
+
+      const result = await response.json();
+      setIsFollowing(Boolean(result.is_following));
+      setShopDetail((current) =>
+        current
+          ? {
+              ...current,
+              follower_count: Number(result.follower_count ?? current.follower_count ?? 0),
+              is_following: Boolean(result.is_following),
+            }
+          : current,
+      );
+      await loadShopVouchers(id);
+    } catch (err) {
+      console.error('Failed to toggle follow status', err);
+      alert('Failed to update follow status');
+    } finally {
+      setIsFollowLoading(false);
+    }
+  };
+
+  // Set default category if none selected
+  useEffect(() => {
+    if (activeTab === 'categories' && !selectedCategoryId && shopDetail?.categories && shopDetail.categories.length > 0) {
+      setSelectedCategoryId(shopDetail.categories[0].id);
+    }
+  }, [activeTab, shopDetail?.categories, selectedCategoryId]);
 
   if (loading) {
     return (
@@ -81,6 +264,12 @@ export const ShopPage: FC = () => {
   const { products } = shopDetail;
   const productCount = shopDetail._count.products;
   const shopRating = shopDetail.rating || 4.9;
+  const followerCount = Number(shopDetail.follower_count || 0);
+  const userStr = localStorage.getItem('c2c_user');
+  const currentUser = userStr ? JSON.parse(userStr) : null;
+  const isOwnShop =
+    (currentUser?.shop?.id != null && Number(currentUser.shop.id) === Number(shopDetail.id)) ||
+    (currentUser?.id != null && Number(currentUser.id) === Number(shopDetail.owner_id));
 
   // Filter products based on active tab
   const filteredProducts = activeTab === 'new'
@@ -89,7 +278,9 @@ export const ShopPage: FC = () => {
         const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
         return dateB - dateA;
       }).slice(0, 8)
-    : products;
+    : activeTab === 'categories' && selectedCategoryId
+      ? products.filter(p => p.shop_categories?.some(sc => sc.id === selectedCategoryId))
+      : products;
 
   // Mock vouchers for the shop (static display)
   const vouchers = [
@@ -101,7 +292,7 @@ export const ShopPage: FC = () => {
   // Stats
   const stats = [
     { value: productCount >= 1000 ? `${(productCount / 1000).toFixed(1)}k` : String(productCount), label: 'SẢN PHẨM' },
-    { value: '48.5k', label: 'NGƯỜI THEO DÕI' },
+    { value: formatFollowerCount(followerCount), label: 'NGƯỜI THEO DÕI' },
     { value: '99%', label: 'PHẢN HỒI' },
     { value: `${shopRating} ★`, label: 'ĐÁNH GIÁ' },
   ];
@@ -110,7 +301,10 @@ export const ShopPage: FC = () => {
     { key: 'home', label: 'Trang chủ' },
     { key: 'all', label: 'Tất cả sản phẩm' },
     { key: 'new', label: 'Sản phẩm mới' },
+    { key: 'categories', label: 'Danh mục' },
   ];
+
+  const selectedCategory = shopDetail.categories.find(c => c.id === selectedCategoryId) || shopDetail.categories[0];
 
   return (
     <MarketplaceLayout>
@@ -164,14 +358,15 @@ export const ShopPage: FC = () => {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <button
-                      onClick={() => setIsFollowing(!isFollowing)}
-                      className={`px-5 py-2.5 rounded-full font-bold text-sm transition-all duration-300 ${
+                      onClick={handleToggleFollow}
+                      disabled={isFollowLoading || isOwnShop}
+                      className={`px-5 py-2.5 rounded-full font-bold text-sm transition-all duration-300 disabled:opacity-60 ${
                         isFollowing
                           ? 'bg-[#e0efff] text-[#00629d] hover:bg-[#d0e5ff]'
                           : 'bg-[#00629d] text-white hover:bg-[#004e7c] shadow-md shadow-blue-200/50'
                       }`}
                     >
-                      {isFollowing ? 'Đang theo dõi' : 'Theo dõi'}
+                      {isOwnShop ? 'Cửa hàng của bạn' : isFollowLoading ? 'Đang xử lý...' : isFollowing ? 'Đang theo dõi' : 'Theo dõi'}
                     </button>
                     <button className="px-5 py-2.5 rounded-full font-bold text-sm border-2 border-[#dbeaf5] text-[#0f1d25] bg-white hover:bg-[#f5faff] transition-all">
                       Chat
@@ -227,7 +422,37 @@ export const ShopPage: FC = () => {
         </div>
 
         {/* ==================== SHOP VOUCHERS ==================== */}
-        {activeTab === 'home' && (
+        {activeTab === 'home' && (voucherLoading || shopVouchers.length > 0) && (
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-8 mt-8">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg sm:text-xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">
+                Eligible Shop Vouchers
+              </h2>
+              <Link to="/vouchers" className="text-sm font-bold text-[#00629d] hover:underline">
+                View all vouchers
+              </Link>
+            </div>
+            {voucherLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index} className="h-32 rounded-2xl bg-white border border-[#e4e9f0] animate-pulse"></div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {shopVouchers.map((voucher) => (
+                  <VoucherCard
+                    key={voucher.id}
+                    voucher={voucher}
+                    onClaim={handleClaimVoucher}
+                    isClaimed={voucher.isClaimed}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {false && activeTab === 'home' && (
           <div className="max-w-[1200px] mx-auto px-4 sm:px-8 mt-8">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg sm:text-xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">
@@ -277,11 +502,99 @@ export const ShopPage: FC = () => {
             </div>
           </div>
 
-          {filteredProducts.length === 0 ? (
+          {activeTab === 'categories' ? (
+            <div className="flex flex-col lg:flex-row gap-8">
+              {/* Sidebar */}
+              <div className="w-full lg:w-[260px] flex-shrink-0">
+                <div className="bg-white rounded-2xl border border-[#e4e9f0] p-4 shadow-sm sticky top-24">
+                  <h3 className="text-[12px] font-black text-[#0f1d25] uppercase tracking-[0.15em] mb-4 px-3">Danh mục</h3>
+                  <div className="flex flex-col gap-1">
+                    {shopDetail.categories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        onClick={() => setSelectedCategoryId(cat.id)}
+                        className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                          selectedCategoryId === cat.id
+                            ? 'bg-[#e9f5ff] text-[#00629d] shadow-sm'
+                            : 'text-[#707882] hover:bg-[#f5faff] hover:text-[#0f1d25]'
+                        }`}
+                      >
+                        {cat.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Product Area */}
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">
+                    {selectedCategory?.name || 'Sản phẩm'}
+                  </h2>
+                </div>
+
+                {filteredProducts.length === 0 ? (
+                  <div className="bg-white rounded-3xl shadow-sm border border-[#e4e9f0] p-6 lg:p-10 min-h-[400px] flex flex-col items-center justify-center">
+                    <span className="material-symbols-outlined text-6xl text-[#dbeaf5] mb-4">inventory_2</span>
+                    <h3 className="text-xl font-bold text-[#0f1d25] mb-2">Không tìm thấy sản phẩm nào</h3>
+                    <p className="text-[#707882]">Vui lòng quay lại sau.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-5 gap-y-8">
+                    {filteredProducts.map((product) => {
+                      const image = product.images?.[0]?.image_url || product.thumbnail_url || 'https://via.placeholder.com/600x600?text=Product';
+                      const displayImage = image.startsWith('http') ? image : `http://localhost:3000${image}`;
+                      const categoryName = product.category?.name || product.shop?.name || 'SHOP';
+
+                      return (
+                        <div key={product.id} className="group relative">
+                          <Link to={`/product/${product.id}`} className="flex flex-col">
+                            <div className="relative overflow-hidden rounded-2xl bg-[#f0f3f8] aspect-[4/5] mb-3.5">
+                              <img
+                                src={displayImage}
+                                alt={product.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                              />
+                              <button
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                className="absolute top-3 right-3 w-9 h-9 bg-white/80 backdrop-blur-md rounded-full flex items-center justify-center shadow-sm hover:bg-white hover:shadow-md transition-all group/heart"
+                              >
+                                <span className="material-symbols-outlined text-[20px] text-[#00629d] group-hover/heart:scale-110 transition-transform">
+                                  favorite
+                                </span>
+                              </button>
+                            </div>
+                            <div className="px-0.5">
+                              <p className="text-[10px] font-bold text-[#00629d] uppercase tracking-[0.12em] mb-1.5">{categoryName}</p>
+                              <h4 className="font-bold text-[14px] leading-snug text-[#0f1d25] group-hover:text-[#00629d] transition-colors line-clamp-2 min-h-[40px]">
+                                {product.name}
+                              </h4>
+                              <div className="flex items-center justify-between mt-2">
+                                <p className="text-[15px] font-black text-[#0f1d25] font-['Plus_Jakarta_Sans']">
+                                  {formatPriceRange(product.base_price, product.variants)}
+                                </p>
+                                <div className="flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-[14px] text-[#d99000]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                                    star
+                                  </span>
+                                  <span className="text-xs font-bold text-[#707882]">{product.shop.rating || '4.8'}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </Link>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : filteredProducts.length === 0 ? (
             <div className="bg-white rounded-3xl shadow-sm border border-[#e4e9f0] p-6 lg:p-10 min-h-[400px] flex flex-col items-center justify-center">
               <span className="material-symbols-outlined text-6xl text-[#dbeaf5] mb-4">inventory_2</span>
-              <h3 className="text-xl font-bold text-[#0f1d25] mb-2">Cửa hàng chưa có sản phẩm nào</h3>
-              <p className="text-[#707882]">Xin hãy quay lại sau.</p>
+              <h3 className="text-xl font-bold text-[#0f1d25] mb-2">Không tìm thấy sản phẩm nào</h3>
+              <p className="text-[#707882]">Vui lòng quay lại sau.</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-8">
@@ -293,15 +606,12 @@ export const ShopPage: FC = () => {
                 return (
                   <div key={product.id} className="group relative">
                     <Link to={`/product/${product.id}`} className="flex flex-col">
-                      {/* Image Container */}
                       <div className="relative overflow-hidden rounded-2xl bg-[#f0f3f8] aspect-[4/5] mb-3.5">
                         <img
                           src={displayImage}
                           alt={product.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                         />
-
-                        {/* Wishlist Heart */}
                         <button
                           onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
                           className="absolute top-3 right-3 w-9 h-9 bg-white/80 backdrop-blur-md rounded-full flex items-center justify-center shadow-sm hover:bg-white hover:shadow-md transition-all group/heart"
@@ -310,8 +620,6 @@ export const ShopPage: FC = () => {
                             favorite
                           </span>
                         </button>
-
-                        {/* Sale badge for some products */}
                         {Number(product.base_price) > 100000 && (
                           <div className="absolute bottom-3 left-3">
                             <span className="px-2.5 py-1 bg-[#00629d] text-white text-[10px] font-bold rounded-md uppercase shadow-sm">
@@ -320,26 +628,20 @@ export const ShopPage: FC = () => {
                           </div>
                         )}
                       </div>
-
-                      {/* Product Info */}
                       <div className="px-0.5">
-                        <p className="text-[10px] font-bold text-[#00629d] uppercase tracking-[0.12em] mb-1.5">
-                          {categoryName}
-                        </p>
+                        <p className="text-[10px] font-bold text-[#00629d] uppercase tracking-[0.12em] mb-1.5">{categoryName}</p>
                         <h4 className="font-bold text-[14px] leading-snug text-[#0f1d25] group-hover:text-[#00629d] transition-colors line-clamp-2 min-h-[40px]">
                           {product.name}
                         </h4>
                         <div className="flex items-center justify-between mt-2">
                           <p className="text-[15px] font-black text-[#0f1d25] font-['Plus_Jakarta_Sans']">
-                            {Number(product.base_price).toLocaleString('vi-VN')} ₫
+                            {formatPriceRange(product.base_price, product.variants)}
                           </p>
                           <div className="flex items-center gap-1">
                             <span className="material-symbols-outlined text-[14px] text-[#d99000]" style={{ fontVariationSettings: "'FILL' 1" }}>
                               star
                             </span>
-                            <span className="text-xs font-bold text-[#707882]">
-                              {product.shop.rating || '4.8'}
-                            </span>
+                            <span className="text-xs font-bold text-[#707882]">{product.shop.rating || '4.8'}</span>
                           </div>
                         </div>
                       </div>
