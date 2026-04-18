@@ -53,12 +53,9 @@ export class AuthService {
         ...rest,
         password: hashedPassword,
         role: 'user', 
-        status: 'pending_verification' // Require OTP for activation
+        status: 'active' // Tiện cho việc test: Bỏ qua bước chờ OTP
       },
     });
-
-    // Generate Registration OTP
-    await this.generateAndSendOtp(user.id, user.email, 'REGISTER');
 
     const { password: _, ...result } = user;
     return result;

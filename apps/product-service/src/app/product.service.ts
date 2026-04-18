@@ -509,7 +509,10 @@ export class ProductService {
 
   // Homepage / Discovery: List all 'active' products
   async getActiveProducts(searchQuery?: string) {
-    const where: any = { status: 'active' };
+    const where: any = { 
+      status: 'active',
+      shop: { status: 'active' }
+    };
     
     if (searchQuery && searchQuery.trim() !== '') {
       where.name = { contains: searchQuery.trim(), mode: 'insensitive' };
@@ -544,7 +547,9 @@ export class ProductService {
         attribute_values: { include: { attribute: true, attribute_option: true } }
       }
     });
-    if (!product || product.status !== 'active') throw new NotFoundException('Product not available');
+    if (!product || product.status !== 'active' || product.shop.status !== 'active') {
+      throw new NotFoundException('Product not available or shop is suspended');
+    }
     return product;
   }
 

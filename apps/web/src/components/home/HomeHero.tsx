@@ -19,6 +19,7 @@ export const HomeHero: FC = () => {
         const res = await fetch('/api/admin/public/banners');
         if (res.ok) {
           const data = await res.json();
+          console.log('[HomeHero] Fetched banners:', data.length, data);
           setBanners(data);
         }
       } catch (e) {
