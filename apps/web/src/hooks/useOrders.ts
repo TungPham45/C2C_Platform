@@ -151,5 +151,32 @@ export const useOrders = () => {
     }
   };
 
-  return { orders, loading, error, fetchBuyerOrders, fetchSellerOrders, fetchOrderDetail, updateOrderStatus, createOrder };
+  const fetchCheckoutVouchers = async (checkoutData: any) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const token = localStorage.getItem('c2c_token');
+      const res = await fetch(`${API_BASE}/checkout-vouchers`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(checkoutData)
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        const msg = json?.message || 'Failed to load checkout vouchers.';
+        throw new Error(Array.isArray(msg) ? msg.join(', ') : msg);
+      }
+      return json;
+    } catch (err: any) {
+      setError(err.message);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { orders, loading, error, fetchBuyerOrders, fetchSellerOrders, fetchOrderDetail, updateOrderStatus, createOrder, fetchCheckoutVouchers };
 };

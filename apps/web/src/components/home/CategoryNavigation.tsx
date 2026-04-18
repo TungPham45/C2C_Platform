@@ -5,11 +5,15 @@ interface Category {
   id: number;
   name: string;
   slug: string;
+  parent_id: number | null;
+  level: number;
 }
 
 export const CategoryNavigation: FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const rootCategories = categories.filter((category) => category.parent_id === null || category.level === 1);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -38,13 +42,13 @@ export const CategoryNavigation: FC = () => {
             <span className="text-[10px] font-bold text-[#00629d] uppercase tracking-[0.3em]">Discovery</span>
             <h2 className="text-4xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25] mt-2">Explore Categories</h2>
           </div>
-          <Link to="/categories" className="text-sm font-bold text-[#707882] hover:text-[#00629d] transition-colors flex items-center gap-2">
-            View All <span className="material-symbols-outlined text-lg">arrow_forward</span>
+          <Link to="/products" className="text-sm font-bold text-[#707882] hover:text-[#00629d] transition-colors flex items-center gap-2">
+            Browse All <span className="material-symbols-outlined text-lg">arrow_forward</span>
           </Link>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-          {categories.slice(0, 6).map((cat, index) => (
+          {rootCategories.map((cat) => (
             <Link 
               key={cat.id} 
               to={`/category/${cat.slug}`}

@@ -1,8 +1,8 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 import { Logger } from '@nestjs/common';
-import { createProxyMiddleware } from 'http-proxy-middleware';
 import * as jwt from 'jsonwebtoken';
+import { createReverseProxy } from './app/reverse-proxy';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -13,6 +13,7 @@ async function bootstrap() {
   const orderServiceUrl = process.env.ORDER_SERVICE_URL ?? 'http://localhost:3004/api/orders';
   const chatServiceUrl = process.env.CHAT_SERVICE_URL ?? 'http://localhost:3006/api/chat';
   const productPublicUrl = process.env.PRODUCT_PUBLIC_URL ?? 'http://localhost:3001/uploads';
+  const orderBaseUrl = orderServiceUrl.replace(/\/api\/orders\/?$/, '');
   
   // Custom middleware to extract JWT and append headers safely downstream
   app.use((req, res, next) => {
@@ -31,47 +32,28 @@ async function bootstrap() {
   });
 
   // Proxy Auth Service
-  app.use('/api/auth', createProxyMiddleware({
-    target: authServiceUrl,
-    changeOrigin: true,
-  }));
+  app.use('/api/auth', createReverseProxy(authServiceUrl));
 
   // Proxy Chat Service
-  app.use('/api/chat', createProxyMiddleware({
-    target: chatServiceUrl,
-    changeOrigin: true,
-  }));
+  app.use('/api/chat', createReverseProxy(chatServiceUrl));
 
   // Proxy Product Service
-  app.use('/api/products', createProxyMiddleware({
-    target: productServiceUrl,
-    changeOrigin: true,
-  }));
+  app.use('/api/products', createReverseProxy(productServiceUrl));
 
   // Proxy Admin Service
-  app.use('/api/admin', createProxyMiddleware({
-    target: adminServiceUrl,
-    changeOrigin: true,
-  }));
+  app.use('/api/admin', createReverseProxy(adminServiceUrl));
 
   // Proxy Order Service
-  app.use('/api/orders', createProxyMiddleware({
-    target: orderServiceUrl,
-    changeOrigin: true,
-  }));
+  app.use('/api/orders', createReverseProxy(orderServiceUrl));
+
+  // Proxy Voucher APIs (part of Order Service)
+  app.use('/api/vouchers', createReverseProxy(`${orderBaseUrl}/api/vouchers`));
 
   // Proxy Cart (part of Order Service)
-  const orderBaseUrl = orderServiceUrl.replace(/\/api\/orders\/?$/, '');
-  app.use('/api/cart', createProxyMiddleware({
-    target: `${orderBaseUrl}/api/cart`,
-    changeOrigin: true,
-  }));
+  app.use('/api/cart', createReverseProxy(`${orderBaseUrl}/api/cart`));
 
   // Proxy product uploads so the browser only needs the gateway's public URL.
-  app.use('/uploads', createProxyMiddleware({
-    target: productPublicUrl,
-    changeOrigin: true,
-  }));
+  app.use('/uploads', createReverseProxy(productPublicUrl));
 
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix); // Won't apply to raw .use middlewares above without rewriting. 

@@ -5,6 +5,67 @@ import { PrismaService } from './prisma.service';
 export class ProductService {
   constructor(@Inject(PrismaService) private prisma: PrismaService) {}
 
+  private async getCategoryLineageIds(categoryId: number) {
+    const lineage: number[] = [];
+    const visited = new Set<number>();
+    let currentCategoryId: number | null = categoryId;
+
+    while (currentCategoryId && !visited.has(currentCategoryId)) {
+      visited.add(currentCategoryId);
+
+      const category = await this.prisma.category.findUnique({
+        where: { id: currentCategoryId },
+        select: { id: true, parent_id: true },
+      });
+
+      if (!category) {
+        break;
+      }
+
+      lineage.unshift(category.id);
+      currentCategoryId = category.parent_id ?? null;
+    }
+
+    return lineage;
+  }
+
+  private async getCategoryDescendantIds(categoryId: number) {
+    const categories = await this.prisma.category.findMany({
+      where: { is_active: true },
+      select: { id: true, parent_id: true },
+    });
+
+    const childrenByParent = new Map<number, number[]>();
+    for (const category of categories) {
+      if (category.parent_id == null) {
+        continue;
+      }
+
+      const children = childrenByParent.get(category.parent_id) ?? [];
+      children.push(category.id);
+      childrenByParent.set(category.parent_id, children);
+    }
+
+    const descendantIds: number[] = [];
+    const visited = new Set<number>();
+    const queue = [categoryId];
+
+    while (queue.length > 0) {
+      const currentCategoryId = queue.shift();
+      if (!currentCategoryId || visited.has(currentCategoryId)) {
+        continue;
+      }
+
+      visited.add(currentCategoryId);
+      descendantIds.push(currentCategoryId);
+
+      const childIds = childrenByParent.get(currentCategoryId) ?? [];
+      queue.push(...childIds);
+    }
+
+    return descendantIds;
+  }
+
   private async findActiveSellerShop(userId: number) {
     return this.prisma.shop.findFirst({
       where: {
@@ -28,6 +89,33 @@ export class ProductService {
     if (!shop) {
       throw new UnauthorizedException('No active seller shop found for this user');
     }
+    return shop;
+  }
+
+  private async requireActiveShop(shopId: number) {
+    const shop = await this.prisma.shop.findFirst({
+      where: {
+        id: shopId,
+        status: 'active',
+      },
+      select: {
+        id: true,
+        owner_id: true,
+        name: true,
+        slug: true,
+        description: true,
+        logo_url: true,
+        rating: true,
+        status: true,
+        created_at: true,
+        updated_at: true,
+      },
+    });
+
+    if (!shop) {
+      throw new NotFoundException('Shop not found or not active');
+    }
+
     return shop;
   }
 
@@ -79,6 +167,9 @@ export class ProductService {
           category_id: Number(data.category_id) || 1,
           base_price: Number(data.base_price),
           thumbnail_url: data.thumbnail_url || '',
+          shop_categories: data.shop_category_ids && Array.isArray(data.shop_category_ids) 
+            ? { connect: data.shop_category_ids.map((id: number) => ({ id: Number(id) })) }
+            : undefined
         }
       });
       console.log('[CREATE] Step 1 done. Product ID:', product.id);
@@ -114,6 +205,25 @@ export class ProductService {
       console.log('[CREATE] Step 3: Creating', variantData.length, 'variants...');
       await this.prisma.productVariant.createMany({ data: variantData });
 
+      // Step 3.5: Save variant images
+      if (data.has_variants && data.variants && data.variants.length > 0) {
+        console.log('[CREATE] Step 3.5: Saving variant images...');
+        const createdVariants = await this.prisma.productVariant.findMany({ where: { product_id: product.id } });
+        for (let idx = 0; idx < data.variants.length; idx++) {
+          const v = data.variants[idx];
+          console.log('[CREATE] Variant', idx, 'image:', v.image);
+          if (v.image) {
+            const savedVariant = createdVariants.find((cv: any) => cv.attributes && JSON.stringify(cv.attributes) === JSON.stringify(v.attributes));
+            if (savedVariant) {
+              await this.prisma.productImage.create({
+                data: { product_id: product.id, variant_id: savedVariant.id, image_url: v.image, is_primary: false, sort_order: 100 + idx }
+              });
+              console.log('[CREATE] Saved image for variant', savedVariant.id);
+            }
+          }
+        }
+      }
+
       // Step 4: Create attribute values
       if (data.attributeValues && Object.keys(data.attributeValues).length > 0) {
         console.log('[CREATE] Step 4: Creating attribute values...');
@@ -137,7 +247,7 @@ export class ProductService {
       console.log('[CREATE] Step 5: Fetching complete product...');
       const result = await this.prisma.product.findUnique({
         where: { id: product.id },
-        include: { variants: true, images: true, attribute_values: true, category: true }
+        include: { variants: true, images: true, attribute_values: true, category: true, shop_categories: true }
       });
 
       console.log('[CREATE] Done! Product:', result?.id);
@@ -153,7 +263,7 @@ export class ProductService {
     const shop = await this.requireActiveSellerShop(userId);
     return this.prisma.product.findMany({
       where: { shop_id: shop.id },
-      include: { category: true, images: true, variants: true },
+      include: { category: true, images: true, variants: true, shop_categories: true },
       orderBy: { created_at: 'desc' }
     });
   }
@@ -186,6 +296,9 @@ export class ProductService {
           category_id: Number(data.category_id) || product.category_id,
           base_price: Number(data.base_price),
           thumbnail_url: data.thumbnail_url || '',
+          shop_categories: data.shop_category_ids !== undefined 
+            ? { set: Array.isArray(data.shop_category_ids) ? data.shop_category_ids.map((id: number) => ({ id: Number(id) })) : [] }
+            : undefined
         }
       });
 
@@ -220,6 +333,23 @@ export class ProductService {
       console.log('[UPDATE] Step 4: Creating', variantData.length, 'variants...');
       await this.prisma.productVariant.createMany({ data: variantData });
 
+      // Step 4.5: Save variant images
+      if (data.has_variants && data.variants && data.variants.length > 0) {
+        console.log('[UPDATE] Step 4.5: Saving variant images...');
+        const createdVariants = await this.prisma.productVariant.findMany({ where: { product_id: productId } });
+        for (let idx = 0; idx < data.variants.length; idx++) {
+          const v = data.variants[idx];
+          if (v.image) {
+            const savedVariant = createdVariants.find((cv: any) => cv.attributes && JSON.stringify(cv.attributes) === JSON.stringify(v.attributes));
+            if (savedVariant) {
+              await this.prisma.productImage.create({
+                data: { product_id: productId, variant_id: savedVariant.id, image_url: v.image, is_primary: false, sort_order: 100 + idx }
+              });
+            }
+          }
+        }
+      }
+
       // Step 5: Create attribute values
       if (data.attributeValues && Object.keys(data.attributeValues).length > 0) {
         console.log('[UPDATE] Step 5: Creating attribute values...');
@@ -243,7 +373,7 @@ export class ProductService {
       console.log('[UPDATE] Step 6: Fetching updated product...');
       const result = await this.prisma.product.findUnique({
         where: { id: productId },
-        include: { variants: true, images: true, attribute_values: true, category: true }
+        include: { variants: true, images: true, attribute_values: true, category: true, shop_categories: true }
       });
 
       console.log('[UPDATE] Done! Product:', result?.id);
@@ -304,8 +434,9 @@ export class ProductService {
       include: {
         category: true,
         images: { orderBy: { sort_order: 'asc' } },
-        variants: true,
-        attribute_values: { include: { attribute: true, attribute_option: true } }
+        variants: { include: { images: true } },
+        attribute_values: { include: { attribute: true, attribute_option: true } },
+        shop_categories: true
       }
     });
     if (!product) throw new NotFoundException('Product not found');
@@ -330,17 +461,269 @@ export class ProductService {
   // =====================
 
   async getAdminStats() {
-    const [activeShops, pendingApplications, pendingProducts] = await Promise.all([
+    const [activeShops, pendingApplications, pendingProducts, totalCategories, rootCategories] = await Promise.all([
       this.prisma.shop.count({ where: { status: 'active' } }),
       this.prisma.shop.count({ where: { status: 'pending' } }),
       this.prisma.product.count({ where: { status: 'pending_approval' } }),
+      this.prisma.category.count(),
+      this.prisma.category.count({ where: { level: 1 } }),
     ]);
+
+    // Get max attributes in a single category
+    const categoriesWithAtts = await this.prisma.category.findMany({
+      include: { _count: { select: { attribute_defs: true } } }
+    });
+    const maxAttributes = categoriesWithAtts.reduce((max, cat) => Math.max(max, cat._count.attribute_defs), 0);
 
     return {
       activeShops,
       pendingApplications,
       pendingProducts,
+      totalCategories,
+      rootCategories,
+      maxAttributes,
     };
+  }
+
+  async getAdminCategories() {
+    return this.prisma.category.findMany({
+      where: { shop_id: null },
+      orderBy: [{ level: 'asc' }, { sort_order: 'asc' }, { name: 'asc' }],
+    });
+  }
+
+  async getAdminCategoryById(id: number) {
+    const category = await this.prisma.category.findUnique({
+      where: { id },
+      include: {
+        attribute_defs: {
+          include: { options: { orderBy: { sort_order: 'asc' } } },
+          orderBy: { sort_order: 'asc' }
+        }
+      }
+    });
+    if (!category) throw new NotFoundException('Category not found');
+    return category;
+  }
+
+  async createCategory(data: any) {
+    const slug = data.slug || this.generateSlug(data.name);
+    return this.prisma.category.create({
+      data: {
+        name: data.name,
+        slug: slug,
+        parent_id: data.parent_id ? Number(data.parent_id) : null,
+        icon_url: data.icon_url || null,
+        level: data.level ? Number(data.level) : 1,
+        sort_order: data.sort_order ? Number(data.sort_order) : 0,
+        is_active: data.is_active !== undefined ? Boolean(data.is_active) : true,
+      },
+    });
+  }
+
+  async updateCategory(id: number, data: any) {
+    return this.prisma.category.update({
+      where: { id },
+      data: {
+        name: data.name,
+        slug: data.slug,
+        parent_id: data.parent_id !== undefined ? (data.parent_id ? Number(data.parent_id) : null) : undefined,
+        icon_url: data.icon_url,
+        level: data.level ? Number(data.level) : undefined,
+        sort_order: data.sort_order !== undefined ? Number(data.sort_order) : undefined,
+        is_active: data.is_active !== undefined ? Boolean(data.is_active) : undefined,
+      },
+    });
+  }
+
+  async deleteCategory(id: number) {
+    // Check if category has children
+    const childrenCount = await this.prisma.category.count({ where: { parent_id: id } });
+    if (childrenCount > 0) {
+      throw new BadRequestException('Cannot delete category with sub-categories');
+    }
+    // Check if category has products
+    const productCount = await this.prisma.product.count({ where: { category_id: id } });
+    if (productCount > 0) {
+      throw new BadRequestException('Cannot delete category with assigned products');
+    }
+
+    return this.prisma.category.delete({ where: { id } });
+  }
+
+  // =====================
+  // SELLER CATEGORY CONTEXT (FLAT)
+  // =====================
+
+  async getShopCategories(userId: number) {
+    const shop = await this.requireActiveSellerShop(userId);
+    return this.prisma.category.findMany({
+      where: { shop_id: shop.id },
+      orderBy: { sort_order: 'asc' }
+    });
+  }
+
+  async createShopCategory(userId: number, data: any) {
+    const shop = await this.requireActiveSellerShop(userId);
+    
+    // Check limit (max 20 categories per shop)
+    const count = await this.prisma.category.count({ where: { shop_id: shop.id } });
+    if (count >= 20) {
+      throw new BadRequestException('Mỗi cửa hàng chỉ được tạo tối đa 20 danh mục tùy chỉnh');
+    }
+
+    const slug = this.generateSlug(data.name);
+    return this.prisma.category.create({
+      data: {
+        name: data.name,
+        slug: slug,
+        shop_id: shop.id,
+        level: 1, // Flat structure
+        parent_id: null,
+        is_active: true,
+        sort_order: data.sort_order || 0
+      }
+    });
+  }
+
+  async updateShopCategory(userId: number, categoryId: number, data: any) {
+    const shop = await this.requireActiveSellerShop(userId);
+    const category = await this.prisma.category.findUnique({ where: { id: categoryId } });
+    if (!category || category.shop_id !== shop.id) {
+      throw new UnauthorizedException('Không có quyền chỉnh sửa danh mục này');
+    }
+
+    return this.prisma.category.update({
+      where: { id: categoryId },
+      data: {
+        name: data.name,
+        slug: data.name ? this.generateSlug(data.name) : undefined,
+        sort_order: data.sort_order !== undefined ? data.sort_order : undefined,
+        is_active: data.is_active !== undefined ? data.is_active : undefined
+      }
+    });
+  }
+
+  async deleteShopCategory(userId: number, categoryId: number) {
+    const shop = await this.requireActiveSellerShop(userId);
+    const category = await this.prisma.category.findUnique({ where: { id: categoryId } });
+    if (!category || category.shop_id !== shop.id) {
+      throw new UnauthorizedException('Không có quyền xóa danh mục này');
+    }
+
+    return this.prisma.category.delete({ where: { id: categoryId } });
+  }
+
+  async getCategoryProducts(userId: number, categoryId: number) {
+    const shop = await this.requireActiveSellerShop(userId);
+    const category = await this.prisma.category.findUnique({
+      where: { id: categoryId },
+      include: { shop_products: { select: { id: true } } }
+    });
+    
+    if (!category || (category.shop_id !== shop.id && category.shop_id !== null)) {
+      throw new UnauthorizedException('Không có quyền truy cập danh mục này');
+    }
+
+    const allProducts = await this.prisma.product.findMany({
+      where: { shop_id: shop.id },
+      include: {
+        images: { take: 1 }
+      }
+    });
+
+    const assignedIds = new Set(category.shop_products.map(p => p.id));
+
+    return allProducts.map(p => {
+      const thumbnail_url = p.thumbnail_url || (p.images && p.images[0]?.image_url) || '';
+      return {
+        id: p.id,
+        name: p.name,
+        thumbnail_url: thumbnail_url,
+        base_price: p.base_price.toString(),
+        is_assigned: assignedIds.has(p.id)
+      };
+    });
+  }
+
+  async syncCategoryProducts(userId: number, categoryId: number, productIds: number[]) {
+    const shop = await this.requireActiveSellerShop(userId);
+    const category = await this.prisma.category.findUnique({ where: { id: categoryId } });
+    
+    if (!category || category.shop_id !== shop.id) {
+      throw new UnauthorizedException('Không có quyền chỉnh sửa danh mục này');
+    }
+
+    return this.prisma.category.update({
+      where: { id: categoryId },
+      data: {
+        shop_products: {
+          set: productIds.map(id => ({ id: Number(id) }))
+        }
+      }
+    });
+  }
+
+  async getAdminCategoryAttributes(categoryId: number) {
+    return this.prisma.attributeDefinition.findMany({
+      where: { category_id: categoryId },
+      include: {
+        options: { orderBy: { sort_order: 'asc' } }
+      },
+      orderBy: { sort_order: 'asc' }
+    });
+  }
+
+  async createAttributeDefinition(categoryId: number, data: any) {
+    return this.prisma.attributeDefinition.create({
+      data: {
+        category_id: categoryId,
+        name: data.name,
+        input_type: data.input_type || 'text',
+        is_required: Boolean(data.is_required),
+        sort_order: data.sort_order ? Number(data.sort_order) : 0,
+      },
+    });
+  }
+
+  async updateAttributeDefinition(id: number, data: any) {
+    return this.prisma.attributeDefinition.update({
+      where: { id },
+      data: {
+        name: data.name,
+        input_type: data.input_type,
+        is_required: data.is_required !== undefined ? Boolean(data.is_required) : undefined,
+        sort_order: data.sort_order !== undefined ? Number(data.sort_order) : undefined,
+      },
+    });
+  }
+
+  async deleteAttributeDefinition(id: number) {
+    return this.prisma.attributeDefinition.delete({ where: { id } });
+  }
+
+  async createAttributeOption(attributeId: number, data: any) {
+    return this.prisma.attributeOption.create({
+      data: {
+        attribute_id: attributeId,
+        value_name: data.value_name,
+        sort_order: data.sort_order ? Number(data.sort_order) : 0,
+      },
+    });
+  }
+
+  async updateAttributeOption(id: number, data: any) {
+    return this.prisma.attributeOption.update({
+      where: { id },
+      data: {
+        value_name: data.value_name,
+        sort_order: data.sort_order !== undefined ? Number(data.sort_order) : undefined,
+      },
+    });
+  }
+
+  async deleteAttributeOption(id: number) {
+    return this.prisma.attributeOption.delete({ where: { id } });
   }
 
   async getPendingProducts() {
@@ -481,38 +864,208 @@ export class ProductService {
   // PUBLIC CONTEXT
   // =====================
 
-  async getPublicShopDetail(shopId: number) {
-    const shop = await this.prisma.shop.findUnique({
-      where: { id: shopId, status: 'active' },
-      include: {
-        _count: {
-          select: { products: { where: { status: 'active' } } }
-        }
-      }
-    });
+  async getPublicShopDetail(shopId: number, userId?: number | null) {
+    const shop = await this.requireActiveShop(shopId);
 
-    if (!shop) {
-      throw new NotFoundException('Shop not found or not active');
+    const [productCount, followerCount, followRecord, products, categories] = await Promise.all([
+      this.prisma.product.count({
+        where: { shop_id: shop.id, status: 'active' },
+      }),
+      this.prisma.shopFollow.count({
+        where: { shop_id: shop.id },
+      }),
+      userId
+        ? this.prisma.shopFollow.findUnique({
+            where: {
+              shop_id_user_id: {
+                shop_id: shop.id,
+                user_id: userId,
+              },
+            },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+      this.prisma.product.findMany({
+        where: { shop_id: shop.id, status: 'active' },
+        include: {
+          images: { where: { is_primary: true } },
+          shop: { select: { name: true, rating: true } },
+          variants: true,
+          shop_categories: true,
+        },
+        orderBy: { created_at: 'desc' },
+      }),
+      this.prisma.category.findMany({
+        where: { shop_id: shop.id, is_active: true },
+        orderBy: { sort_order: 'asc' }
+      })
+    ]);
+
+    return {
+      ...shop,
+      _count: {
+        products: productCount,
+      },
+      follower_count: followerCount,
+      is_following: Boolean(followRecord),
+      products,
+      categories,
+    };
+  }
+
+  async followShop(userId: number, shopId: number) {
+    const shop = await this.requireActiveShop(shopId);
+
+    if (shop.owner_id === userId) {
+      throw new BadRequestException('You cannot follow your own shop');
     }
 
-    const products = await this.prisma.product.findMany({
-      where: { shop_id: shop.id, status: 'active' },
-      include: {
-        images: { where: { is_primary: true } },
-        shop: { select: { name: true, rating: true } }
+    await this.prisma.shopFollow.upsert({
+      where: {
+        shop_id_user_id: {
+          shop_id: shop.id,
+          user_id: userId,
+        },
       },
-      orderBy: { created_at: 'desc' }
+      create: {
+        shop_id: shop.id,
+        user_id: userId,
+      },
+      update: {},
     });
 
-    return { ...shop, products };
+    const followerCount = await this.prisma.shopFollow.count({
+      where: { shop_id: shop.id },
+    });
+
+    return {
+      shop_id: shop.id,
+      is_following: true,
+      follower_count: followerCount,
+    };
+  }
+
+  async unfollowShop(userId: number, shopId: number) {
+    const shop = await this.requireActiveShop(shopId);
+
+    await this.prisma.shopFollow.deleteMany({
+      where: {
+        shop_id: shop.id,
+        user_id: userId,
+      },
+    });
+
+    const followerCount = await this.prisma.shopFollow.count({
+      where: { shop_id: shop.id },
+    });
+
+    return {
+      shop_id: shop.id,
+      is_following: false,
+      follower_count: followerCount,
+    };
+  }
+
+  async getFollowedShops(userId: number) {
+    const follows = await this.prisma.shopFollow.findMany({
+      where: {
+        user_id: userId,
+        shop: {
+          is: {
+            status: 'active',
+          },
+        },
+      },
+      include: {
+        shop: {
+          select: {
+            id: true,
+            owner_id: true,
+            name: true,
+            slug: true,
+            description: true,
+            logo_url: true,
+            rating: true,
+            status: true,
+            created_at: true,
+            updated_at: true,
+          },
+        },
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+    });
+
+    const shopIds = follows.map((follow) => follow.shop_id);
+    const [productCounts, followerCounts] = await Promise.all([
+      shopIds.length
+        ? this.prisma.product.groupBy({
+            by: ['shop_id'],
+            where: {
+              shop_id: { in: shopIds },
+              status: 'active',
+            },
+            _count: {
+              _all: true,
+            },
+          })
+        : Promise.resolve([]),
+      shopIds.length
+        ? this.prisma.shopFollow.groupBy({
+            by: ['shop_id'],
+            where: {
+              shop_id: { in: shopIds },
+            },
+            _count: {
+              _all: true,
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const productCountByShopId = new Map(
+      productCounts.map((entry) => [entry.shop_id, entry._count._all]),
+    );
+    const followerCountByShopId = new Map(
+      followerCounts.map((entry) => [entry.shop_id, entry._count._all]),
+    );
+
+    return follows.map((follow) => ({
+      ...follow.shop,
+      followed_at: follow.created_at,
+      follower_count: followerCountByShopId.get(follow.shop_id) ?? 0,
+      is_following: true,
+      _count: {
+        products: productCountByShopId.get(follow.shop_id) ?? 0,
+      },
+    }));
   }
 
   // Homepage / Discovery: List all 'active' products
-  async getActiveProducts(searchQuery?: string) {
+  async getActiveProducts(searchQuery?: string, categorySlug?: string) {
     const where: any = { 
       status: 'active',
       shop: { status: 'active' }
     };
+
+    if (categorySlug && categorySlug.trim() !== '') {
+      const category = await this.prisma.category.findFirst({
+        where: {
+          slug: categorySlug.trim(),
+          is_active: true,
+          shop_id: null, // Global discovery only for platform categories
+        },
+        select: { id: true },
+      });
+
+      if (!category) {
+        throw new NotFoundException('Category not found');
+      }
+
+      const categoryIds = await this.getCategoryDescendantIds(category.id);
+      where.category_id = { in: categoryIds };
+    }
     
     if (searchQuery && searchQuery.trim() !== '') {
       where.name = { contains: searchQuery.trim(), mode: 'insensitive' };
@@ -521,8 +1074,9 @@ export class ProductService {
     return this.prisma.product.findMany({
       where,
       include: { 
-        shop: { select: { name: true, logo_url: true, rating: true } }, 
-        images: { where: { is_primary: true } } 
+        shop: { select: { name: true, logo_url: true, rating: true, id: true } }, 
+        images: { where: { is_primary: true } },
+        variants: true
       },
       orderBy: { created_at: 'desc' },
       take: 40 // Tăng limit lên 40 cho ProductsPage hiển thị nhiều hơn
@@ -559,18 +1113,46 @@ export class ProductService {
 
   async getCategories() {
     return this.prisma.category.findMany({
-      where: { is_active: true },
+      where: { is_active: true, shop_id: null },
       orderBy: [{ level: 'asc' }, { sort_order: 'asc' }, { name: 'asc' }]
     });
   }
 
   async getCategoryAttributes(categoryId: number) {
-    return this.prisma.attributeDefinition.findMany({
-      where: { category_id: categoryId },
+    const categoryIds = await this.getCategoryLineageIds(categoryId);
+    if (categoryIds.length === 0) {
+      return [];
+    }
+
+    const categoryOrder = new Map(categoryIds.map((id, index) => [id, index]));
+    const attributes = await this.prisma.attributeDefinition.findMany({
+      where: {
+        category_id: { in: categoryIds },
+      },
       include: {
         options: { orderBy: { sort_order: 'asc' } }
       },
-      orderBy: { sort_order: 'asc' }
+      orderBy: [
+        { sort_order: 'asc' },
+        { name: 'asc' },
+      ]
+    });
+
+    return attributes.sort((left, right) => {
+      const leftCategoryOrder = categoryOrder.get(left.category_id) ?? Number.MAX_SAFE_INTEGER;
+      const rightCategoryOrder = categoryOrder.get(right.category_id) ?? Number.MAX_SAFE_INTEGER;
+
+      if (leftCategoryOrder !== rightCategoryOrder) {
+        return leftCategoryOrder - rightCategoryOrder;
+      }
+
+      const leftSortOrder = left.sort_order ?? 0;
+      const rightSortOrder = right.sort_order ?? 0;
+      if (leftSortOrder !== rightSortOrder) {
+        return leftSortOrder - rightSortOrder;
+      }
+
+      return left.name.localeCompare(right.name);
     });
   }
 

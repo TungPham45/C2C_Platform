@@ -2,6 +2,8 @@ import { FC, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useOrders } from '../hooks/useOrders';
+import { formatVnd } from '../utils/currency';
+import { getOrderPricing } from '../utils/orderPricing';
 
 const statusConfig: Record<string, { label: string; color: string; icon: string }> = {
   pending:    { label: 'CHờ Xử LÝ',     color: 'bg-[#fff8e5] text-[#e09110] border-[#ffb952]/30', icon: 'schedule' },
@@ -128,6 +130,7 @@ export const MyPurchasesPage: FC = () => {
                   const status = statusConfig[order.status?.toLowerCase()] || statusConfig.pending;
                   const orderDate = new Date(order.created_at).toLocaleDateString('vi-VN', { year: 'numeric', month: 'long', day: 'numeric' });
                   const customerName = order.shipping_address?.split(',')[0] || 'Order';
+                  const pricing = getOrderPricing(order);
 
                   return (
                     <div key={order.id} className="bg-white rounded-[2rem] border border-[#e4e9f0] shadow-sm overflow-hidden hover:shadow-md transition-shadow">
@@ -169,7 +172,7 @@ export const MyPurchasesPage: FC = () => {
                             </div>
                             <div className="text-right flex-shrink-0">
                               <p className="font-black text-[#00629d] text-sm">
-                                {Number(item.price_at_purchase).toLocaleString('vi-VN')} VND
+                                {formatVnd(item.price_at_purchase)}
                               </p>
                               <p className="text-[10px] text-[#707882] font-semibold mt-0.5">SL: {item.quantity}</p>
                             </div>
@@ -182,7 +185,7 @@ export const MyPurchasesPage: FC = () => {
                         <div>
                           <p className="text-[10px] text-[#707882] font-bold uppercase tracking-widest">Tổng cộng</p>
                           <p className="text-xl font-black text-[#0f1d25] font-['Plus_Jakarta_Sans']">
-                            {Number(order.subtotal).toLocaleString('vi-VN')} VND
+                            {formatVnd(pricing.finalTotal)}
                           </p>
                         </div>
                         <div className="flex items-center gap-3">

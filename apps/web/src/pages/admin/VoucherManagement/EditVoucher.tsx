@@ -1,0 +1,443 @@
+import { FC, useEffect, useState } from 'react';
+import { useNavigate, useParams, Link } from 'react-router-dom';
+import { AdminLayout } from '../../../components/layout/AdminLayout';
+import { Select } from '../../../components/ui/Select';
+import { formatVndCode } from '../../../utils/currency';
+
+const voucherStatusOptions = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'active', label: 'Active' },
+  { value: 'paused', label: 'Paused' },
+] as const;
+
+interface VoucherStats {
+  id: number;
+  code: string;
+  target_type: 'all_buyers' | 'new_buyer';
+  discount_type: string;
+  discount_value: number;
+  min_spend: number;
+  max_discount: number | null;
+  total_quantity: number | null;
+  used_count: number;
+  status: string;
+  start_date: string;
+  end_date: string;
+  max_per_user: number;
+  capacity: string;
+  dailyAvg: string;
+  expiresIn: number;
+}
+
+interface VoucherFormData {
+  code: string;
+  target_type: 'all_buyers' | 'new_buyer';
+  discount_type: string;
+  discount_value: number | string;
+  min_spend: number | string;
+  max_discount: number | string | null;
+  total_quantity: number | string | null;
+  max_per_user: number | string;
+  status: string;
+  start_date: string;
+  end_date: string;
+}
+
+export const EditVoucher: FC = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [stats, setStats] = useState<VoucherStats | null>(null);
+  const [formData, setFormData] = useState<VoucherFormData | null>(null);
+
+  useEffect(() => {
+    fetchVoucher();
+  }, [id]);
+
+  const fetchVoucher = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/admin/vouchers/${id}`);
+      if (response.ok) {
+        const data = await response.json();
+        setStats(data);
+        setFormData(toVoucherFormData(data));
+      }
+    } catch (error) {
+      console.error('Failed to fetch voucher:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSaving(true);
+      const response = await fetch(`/api/admin/vouchers/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildVoucherPayload(formData)),
+      });
+
+      if (response.ok) {
+        navigate('/admin/vouchers');
+      }
+    } catch (error) {
+      console.error('Failed to update voucher:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleArchive = async () => {
+    if (!confirm('Are you sure you want to archive this voucher? This action cannot be undone.')) return;
+    try {
+      const response = await fetch(`/api/admin/vouchers/${id}`, { method: 'DELETE' });
+      if (response.ok) navigate('/admin/vouchers');
+    } catch (error) {
+       console.error('Failed to archive:', error);
+    }
+  };
+
+  if (loading || !formData) return <AdminLayout>Loading...</AdminLayout>;
+
+  return (
+    <AdminLayout pageTitle="Chỉnh sửa Voucher">
+      <div className="max-w-6xl mx-auto pb-20">
+        <div className="flex items-center justify-between mb-10">
+           <div>
+              <Link to="/admin/vouchers" className="text-xs font-bold text-[#707882] flex items-center gap-2 hover:text-[#00629d] mb-4 group transition-colors">
+                 <span className="material-symbols-outlined text-sm group-hover:-translate-x-1 transition-transform">arrow_back</span> Vouchers
+                 <span className="text-[#cfe5ff]">/</span> Edit Voucher
+              </Link>
+              <h2 className="text-4xl font-extrabold text-[#0f1d25] font-['Plus_Jakarta_Sans'] tracking-tight">Edit System Voucher</h2>
+              <p className="text-sm text-[#707882] mt-2">Modify existing campaign parameters and monitoring performance.</p>
+           </div>
+           
+           <div className="flex gap-4">
+              <button onClick={() => navigate('/admin/vouchers')} className="px-8 py-4 bg-[#f5faff] text-[#707882] rounded-2xl text-xs font-bold uppercase tracking-widest hover:bg-[#e9f5ff] transition-all">Discard Changes</button>
+              <button 
+                onClick={handleSubmit} 
+                disabled={saving}
+                className="px-8 py-4 bg-gradient-to-br from-[#00629d] to-[#42a5f5] text-white rounded-2xl text-xs font-bold uppercase tracking-widest shadow-xl shadow-blue-100 hover:scale-105 transition-all disabled:opacity-50"
+              >
+                {saving ? 'Updating...' : 'Update Voucher'}
+              </button>
+           </div>
+        </div>
+
+        <div className="grid grid-cols-12 gap-10">
+          {/* Left Column: Stats and Form */}
+          <div className="col-span-8 space-y-10">
+            {/* Usage Stats Card */}
+            <div className="bg-white p-10 rounded-[3rem] shadow-[0_20px_60px_rgba(0,0,0,0.02)] border border-[#e1f0fb]">
+               <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <p className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] mb-1">Voucher Usage Performance</p>
+                    <h4 className="text-2xl font-bold text-[#0f1d25] font-['Plus_Jakarta_Sans']">
+                      {stats?.used_count} / {stats?.total_quantity || '∞'} Redeemed
+                    </h4>
+                  </div>
+                  <div className="px-4 py-1.5 bg-[#dcfce7] text-[#166534] rounded-full text-[10px] font-bold uppercase tracking-widest">
+                     {stats?.capacity}% Capacity
+                  </div>
+               </div>
+               
+               <div className="w-full h-3 bg-[#f5faff] rounded-full overflow-hidden mb-8">
+                  <div 
+                    className="h-full bg-gradient-to-r from-[#00629d] to-[#42a5f5] rounded-full transition-all duration-1000" 
+                    style={{ width: `${stats?.capacity}%` }}
+                  ></div>
+               </div>
+
+               <div className="grid grid-cols-4 gap-8">
+                  <div className="space-y-1">
+                     <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest opacity-60 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#166534]"></span> Status
+                     </p>
+                     <p className="text-sm font-bold text-[#0f1d25] capitalize">{stats?.status}</p>
+                  </div>
+                  <div className="space-y-1">
+                     <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest opacity-60">Daily Avg</p>
+                     <p className="text-sm font-bold text-[#0f1d25]">{stats?.dailyAvg} Uses</p>
+                  </div>
+                  <div className="space-y-1">
+                     <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest opacity-60">Expires In</p>
+                     <p className="text-sm font-bold text-[#0f1d25]">{stats?.expiresIn} Days</p>
+                  </div>
+                  <div className="space-y-1">
+                     <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest opacity-60">Audience</p>
+                     <p className="text-sm font-bold text-[#0f1d25]">{stats?.target_type === 'new_buyer' ? 'New Buyer Only' : 'All Buyers'}</p>
+                  </div>
+               </div>
+            </div>
+
+            {/* Form Sections */}
+            <div className="bg-white p-12 rounded-[3.5rem] shadow-[0_30px_100px_rgba(0,0,0,0.03)] border border-[#e1f0fb] space-y-12">
+               {/* Section 1: Identity & Rewards */}
+               <section className="space-y-8">
+                  <div className="flex items-center gap-4">
+                     <div className="w-8 h-8 rounded-full bg-[#e9f5ff] text-[#00629d] font-bold text-xs flex items-center justify-center">1</div>
+                     <h5 className="font-bold text-[#0f1d25] tracking-tight">Identity & Rewards</h5>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-10">
+                    <div className="space-y-3">
+                       <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Voucher Code</label>
+                       <input 
+                        type="text" 
+                        className="w-full px-8 py-5 bg-[#f5faff] border-2 border-transparent focus:border-[#00629d]/20 rounded-3xl text-sm font-bold text-[#0f1d25] outline-none transition-all"
+                        value={formData.code}
+                        onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                       />
+                    </div>
+                    <div className="space-y-3">
+                       <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Discount Type</label>
+                       <Select 
+                        options={[
+                          { value: 'percentage', label: 'Percentage Discount' },
+                          { value: 'fixed_amount', label: 'Fixed Amount Discount' }
+                        ]}
+                        value={formData.discount_type}
+                        onChange={(val) => setFormData({ ...formData, discount_type: val })}
+                       />
+                    </div>
+                    <div className="space-y-3">
+                       <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Target Audience</label>
+                       <Select
+                        options={[
+                          { value: 'all_buyers', label: 'All Buyers' },
+                          { value: 'new_buyer', label: 'New Buyer Only' }
+                        ]}
+                        value={formData.target_type}
+                        onChange={(val) => setFormData({ ...formData, target_type: val as 'all_buyers' | 'new_buyer' })}
+                       />
+                    </div>
+                    <div className="space-y-3">
+                       <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Voucher Status</label>
+                       <Select
+                        options={[...voucherStatusOptions]}
+                        value={formData.status}
+                        onChange={(val) => setFormData({ ...formData, status: val })}
+                       />
+                    </div>
+                    <div className="space-y-3">
+                       <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Discount Value</label>
+                       <div className="relative">
+                          <input 
+                            type="number" 
+                            placeholder={formData.discount_type === 'percentage' ? '10' : '50000'}
+                            className="w-full pl-8 pr-16 py-5 bg-[#f5faff] border-2 border-transparent focus:border-[#00629d]/20 rounded-3xl text-sm font-bold text-[#0f1d25] outline-none transition-all"
+                            value={formData.discount_value}
+                            onChange={(e) => setFormData({ ...formData, discount_value: e.target.value })}
+                          />
+                          <span className="absolute right-8 top-1/2 -translate-y-1/2 text-[#a1aab3] font-bold text-xs">{formData.discount_type === 'percentage' ? '%' : 'VND'}</span>
+                       </div>
+                    </div>
+                    <div className="space-y-3">
+                       <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Total Quantity</label>
+                       <input 
+                        type="number" 
+                        className="w-full px-8 py-5 bg-[#f5faff] border-2 border-transparent focus:border-[#00629d]/20 rounded-3xl text-sm font-bold text-[#0f1d25] outline-none transition-all"
+                        value={formData.total_quantity || ''}
+                        onChange={(e) => setFormData({ ...formData, total_quantity: e.target.value })}
+                       />
+                    </div>
+                  </div>
+               </section>
+
+               {/* Section 2: Usage Constraints */}
+               <section className="space-y-8 pt-6 border-t border-[#f5faff]">
+                  <div className="flex items-center gap-4">
+                     <div className="w-8 h-8 rounded-full bg-[#e9f5ff] text-[#00629d] font-bold text-xs flex items-center justify-center">2</div>
+                     <h5 className="font-bold text-[#0f1d25] tracking-tight">Usage Constraints</h5>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-6">
+                    <div className="space-y-3">
+                       <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Min. Order Value (VND)</label>
+                       <div className="relative">
+                          <input 
+                            type="number" 
+                            placeholder="100000"
+                            className="w-full pl-8 pr-16 py-5 bg-[#f5faff] border-2 border-transparent focus:border-[#00629d]/20 rounded-3xl text-sm font-bold text-[#0f1d25] outline-none transition-all"
+                            value={formData.min_spend}
+                            onChange={(e) => setFormData({ ...formData, min_spend: e.target.value })}
+                          />
+                          <span className="absolute right-8 top-1/2 -translate-y-1/2 text-[#a1aab3] font-bold text-xs">VND</span>
+                       </div>
+                    </div>
+                    <div className="space-y-3">
+                       <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Max. Discount Cap (VND)</label>
+                       <div className="relative">
+                          <input 
+                            type="number" 
+                            placeholder="50000"
+                            className="w-full pl-8 pr-16 py-5 bg-[#f5faff] border-2 border-transparent focus:border-[#00629d]/20 rounded-3xl text-sm font-bold text-[#0f1d25] outline-none transition-all"
+                            value={formData.max_discount || ''}
+                            onChange={(e) => setFormData({ ...formData, max_discount: e.target.value })}
+                          />
+                          <span className="absolute right-8 top-1/2 -translate-y-1/2 text-[#a1aab3] font-bold text-xs">VND</span>
+                       </div>
+                    </div>
+                    <div className="space-y-3">
+                       <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Uses Per User</label>
+                       <input 
+                        type="number" 
+                        className="w-full px-8 py-5 bg-[#f5faff] border-2 border-transparent focus:border-[#00629d]/20 rounded-3xl text-sm font-bold text-[#0f1d25] outline-none transition-all"
+                        value={formData.max_per_user}
+                        onChange={(e) => setFormData({ ...formData, max_per_user: e.target.value })}
+                       />
+                    </div>
+                  </div>
+               </section>
+
+               {/* Section 3: Duration & Validity */}
+               <section className="space-y-8 pt-6 border-t border-[#f5faff]">
+                  <div className="flex items-center gap-4">
+                     <div className="w-8 h-8 rounded-full bg-[#e9f5ff] text-[#00629d] font-bold text-xs flex items-center justify-center">3</div>
+                     <h5 className="font-bold text-[#0f1d25] tracking-tight">Duration & Validity</h5>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-10">
+                    <div className="space-y-3">
+                       <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Start Date</label>
+                       <div className="relative">
+                          <input 
+                            type="date" 
+                            className="w-full px-8 py-5 bg-[#f5faff] border-2 border-transparent focus:border-[#00629d]/20 rounded-3xl text-sm font-bold text-[#0f1d25] outline-none transition-all"
+                            value={formData.start_date}
+                            onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                          />
+                          <span className="material-symbols-outlined absolute right-8 top-1/2 -translate-y-1/2 text-[#a1aab3] pointer-events-none">calendar_today</span>
+                       </div>
+                    </div>
+                    <div className="space-y-3">
+                       <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">End Date</label>
+                       <div className="relative">
+                          <input 
+                            type="date" 
+                            className="w-full px-8 py-5 bg-[#f5faff] border-2 border-transparent focus:border-[#00629d]/20 rounded-3xl text-sm font-bold text-[#0f1d25] outline-none transition-all"
+                            value={formData.end_date}
+                            onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                          />
+                          <span className="material-symbols-outlined absolute right-8 top-1/2 -translate-y-1/2 text-[#a1aab3] pointer-events-none">calendar_today</span>
+                       </div>
+                    </div>
+                  </div>
+               </section>
+
+               {/* Footer Action */}
+               <div className="pt-12 border-t border-[#f5faff] flex items-center justify-between">
+                  <button 
+                    type="button" 
+                    onClick={handleArchive}
+                    className="flex items-center gap-3 text-[#ba1a1a] font-bold text-xs uppercase tracking-widest hover:opacity-70 transition-all"
+                  >
+                     <span className="material-symbols-outlined">delete_sweep</span> Archive this voucher forever
+                  </button>
+                  <div className="flex gap-4">
+                     <span className="text-xs text-[#707882] font-medium mr-4 flex items-center">Preview Layout</span>
+                     <button 
+                      onClick={handleSubmit} 
+                      disabled={saving}
+                      className="px-10 py-4 bg-[#00629d] text-white rounded-[1.5rem] text-xs font-bold uppercase tracking-widest shadow-xl shadow-blue-100 hover:scale-105 active:scale-95 transition-all"
+                    >
+                        {saving ? '...' : 'Update Voucher'}
+                     </button>
+                  </div>
+               </div>
+            </div>
+          </div>
+
+          {/* Right Column: Previews and Quick Actions */}
+          <div className="col-span-4 space-y-10">
+             {/* Status Card */}
+             <div className="bg-white p-10 rounded-[2.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.02)] border border-[#e1f0fb]">
+                <p className="text-xs font-bold text-[#0f1d25] mb-3">Voucher Status</p>
+                <Select
+                  className="mb-6"
+                  options={[...voucherStatusOptions]}
+                  value={formData.status}
+                  onChange={(val) => setFormData({ ...formData, status: val })}
+                />
+                <p className="text-[11px] text-[#707882] leading-relaxed mb-8">
+                   Choose whether the voucher should stay in draft, launch immediately, wait for its start date, or remain paused.
+                </p>
+                
+                <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest mb-4 ml-2">Voucher Preview</p>
+                <div className="relative group">
+                   <div className="absolute inset-x-0 bottom-0 h-4 bg-[#00629d]/10 blur-xl scale-95 transition-all group-hover:blur-2xl"></div>
+                   <div className="relative bg-gradient-to-br from-[#42a5f5] to-[#00629d] p-8 rounded-[2rem] text-white overflow-hidden">
+                      <div className="flex justify-between items-start relative z-10">
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80 mb-1">Coupon Code</p>
+                          <h6 className="text-xl font-black font-['JetBrains_Mono'] tracking-tight mb-6">{formData.code || 'CODE'}</h6>
+                          <div className="flex items-center gap-2">
+                             <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+                             <p className="text-2xl font-black">{formData.discount_type === 'percentage' ? `${formData.discount_value}%` : `${formatVndCode(formData.discount_value)} giảm`}</p>
+                          </div>
+                        </div>
+                        <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center">
+                           <span className="material-symbols-outlined text-white">confirmation_number</span>
+                        </div>
+                      </div>
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+                   </div>
+                </div>
+             </div>
+
+             {/* Admin Tip Card */}
+             <div className="relative group rounded-[3rem] overflow-hidden shadow-2xl shadow-blue-100">
+                <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=1470&auto=format&fit=crop" className="w-full h-80 object-cover brightness-[0.4] group-hover:scale-110 transition-transform duration-1000" alt="dashboard stat" />
+                <div className="absolute inset-0 p-10 flex flex-col justify-end">
+                   <div className="flex items-center gap-2 mb-3">
+                      <span className="w-2 h-2 rounded-full bg-[#42a5f5]"></span>
+                      <p className="text-[10px] font-bold text-[#42a5f5] uppercase tracking-widest">Admin Tip</p>
+                   </div>
+                   <h5 className="text-xl font-bold text-white leading-tight font-['Plus_Jakarta_Sans']">
+                      High-conversion vouchers usually perform well when the minimum basket starts around {formatVndCode(50000)}.
+                   </h5>
+                </div>
+             </div>
+          </div>
+        </div>
+      </div>
+    </AdminLayout>
+  );
+};
+
+function toVoucherFormData(data: VoucherStats): VoucherFormData {
+  return {
+    code: data.code,
+    target_type: data.target_type,
+    discount_type: data.discount_type,
+    discount_value: data.discount_value,
+    min_spend: data.min_spend,
+    max_discount: data.max_discount,
+    total_quantity: data.total_quantity,
+    max_per_user: data.max_per_user,
+    status: data.status,
+    start_date: data.start_date.split('T')[0],
+    end_date: data.end_date.split('T')[0],
+  };
+}
+
+function buildVoucherPayload(formData: VoucherFormData) {
+  return {
+    code: formData.code,
+    target_type: formData.target_type,
+    discount_type: formData.discount_type,
+    discount_value: Number(formData.discount_value),
+    min_spend: Number(formData.min_spend),
+    max_discount: formData.max_discount ? Number(formData.max_discount) : null,
+    total_quantity: formData.total_quantity ? Number(formData.total_quantity) : null,
+    max_per_user: Number(formData.max_per_user),
+    status: formData.status,
+    start_date: formData.start_date,
+    end_date: formData.end_date,
+  };
+}

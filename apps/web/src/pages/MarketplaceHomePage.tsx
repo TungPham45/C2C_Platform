@@ -4,6 +4,7 @@ import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { HomeHero } from '../components/home/HomeHero';
 import { CategoryNavigation } from '../components/home/CategoryNavigation';
 import { ProductFeed } from '../components/home/ProductFeed';
+import { VoucherSection } from '../components/home/VoucherSection';
 
 export const MarketplaceHomePage: FC = () => {
   const navigate = useNavigate();
@@ -12,6 +13,9 @@ export const MarketplaceHomePage: FC = () => {
       <div className="space-y-10">
         {/* Banner Section */}
         <HomeHero />
+
+        {/* Exclusive Vouchers Section */}
+        <VoucherSection />
 
         {/* Discovery Sections */}
         <CategoryNavigation />

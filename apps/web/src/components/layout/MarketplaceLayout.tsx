@@ -118,14 +118,37 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
                   {/* Dropdown Menu */}
                   <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-[#dbeaf5] rounded-2xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right group-hover:translate-y-0 translate-y-2 z-50 overflow-hidden">
                     <div className="py-2">
-                      <Link to="/profile" className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]">
-                        <span className="material-symbols-outlined text-[#00629d] text-lg">manage_accounts</span>
-                        Hồ sơ của tôi
-                      </Link>
-                      <Link to="/orders" className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]">
-                        <span className="material-symbols-outlined text-[#00629d] text-lg">receipt_long</span>
-                        Đơn mua
-                      </Link>
+                      {currentUser.role === 'admin' ? (
+                        <>
+                          <Link to="/admin" className="flex items-center gap-3 px-5 py-3 hover:bg-purple-50 transition-colors text-sm font-bold text-[#0f1d25]">
+                            <span className="material-symbols-outlined text-purple-600 text-lg">admin_panel_settings</span>
+                            Bảng quản trị
+                          </Link>
+                          <Link to="/admin/products" className="flex items-center gap-3 px-5 py-3 hover:bg-purple-50 transition-colors text-sm font-bold text-[#0f1d25]">
+                            <span className="material-symbols-outlined text-purple-600 text-lg">inventory_2</span>
+                            Duyệt sản phẩm
+                          </Link>
+                          <Link to="/admin/users" className="flex items-center gap-3 px-5 py-3 hover:bg-purple-50 transition-colors text-sm font-bold text-[#0f1d25]">
+                            <span className="material-symbols-outlined text-purple-600 text-lg">group</span>
+                            Quản lý người dùng
+                          </Link>
+                        </>
+                      ) : (
+                        <>
+                          <Link to="/profile" className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]">
+                            <span className="material-symbols-outlined text-[#00629d] text-lg">manage_accounts</span>
+                            Hồ sơ của tôi
+                          </Link>
+                          <Link to="/orders" className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]">
+                            <span className="material-symbols-outlined text-[#00629d] text-lg">receipt_long</span>
+                            Đơn mua
+                          </Link>
+                          <Link to="/vouchers" className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]">
+                            <span className="material-symbols-outlined text-[#00629d] text-lg">confirmation_number</span>
+                            Mã giảm giá
+                          </Link>
+                        </>
+                      )}
                       <div className="border-t border-[#e9f5ff] my-1"></div>
                       <button onClick={handleLogout} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-red-50 hover:text-red-600 transition-colors text-sm font-bold text-[#707882] text-left">
                         <span className="material-symbols-outlined text-lg">logout</span>
@@ -164,14 +187,30 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
                 Nền tảng thương mại điện tử C2C cao cấp. Tinh tế và đẳng cấp.
               </p>
               <div className="flex gap-4">
-                {[FaFacebookF, FaInstagram, FaTwitter, FaYoutube].map((Icon, i) => (
-                  <button
-                    key={i}
-                    className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
-                  >
-                    <Icon className="text-white text-lg" />
-                  </button>
-                ))}
+                <button className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
+                  <a href="https://www.facebook.com/" target="_blank" rel="noopener noreferrer">
+                    <FaFacebookF className="text-white text-lg" />
+                  </a>
+                </button>
+
+                <button className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
+                  <a href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer">
+                    <FaYoutube className="text-white text-lg" />
+                  </a>
+                </button>
+
+                <button className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
+                  <a href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer">
+                    <FaInstagram className="text-white text-lg" />
+                  </a>
+                </button>
+
+                <button className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
+                  <a href="https://www.twitter.com/" target="_blank" rel="noopener noreferrer">
+                    <FaTwitter className="text-white text-lg" />
+                  </a>
+                </button>
+
               </div>
             </div>
 

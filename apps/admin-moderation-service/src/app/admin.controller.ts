@@ -3,7 +3,7 @@ import { AdminService } from './admin.service';
 
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(private readonly adminService: AdminService) { }
 
   @Get('dashboard')
   getAdminStats() {
@@ -65,6 +65,70 @@ export class AdminController {
     return this.adminService.rejectProduct(+id, reason);
   }
 
+  // --- CATEGORIES ---
+
+  @Get('categories')
+  getCategories() {
+    return this.adminService.getCategories();
+  }
+
+  @Get('categories/:id')
+  getCategoryById(@Param('id') id: string) {
+    return this.adminService.getCategoryById(+id);
+  }
+
+  @Post('categories')
+  createCategory(@Body() data: any) {
+    return this.adminService.createCategory(data);
+  }
+
+  @Put('categories/:id')
+  updateCategory(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateCategory(+id, data);
+  }
+
+  @Delete('categories/:id')
+  deleteCategory(@Param('id') id: string) {
+    return this.adminService.deleteCategory(+id);
+  }
+
+  // --- ATTRIBUTES ---
+
+  @Get('categories/:id/attributes')
+  getCategoryAttributes(@Param('id') id: string) {
+    return this.adminService.getCategoryAttributes(+id);
+  }
+
+  @Post('categories/:id/attributes')
+  createAttribute(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.createAttribute(+id, data);
+  }
+
+  @Put('attributes/:id')
+  updateAttribute(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateAttribute(+id, data);
+  }
+
+  @Delete('attributes/:id')
+  deleteAttribute(@Param('id') id: string) {
+    return this.adminService.deleteAttribute(+id);
+  }
+
+  @Post('attributes/:id/options')
+  createAttributeOption(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.createAttributeOption(+id, data);
+  }
+
+  @Put('attribute-options/:id')
+  updateAttributeOption(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateAttributeOption(+id, data);
+  }
+
+  @Delete('attribute-options/:id')
+  deleteAttributeOption(@Param('id') id: string) {
+    return this.adminService.deleteAttributeOption(+id);
+  }
+
   // --- Banners ---
 
   @Get('public/banners')
@@ -90,5 +154,32 @@ export class AdminController {
   @Delete('banners/:id')
   deleteBanner(@Param('id') id: string) {
     return this.adminService.deleteBanner(+id);
+  }
+
+  // --- VOUCHERS ---
+
+  @Get('vouchers')
+  getAllVouchers() {
+    return this.adminService.getAllVouchers();
+  }
+
+  @Get('vouchers/:id')
+  getVoucherById(@Param('id') id: string) {
+    return this.adminService.getVoucherById(+id);
+  }
+
+  @Post('vouchers')
+  createVoucher(@Body() data: any) {
+    return this.adminService.createVoucher(data);
+  }
+
+  @Put('vouchers/:id')
+  updateVoucher(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateVoucher(+id, data);
+  }
+
+  @Delete('vouchers/:id')
+  deleteVoucher(@Param('id') id: string) {
+    return this.adminService.deleteVoucher(+id);
   }
 }
