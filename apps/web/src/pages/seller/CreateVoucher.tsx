@@ -64,6 +64,9 @@ export const SellerCreateVoucherPage: FC = () => {
 
       if (response.ok) {
         navigate('/seller/vouchers');
+      } else {
+        const err = await response.json().catch(() => null);
+        alert(err?.message || 'Không thể tạo voucher. Vui lòng kiểm tra lại.');
       }
     } catch (error) {
       console.error('Failed to create seller voucher:', error);
@@ -73,15 +76,15 @@ export const SellerCreateVoucherPage: FC = () => {
   };
 
   return (
-    <SellerLayout pageTitle="New Shop Voucher">
+    <SellerLayout pageTitle="Tạo Voucher Mới">
       <div className="max-w-5xl mx-auto">
         <div className="mb-10">
           <Link to="/seller/vouchers" className="text-xs font-bold text-[#707882] flex items-center gap-2 hover:text-[#00629d] mb-4 group transition-colors">
-            <span className="material-symbols-outlined text-sm group-hover:-translate-x-1 transition-transform">arrow_back</span> Shop Vouchers
-            <span className="text-[#cfe5ff]">/</span> New Campaign
+            <span className="material-symbols-outlined text-sm group-hover:-translate-x-1 transition-transform">arrow_back</span> Danh Sách Voucher
+            <span className="text-[#cfe5ff]">/</span> Chiến Dịch Mới
           </Link>
-          <h1 className="text-4xl font-extrabold text-[#0f1d25] font-['Plus_Jakarta_Sans'] tracking-tight mb-2">Create a shop voucher</h1>
-          <p className="text-sm text-[#707882]">This voucher will be attached to shop #{shop?.id ?? '--'} automatically.</p>
+          <h1 className="text-4xl font-extrabold text-[#0f1d25] font-['Plus_Jakarta_Sans'] tracking-tight mb-2">Tạo voucher của shop</h1>
+          <p className="text-sm text-[#707882]">Voucher này sẽ được tự động gắn với shop #{shop?.id ?? '--'}.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-10">
@@ -91,7 +94,7 @@ export const SellerCreateVoucherPage: FC = () => {
             <div className="grid grid-cols-2 gap-10 relative z-10">
 
               <div className="space-y-3">
-                <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Voucher Code</label>
+                <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Mã Voucher</label>
                 <input
                   type="text"
                   required
@@ -103,7 +106,7 @@ export const SellerCreateVoucherPage: FC = () => {
               </div>
 
               <div className="space-y-3">
-                <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Target Audience</label>
+                <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Khách Hàng Mục Tiêu</label>
                 <Select
                   options={[...sellerVoucherTargetOptions]}
                   value={formData.target_type}
@@ -112,7 +115,7 @@ export const SellerCreateVoucherPage: FC = () => {
               </div>
 
               <div className="space-y-3">
-                <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Voucher Status</label>
+                <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Trạng Thái</label>
                 <Select
                   options={[...sellerVoucherStatusOptions]}
                   value={formData.status}
@@ -121,7 +124,7 @@ export const SellerCreateVoucherPage: FC = () => {
               </div>
 
               <div className="space-y-3">
-                <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Total Quantity</label>
+                <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Tổng Số Lượng</label>
                 <input
                   type="number"
                   placeholder="300"
@@ -132,7 +135,7 @@ export const SellerCreateVoucherPage: FC = () => {
               </div>
 
               <div className="col-span-2 space-y-3">
-                <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Discount Type</label>
+                <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Loại Giảm Giá</label>
                 <div className="grid grid-cols-2 gap-4">
                   <button
                     type="button"
@@ -143,7 +146,7 @@ export const SellerCreateVoucherPage: FC = () => {
                         : 'bg-[#f5faff] border-transparent text-[#707882] hover:bg-[#e9f5ff]'
                     }`}
                   >
-                    <span className="material-symbols-outlined">percent</span> Percentage
+                    <span className="material-symbols-outlined">percent</span> Phần Trăm
                   </button>
                   <button
                     type="button"
@@ -154,13 +157,13 @@ export const SellerCreateVoucherPage: FC = () => {
                         : 'bg-[#f5faff] border-transparent text-[#707882] hover:bg-[#e9f5ff]'
                     }`}
                   >
-                    <span className="material-symbols-outlined">payments</span> Fixed Amount
+                    <span className="material-symbols-outlined">payments</span> Số Tiền Cố Định
                   </button>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Discount Value</label>
+                <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Giá Trị Giảm</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -177,7 +180,7 @@ export const SellerCreateVoucherPage: FC = () => {
               </div>
 
               <div className="space-y-3">
-                <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Min. Spend (VND)</label>
+                <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Đơn Tối Thiểu (VND)</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -192,7 +195,7 @@ export const SellerCreateVoucherPage: FC = () => {
 
               {formData.discount_type === 'percentage' && (
                 <div className="col-span-2 space-y-3">
-                  <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Max. Discount Cap (VND)</label>
+                  <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Giảm Tối Đa (VND)</label>
                   <div className="relative">
                     <input
                       type="number"
@@ -207,7 +210,7 @@ export const SellerCreateVoucherPage: FC = () => {
               )}
 
               <div className="col-span-2 space-y-3">
-                <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Uses Per User</label>
+                <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Số Lượng Mỗi KH</label>
                 <input
                   type="number"
                   className="w-full px-8 py-5 bg-[#f5faff] border-2 border-transparent focus:border-[#00629d]/20 rounded-3xl text-sm font-bold text-[#0f1d25] outline-none transition-all"
@@ -218,7 +221,7 @@ export const SellerCreateVoucherPage: FC = () => {
 
               <div className="col-span-2 grid grid-cols-2 gap-10">
                 <div className="space-y-3">
-                  <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Start Date</label>
+                  <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Ngày Bắt Đầu</label>
                   <div className="relative">
                     <input
                       type="date"
@@ -232,7 +235,7 @@ export const SellerCreateVoucherPage: FC = () => {
                 </div>
 
                 <div className="space-y-3">
-                  <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">End Date</label>
+                  <label className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] ml-2">Ngày Kết Thúc</label>
                   <div className="relative">
                     <input
                       type="date"
@@ -253,14 +256,14 @@ export const SellerCreateVoucherPage: FC = () => {
                 onClick={() => navigate('/seller/vouchers')}
                 className="px-8 py-4 text-xs font-bold text-[#707882] uppercase tracking-widest hover:text-[#0f1d25] transition-colors"
               >
-                Cancel
+                Hủy
               </button>
               <button
                 type="submit"
                 disabled={loading}
                 className="px-12 py-5 bg-gradient-to-br from-[#00629d] to-[#42a5f5] text-white rounded-[1.5rem] text-xs font-bold uppercase tracking-widest shadow-xl shadow-blue-100 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
               >
-                {loading ? 'Creating...' : 'Create Voucher'}
+                {loading ? 'Đang tạo...' : 'Lưu Thay Đổi'}
               </button>
             </div>
           </div>

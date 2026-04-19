@@ -1,14 +1,14 @@
 export const sellerVoucherStatusOptions = [
-  { value: 'draft', label: 'Draft' },
-  { value: 'scheduled', label: 'Scheduled' },
-  { value: 'active', label: 'Active' },
-  { value: 'paused', label: 'Paused' },
+  { value: 'draft', label: 'Bản Nháp' },
+  { value: 'scheduled', label: 'Lên Lịch' },
+  { value: 'active', label: 'Hoạt Động' },
+  { value: 'paused', label: 'Tạm Dừng' },
 ] as const;
 
 export const sellerVoucherTargetOptions = [
-  { value: 'all_buyers', label: 'All Buyers' },
-  { value: 'new_buyer', label: 'New Buyer Only' },
-  { value: 'followers', label: 'Followers Only' },
+  { value: 'all_buyers', label: 'Tất Cả Người Mua' },
+  { value: 'new_buyer', label: 'Khách Hàng Mới' },
+  { value: 'followers', label: 'Khách Theo Dõi Shop' },
 ] as const;
 
 export type SellerVoucherTargetType =
@@ -102,12 +102,12 @@ export function buildSellerVoucherPayload(formData: SellerVoucherFormData) {
 
 export function getSellerVoucherTargetLabel(targetType: string) {
   if (targetType === 'new_buyer') {
-    return 'New Buyer';
+    return 'Người Mua Mới';
   }
 
   if (targetType === 'followers' || targetType === 'follower') {
-    return 'Followers Only';
+    return 'Chỉ Người Theo Dõi';
   }
 
-  return 'All Buyers';
+  return 'Tất Cả Người Mua';
 }

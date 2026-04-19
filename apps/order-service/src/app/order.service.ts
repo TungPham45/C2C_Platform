@@ -14,7 +14,7 @@ export class OrderService {
   ) {}
 
   async getCheckoutVouchers(userId: number, data: any) {
-    const draft = await this.buildOrderDraft(data);
+    const draft = await this.buildOrderDraft(data, userId);
     const claims = await this.getActiveUnusedVoucherClaims(userId);
 
     return {
@@ -41,7 +41,7 @@ export class OrderService {
   }
 
   async createOrder(userId: number, data: any) {
-    const draft = await this.buildOrderDraft(data);
+    const draft = await this.buildOrderDraft(data, userId);
     const voucherSelection = await this.validateSelectedVoucherClaims(userId, draft, data);
     const now = new Date();
 
@@ -338,7 +338,7 @@ export class OrderService {
     }));
   }
 
-  private async buildOrderDraft(data: any) {
+  private async buildOrderDraft(data: any, userId?: number) {
     const rawShopOrders = Array.isArray(data?.shop_orders) ? data.shop_orders : [];
     if (!rawShopOrders.length) {
       throw new BadRequestException('No items selected for checkout');
@@ -444,7 +444,20 @@ export class OrderService {
       }
     }
 
+    let ownedShopIds: number[] = [];
+    if (userId) {
+      const ownedShops = await this.productPrisma.shop.findMany({
+        where: { owner_id: userId },
+        select: { id: true },
+      });
+      ownedShopIds = ownedShops.map((s) => s.id);
+    }
+
     const normalizedShopOrders = requestedOrders.map((shopOrder) => {
+      if (ownedShopIds.includes(shopOrder.shop_id)) {
+        throw new BadRequestException(`Bạn không thể tự mua hàng hoặc tự tạo đơn từ chính shop của mình (Shop #${shopOrder.shop_id})`);
+      }
+
       let originalSubtotal = 0;
 
       const items = shopOrder.items.map((item) => {

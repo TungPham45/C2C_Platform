@@ -81,7 +81,6 @@ export const CheckoutPage = () => {
   const [paymentMethod, setPaymentMethod] = useState('credit_card');
   const [voucherData, setVoucherData] = useState<CheckoutVoucherResponse | null>(null);
   const [voucherLoading, setVoucherLoading] = useState(false);
-  const [selectedPlatformVoucherClaimId, setSelectedPlatformVoucherClaimId] = useState<number | null>(null);
   const [selectedShopVoucherClaimIds, setSelectedShopVoucherClaimIds] = useState<Record<number, number | null>>({});
 
   const getSinglePrice = () => {
@@ -136,13 +135,13 @@ export const CheckoutPage = () => {
     };
   });
 
-  const subTotal = shopOrders.reduce((sum, shopOrder) => sum + shopOrder.subtotal, 0);
-  const totalShippingFee = shopOrders.reduce((sum, shopOrder) => sum + shopOrder.shipping_fee, 0);
+  const subTotal = shopOrders.reduce((sum: number, shopOrder: any) => sum + shopOrder.subtotal, 0);
+  const totalShippingFee = shopOrders.reduce((sum: number, shopOrder: any) => sum + shopOrder.shipping_fee, 0);
   const checkoutKey = JSON.stringify(
-    shopOrders.map((shopOrder) => ({
+    shopOrders.map((shopOrder: any) => ({
       shop_id: shopOrder.shop_id,
       shipping_fee: shopOrder.shipping_fee,
-      items: shopOrder.items.map((item) => ({
+      items: shopOrder.items.map((item: any) => ({
         product_variant_id: item.product_variant_id,
         quantity: item.quantity,
       })),
@@ -155,7 +154,7 @@ export const CheckoutPage = () => {
     const loadCheckoutVouchers = async () => {
       setVoucherLoading(true);
       const result = await fetchCheckoutVouchers({
-        shop_orders: shopOrders.map((shopOrder) => ({
+        shop_orders: shopOrders.map((shopOrder: any) => ({
           shop_id: shopOrder.shop_id,
           shipping_fee: shopOrder.shipping_fee,
           items: shopOrder.items,
@@ -167,17 +166,14 @@ export const CheckoutPage = () => {
       }
 
       setVoucherData(result);
-      setSelectedPlatformVoucherClaimId((current) =>
-        result?.platform_vouchers.some((voucher) => voucher.claim_id === current) ? current : null,
-      );
       setSelectedShopVoucherClaimIds((current) => {
         const next: Record<number, number | null> = {};
 
-        shopOrders.forEach((shopOrder) => {
-          const matchingGroup = result?.shop_vouchers.find((group) => group.shop_id === shopOrder.shop_id);
+        shopOrders.forEach((shopOrder: any) => {
+          const matchingGroup = result?.shop_vouchers.find((group: any) => group.shop_id === shopOrder.shop_id);
           const currentSelection = current[shopOrder.shop_id];
           next[shopOrder.shop_id] =
-            matchingGroup?.vouchers.some((voucher) => voucher.claim_id === currentSelection)
+            matchingGroup?.vouchers.some((voucher: any) => voucher.claim_id === currentSelection)
               ? currentSelection
               : null;
         });
@@ -194,10 +190,7 @@ export const CheckoutPage = () => {
     };
   }, [checkoutKey]);
 
-  const selectedPlatformVoucher =
-    voucherData?.platform_vouchers.find((voucher) => voucher.claim_id === selectedPlatformVoucherClaimId) ?? null;
-
-  const shopDiscountTotal = shopOrders.reduce((sum, shopOrder) => {
+  const shopDiscountTotal = shopOrders.reduce((sum: number, shopOrder: any) => {
     const selectedClaimId = selectedShopVoucherClaimIds[shopOrder.shop_id];
     const selectedVoucher = voucherData?.shop_vouchers
       .find((group) => group.shop_id === shopOrder.shop_id)
@@ -207,13 +200,7 @@ export const CheckoutPage = () => {
   }, 0);
 
   const subtotalAfterShopDiscount = Math.max(0, subTotal - shopDiscountTotal);
-  const platformDiscount = selectedPlatformVoucher
-    ? Math.min(
-        calculateVoucherDiscount(selectedPlatformVoucher.voucher, subTotal),
-        subtotalAfterShopDiscount,
-      )
-    : 0;
-  const totalPayment = Math.max(0, subtotalAfterShopDiscount + totalShippingFee - platformDiscount);
+  const totalPayment = Math.max(0, subtotalAfterShopDiscount + totalShippingFee);
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -222,13 +209,12 @@ export const CheckoutPage = () => {
       total_payment: totalPayment,
       payment_method: paymentMethod,
       shipping_address: `${shippingAddress.fullName}, ${shippingAddress.address}, ${shippingAddress.city}, ${shippingAddress.phone}`,
-      shop_orders: shopOrders.map((shopOrder) => ({
+      shop_orders: shopOrders.map((shopOrder: any) => ({
         shop_id: shopOrder.shop_id,
         subtotal: shopOrder.subtotal,
         shipping_fee: shopOrder.shipping_fee,
         items: shopOrder.items,
       })),
-      platform_voucher_claim_id: selectedPlatformVoucherClaimId,
       shop_voucher_claim_ids: selectedShopVoucherClaimIds,
     };
 
@@ -333,11 +319,10 @@ export const CheckoutPage = () => {
                     key={method.id}
                     type="button"
                     onClick={() => setPaymentMethod(method.id)}
-                    className={`flex items-center gap-4 p-5 lg:p-6 rounded-2xl border-2 transition-all ${
-                      paymentMethod === method.id
+                    className={`flex items-center gap-4 p-5 lg:p-6 rounded-2xl border-2 transition-all ${paymentMethod === method.id
                         ? 'bg-[#f5faff] border-[#00629d] text-[#00629d]'
                         : 'bg-white border-[#f0f3f8] hover:border-[#dbeaf5] text-[#404751]'
-                    }`}
+                      }`}
                   >
                     <span className="material-symbols-outlined">{method.icon}</span>
                     <span className="font-bold text-sm lg:text-base">{method.label}</span>
@@ -349,66 +334,12 @@ export const CheckoutPage = () => {
             <section className="bg-white border border-[#e4e9f0] rounded-[2rem] p-8 lg:p-10 shadow-sm">
               <h2 className="text-xl font-bold mb-8 flex items-center gap-3 text-[#0f1d25]">
                 <span className="w-8 h-8 rounded-lg bg-[#e1f0fb] text-[#00629d] flex items-center justify-center text-sm">3</span>
-                Voucher da claim
+                VOUCHER
               </h2>
 
               <div className="space-y-8">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-bold text-[#0f1d25]">Voucher he thong</h3>
-                      <p className="text-sm text-[#707882]">Chi hien voucher da claim, chua dung va du dieu kien don hang.</p>
-                    </div>
-                    {selectedPlatformVoucher && (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPlatformVoucherClaimId(null)}
-                        className="text-sm font-bold text-[#00629d]"
-                      >
-                        Bo chon
-                      </button>
-                    )}
-                  </div>
-
-                  {voucherLoading ? (
-                    <div className="h-24 rounded-2xl bg-[#f5faff] animate-pulse"></div>
-                  ) : voucherData?.platform_vouchers.length ? (
-                    <div className="space-y-3">
-                      {voucherData.platform_vouchers.map((option) => {
-                        const isSelected = selectedPlatformVoucherClaimId === option.claim_id;
-                        return (
-                          <button
-                            key={option.claim_id}
-                            type="button"
-                            onClick={() => setSelectedPlatformVoucherClaimId(isSelected ? null : option.claim_id)}
-                            className={`w-full text-left p-5 rounded-2xl border transition-all ${
-                              isSelected
-                                ? 'border-[#00629d] bg-[#f5faff]'
-                                : 'border-[#e4e9f0] bg-white hover:border-[#cfe4f6]'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-4">
-                              <div>
-                                <p className="font-black text-[#0f1d25]">{option.voucher.code}</p>
-                                <p className="text-sm text-[#707882] mt-1">
-                                  Giam toi da {formatCurrency(option.estimated_discount)} cho don tu {formatCurrency(Number(option.voucher.min_spend || 0))}
-                                </p>
-                              </div>
-                              <div className={`w-5 h-5 rounded-full border-2 ${isSelected ? 'border-[#00629d] bg-[#00629d]' : 'border-[#c8d3de]'}`}></div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="rounded-2xl border border-dashed border-[#dbeaf5] px-5 py-6 text-sm text-[#707882]">
-                      Khong co voucher he thong phu hop cho don nay.
-                    </div>
-                  )}
-                </div>
-
                 <div className="space-y-6">
-                  {shopOrders.map((shopOrder) => {
+                  {shopOrders.map((shopOrder: any) => {
                     const voucherGroup = voucherData?.shop_vouchers.find((group) => group.shop_id === shopOrder.shop_id);
                     const selectedClaimId = selectedShopVoucherClaimIds[shopOrder.shop_id];
 
@@ -417,7 +348,7 @@ export const CheckoutPage = () => {
                         <div className="flex items-center justify-between gap-4 mb-4">
                           <div>
                             <h3 className="font-bold text-[#0f1d25]">{shopOrder.shop_name}</h3>
-                            <p className="text-sm text-[#707882]">Tam tinh shop: {formatCurrency(shopOrder.subtotal)}</p>
+                            <p className="text-sm text-[#707882]">Tạm Tính Shop: {formatCurrency(shopOrder.subtotal)}</p>
                           </div>
                           {selectedClaimId && (
                             <button
@@ -425,7 +356,7 @@ export const CheckoutPage = () => {
                               onClick={() => toggleShopVoucher(shopOrder.shop_id, selectedClaimId)}
                               className="text-sm font-bold text-[#00629d]"
                             >
-                              Bo chon
+                              Bỏ Chọn
                             </button>
                           )}
                         </div>
@@ -441,17 +372,16 @@ export const CheckoutPage = () => {
                                   key={option.claim_id}
                                   type="button"
                                   onClick={() => toggleShopVoucher(shopOrder.shop_id, option.claim_id)}
-                                  className={`w-full text-left p-4 rounded-2xl border transition-all ${
-                                    isSelected
+                                  className={`w-full text-left p-4 rounded-2xl border transition-all ${isSelected
                                       ? 'border-[#00629d] bg-white'
                                       : 'border-[#e4e9f0] bg-white hover:border-[#cfe4f6]'
-                                  }`}
+                                    }`}
                                 >
                                   <div className="flex items-start justify-between gap-4">
                                     <div>
                                       <p className="font-bold text-[#0f1d25]">{option.voucher.code}</p>
                                       <p className="text-sm text-[#707882] mt-1">
-                                        Uoc tinh giam {formatCurrency(option.estimated_discount)}
+                                        Ước Tính Giảm {formatCurrency(option.estimated_discount)}
                                       </p>
                                     </div>
                                     <div className={`w-5 h-5 rounded-full border-2 ${isSelected ? 'border-[#00629d] bg-[#00629d]' : 'border-[#c8d3de]'}`}></div>
@@ -462,7 +392,7 @@ export const CheckoutPage = () => {
                           </div>
                         ) : (
                           <div className="rounded-2xl border border-dashed border-[#dbeaf5] px-4 py-5 text-sm text-[#707882]">
-                            Khong co voucher shop phu hop cho shop nay.
+                            Không có voucher phù hợp cho shop này.
                           </div>
                         )}
                       </div>
@@ -537,10 +467,6 @@ export const CheckoutPage = () => {
                   <div className="flex justify-between text-[#707882]">
                     <span>Giam gia shop</span>
                     <span className="font-bold text-[#0f1d25]">- {formatCurrency(shopDiscountTotal)}</span>
-                  </div>
-                  <div className="flex justify-between text-[#707882]">
-                    <span>Giam gia he thong</span>
-                    <span className="font-bold text-[#0f1d25]">- {formatCurrency(platformDiscount)}</span>
                   </div>
                 </div>
 

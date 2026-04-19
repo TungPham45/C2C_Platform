@@ -9,6 +9,7 @@ export const AuthPage: FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [otpPurpose, setOtpPurpose] = useState<'REGISTER' | 'RESET_PASSWORD'>('REGISTER');
   const [error, setError] = useState('');
@@ -285,13 +286,23 @@ export const AuthPage: FC = () => {
                     <div className="relative group">
                       <span className="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-[#bfc7d3] group-focus-within:text-[#00629d] transition-colors">lock</span>
                       <input
-                        type="password"
+                        type={showPassword ? "text" : "password"}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         placeholder="••••••••"
-                        className="w-full h-14 pl-14 pr-5 bg-[#f5faff] border border-[#dbeaf5] rounded-[1.25rem] text-sm font-medium focus:bg-white focus:border-[#00629d] focus:ring-4 focus:ring-[#00629d]/5 outline-none transition-all"
+                        className="w-full h-14 pl-14 pr-12 bg-[#f5faff] border border-[#dbeaf5] rounded-[1.25rem] text-sm font-medium focus:bg-white focus:border-[#00629d] focus:ring-4 focus:ring-[#00629d]/5 outline-none transition-all"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-5 top-1/2 -translate-y-1/2 text-[#bfc7d3] hover:text-[#00629d] transition-colors flex items-center justify-center p-1"
+                        tabIndex={-1}
+                      >
+                        <span className="material-symbols-outlined text-[20px]">
+                          {showPassword ? "visibility_off" : "visibility"}
+                        </span>
+                      </button>
                     </div>
                   </div>
                 )}
@@ -349,13 +360,23 @@ export const AuthPage: FC = () => {
                   <div className="relative group">
                     <span className="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-[#bfc7d3] group-focus-within:text-[#00629d] transition-colors">lock</span>
                     <input
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       placeholder="••••••••"
-                      className="w-full h-14 pl-14 pr-5 bg-[#f5faff] border border-[#dbeaf5] rounded-[1.25rem] text-sm font-medium focus:bg-white focus:border-[#00629d] focus:ring-4 focus:ring-[#00629d]/5 outline-none transition-all"
+                      className="w-full h-14 pl-14 pr-12 bg-[#f5faff] border border-[#dbeaf5] rounded-[1.25rem] text-sm font-medium focus:bg-white focus:border-[#00629d] focus:ring-4 focus:ring-[#00629d]/5 outline-none transition-all"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-5 top-1/2 -translate-y-1/2 text-[#bfc7d3] hover:text-[#00629d] transition-colors flex items-center justify-center p-1"
+                      tabIndex={-1}
+                    >
+                      <span className="material-symbols-outlined text-[20px]">
+                        {showPassword ? "visibility_off" : "visibility"}
+                      </span>
+                    </button>
                   </div>
                 </div>
 

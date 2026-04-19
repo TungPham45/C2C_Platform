@@ -1,5 +1,4 @@
 import { FC, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { AdminLayout } from '../../../components/layout/AdminLayout';
 import { formatVnd, formatVndCompact } from '../../../utils/currency';
 
@@ -114,16 +113,13 @@ export const VoucherList: FC = () => {
         <div className="bg-white rounded-[3rem] shadow-[0_20px_60px_rgba(0,0,0,0.02)] border border-[#e1f0fb] overflow-hidden">
           <div className="px-10 py-8 border-b border-[#f5faff] flex items-center justify-between">
             <div>
-               <h3 className="text-xl font-bold text-[#0f1d25] font-['Plus_Jakarta_Sans']">Platform Voucher Registry</h3>
-               <p className="text-xs text-[#707882]">Manage platform-wide discounts and voucher performance metrics.</p>
+               <h3 className="text-xl font-bold text-[#0f1d25] font-['Plus_Jakarta_Sans']">Danh Sách Voucher Hệ Thống</h3>
+               <p className="text-xs text-[#707882]">Quản lý giảm giá toàn nền tảng và các chỉ số hiệu suất của voucher.</p>
             </div>
             <div className="flex gap-4">
                <button className="px-6 py-3 bg-[#f5faff] text-[#00629d] rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-[#e9f5ff] transition-all">
-                  <span className="material-symbols-outlined text-sm">download</span> Export Reports
+                  <span className="material-symbols-outlined text-sm">download</span> Xuất Báo Cáo
                </button>
-               <Link to="/admin/vouchers/new" className="px-6 py-3 bg-gradient-to-br from-[#00629d] to-[#42a5f5] text-white rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-blue-100 hover:scale-105 transition-all">
-                  <span className="material-symbols-outlined text-sm">add</span> New System Voucher
-               </Link>
             </div>
           </div>
 
@@ -132,13 +128,13 @@ export const VoucherList: FC = () => {
               <thead className="bg-[#f5faff]/50">
                 <tr className="text-[#a1aab3] text-[10px] font-bold uppercase tracking-widest">
                   <th className="px-10 py-6">ID</th>
-                  <th className="px-6 py-6">Code</th>
-                  <th className="px-6 py-6">Type & Value</th>
-                  <th className="px-6 py-6">Audience</th>
-                  <th className="px-6 py-6">Min Spend / Max Disc</th>
-                  <th className="px-6 py-6">Usage Rate</th>
-                  <th className="px-6 py-6">Status</th>
-                  <th className="px-10 py-6 text-right">Action</th>
+                  <th className="px-6 py-6">Mã</th>
+                  <th className="px-6 py-6">Loại & K.Lượng</th>
+                  <th className="px-6 py-6">Khách Hàng</th>
+                  <th className="px-6 py-6">T.Thiểu / T.Đa</th>
+                  <th className="px-6 py-6">Tỷ Lệ SD</th>
+                  <th className="px-6 py-6">Trạng Thái</th>
+                  <th className="px-10 py-6 text-right">Thao Tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#f5faff]">
@@ -162,19 +158,19 @@ export const VoucherList: FC = () => {
                           {v.discount_type === 'percentage' ? `${v.discount_value}%` : formatVnd(v.discount_value)}
                         </p>
                         <p className="text-[10px] text-[#707882] font-bold uppercase tracking-widest opacity-60">
-                          {v.discount_type === 'percentage' ? 'Percentage Based' : 'Fixed Amount'}
+                          {v.discount_type === 'percentage' ? 'Giảm 1 phần' : 'Số tiền cố định'}
                         </p>
                       </td>
                       <td className="px-6 py-6">
                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
                            v.target_type === 'new_buyer' ? 'bg-[#fff4d6] text-[#9a6700]' : 'bg-[#e9f5ff] text-[#00629d]'
                          }`}>
-                            {v.target_type === 'new_buyer' ? 'New Buyer' : 'All Buyers'}
+                            {v.target_type === 'new_buyer' ? 'Khách Mới' : 'Tất Cả'}
                          </span>
                       </td>
                       <td className="px-6 py-6">
-                         <p className="text-xs font-semibold text-[#0f1d25]">Min: {formatVnd(v.min_spend)}</p>
-                         <p className="text-[10px] text-[#707882] font-medium opacity-80">Cap: {v.max_discount ? formatVnd(v.max_discount) : 'No cap'}</p>
+                         <p className="text-xs font-semibold text-[#0f1d25]">Tổi thiểu: {formatVnd(v.min_spend)}</p>
+                         <p className="text-[10px] text-[#707882] font-medium opacity-80">Tối đa: {v.max_discount ? formatVnd(v.max_discount) : 'Không có'}</p>
                       </td>
                       <td className="px-6 py-6 w-48">
                         <div className="flex items-center gap-3">
@@ -197,9 +193,6 @@ export const VoucherList: FC = () => {
                       </td>
                       <td className="px-10 py-6 text-right">
                          <div className="flex items-center justify-end gap-2">
-                           <Link to={`/admin/vouchers/edit/${v.id}`} className="w-10 h-10 rounded-full hover:bg-[#e9f5ff] flex items-center justify-center text-[#707882] hover:text-[#00629d] transition-all" title="Edit Voucher">
-                              <span className="material-symbols-outlined">edit</span>
-                           </Link>
                            <button onClick={() => handleDelete(v.id)} className="w-10 h-10 rounded-full hover:bg-red-50 flex items-center justify-center text-[#707882] hover:text-red-500 transition-all" title="Delete Voucher">
                               <span className="material-symbols-outlined">delete_outline</span>
                            </button>
@@ -213,7 +206,7 @@ export const VoucherList: FC = () => {
           </div>
           
           <div className="px-10 py-6 bg-[#f5faff]/30 border-t border-[#f5faff] flex items-center justify-between">
-             <p className="text-xs text-[#707882] font-medium">Showing {vouchers.length} platform vouchers</p>
+             <p className="text-xs text-[#707882] font-medium">Hiển thị {vouchers.length} voucher</p>
              <div className="flex gap-2">
                 <button className="w-8 h-8 rounded-lg bg-white border border-[#e1f0fb] flex items-center justify-center text-[#707882] hover:border-[#00629d] transition-all"><span className="material-symbols-outlined text-sm">chevron_left</span></button>
                 <button className="w-8 h-8 rounded-lg bg-[#00629d] text-white flex items-center justify-center text-xs font-bold">1</button>
@@ -229,14 +222,14 @@ export const VoucherList: FC = () => {
                  <span className="material-symbols-outlined text-4xl text-[#42a5f5]">auto_awesome</span>
               </div>
               <div>
-                 <h4 className="text-2xl font-bold font-['Plus_Jakarta_Sans'] mb-2">Automated Optimization</h4>
+                 <h4 className="text-2xl font-bold font-['Plus_Jakarta_Sans'] mb-2">Tối Ưu Tự Động</h4>
                  <p className="text-sm text-blue-100 max-w-lg opacity-80">
-                    System has detected high demand in "Lifestyle" category. Recommend creating 500 limited-time 20% vouchers for tomorrow's flash sale.
+                    Hệ thống ghi nhận nhu cầu mua sắm tăng cao ở một vài danh mục. Đề xuất tạo 500 voucher 20% giới hạn thời gian cho đợt Sale ngày mai.
                  </p>
               </div>
            </div>
            <button className="px-8 py-4 bg-white text-[#00629d] rounded-2xl text-sm font-bold hover:bg-blue-50 transition-all flex items-center gap-3">
-              Execute Recommendation <span className="material-symbols-outlined">arrow_forward</span>
+              Áp Dụng Khuyến Nghị <span className="material-symbols-outlined">arrow_forward</span>
            </button>
         </div>
       </div>

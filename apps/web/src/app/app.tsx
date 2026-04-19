@@ -33,8 +33,6 @@ import ShopSalesAnalytics from '../pages/admin/ShopSalesAnalytics';
 import CategoryManagement from '../pages/admin/CategoryManagement';
 import { BannersAdminPage } from '../pages/admin/BannersAdminPage';
 import { VoucherList } from '../pages/admin/VoucherManagement/VoucherList';
-import { CreateVoucher } from '../pages/admin/VoucherManagement/CreateVoucher';
-import { EditVoucher } from '../pages/admin/VoucherManagement/EditVoucher';
 import { SellerProtectedRoute } from '../components/auth/SellerProtectedRoute';
 import { BuyerProtectedRoute } from '../components/auth/BuyerProtectedRoute';
 import { SellerRegistration } from '../pages/seller/SellerRegistration';
@@ -86,8 +84,6 @@ export function App() {
       <Route path="/admin/shops" element={<ShopManagement />} />
       <Route path="/admin/banners" element={<BannersAdminPage />} />
       <Route path="/admin/vouchers" element={<VoucherList />} />
-      <Route path="/admin/vouchers/new" element={<CreateVoucher />} />
-      <Route path="/admin/vouchers/edit/:id" element={<EditVoucher />} />
       <Route path="/admin/users" element={<AccountManagement />} />
       <Route path="/admin/analytics/users" element={<UserAnalytics />} />
       <Route path="/admin/analytics/shop-sales" element={<ShopSalesAnalytics />} />

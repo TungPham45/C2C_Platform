@@ -36,18 +36,6 @@ export class VoucherController {
     return this.voucherService.getVoucherStats(+id);
   }
 
-  @Post('internal/admin')
-  async createVoucher(@Body() data: any, @Headers() headers: any) {
-    this.requireInternalAccess(headers);
-    return this.voucherService.createVoucher(data);
-  }
-
-  @Put('internal/admin/:id')
-  async updateVoucher(@Param('id') id: string, @Body() data: any, @Headers() headers: any) {
-    this.requireInternalAccess(headers);
-    return this.voucherService.updateVoucher(+id, data);
-  }
-
   @Delete('internal/admin/:id')
   async deleteVoucher(@Param('id') id: string, @Headers() headers: any) {
     this.requireInternalAccess(headers);

@@ -73,15 +73,15 @@ export const VoucherSection: FC = () => {
                             <span className="material-symbols-outlined font-bold">confirmation_number</span>
                         </div>
                         <div>
-                            <h2 className="text-2xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">Exclusive Vouchers for You</h2>
-                            <p className="text-xs text-[#707882] font-semibold uppercase tracking-widest">Hand-picked rewards</p>
+                            <h2 className="text-2xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">Voucher Độc Quyền Cho Bạn</h2>
+                            <p className="text-xs text-[#707882] font-semibold uppercase tracking-widest">Phần thưởng được chọn lọc</p>
                         </div>
                     </div>
                     <Link 
                         to="/vouchers" 
                         className="flex items-center gap-2 text-sm font-bold text-[#00629d] hover:underline"
                     >
-                        View All Vouchers
+                        Xem Tất Cả Voucher
                         <span className="material-symbols-outlined text-lg">arrow_forward</span>
                     </Link>
                 </div>

@@ -70,6 +70,9 @@ export const SellerEditVoucherPage: FC = () => {
 
       if (response.ok) {
         navigate('/seller/vouchers');
+      } else {
+        const err = await response.json().catch(() => null);
+        alert(err?.message || 'Không thể cập nhật voucher. Vui lòng thử lại.');
       }
     } catch (error) {
       console.error('Failed to update seller voucher:', error);
@@ -105,21 +108,21 @@ export const SellerEditVoucherPage: FC = () => {
         <div className="flex items-center justify-between mb-10">
           <div>
             <Link to="/seller/vouchers" className="text-xs font-bold text-[#707882] flex items-center gap-2 hover:text-[#00629d] mb-4 group transition-colors">
-              <span className="material-symbols-outlined text-sm group-hover:-translate-x-1 transition-transform">arrow_back</span> Shop Vouchers
-              <span className="text-[#cfe5ff]">/</span> Edit Campaign
+              <span className="material-symbols-outlined text-sm group-hover:-translate-x-1 transition-transform">arrow_back</span> Danh Sách Voucher
+              <span className="text-[#cfe5ff]">/</span> Sửa Chiến Dịch
             </Link>
-            <h1 className="text-4xl font-extrabold text-[#0f1d25] font-['Plus_Jakarta_Sans'] tracking-tight">Edit shop voucher</h1>
-            <p className="text-sm text-[#707882] mt-2">Adjust the campaign, limits, and launch status for your shop-specific voucher.</p>
+            <h1 className="text-4xl font-extrabold text-[#0f1d25] font-['Plus_Jakarta_Sans'] tracking-tight">Chỉnh sửa voucher</h1>
+            <p className="text-sm text-[#707882] mt-2">Điều chỉnh chiến dịch, thông số và trạng thái phát hành voucher cho shop của bạn.</p>
           </div>
 
           <div className="flex gap-4">
-            <button onClick={() => navigate('/seller/vouchers')} className="px-8 py-4 bg-[#f5faff] text-[#707882] rounded-2xl text-xs font-bold uppercase tracking-widest hover:bg-[#e9f5ff] transition-all">Discard Changes</button>
+            <button onClick={() => navigate('/seller/vouchers')} className="px-8 py-4 bg-[#f5faff] text-[#707882] rounded-2xl text-xs font-bold uppercase tracking-widest hover:bg-[#e9f5ff] transition-all">Bỏ Qua Thay Đổi</button>
             <button
               onClick={handleSubmit}
               disabled={saving}
               className="px-8 py-4 bg-gradient-to-br from-[#00629d] to-[#42a5f5] text-white rounded-2xl text-xs font-bold uppercase tracking-widest shadow-xl shadow-blue-100 hover:scale-105 transition-all disabled:opacity-50"
             >
-              {saving ? 'Updating...' : 'Update Voucher'}
+              {saving ? 'Đang cập nhật...' : 'Cập Nhật Voucher'}
             </button>
           </div>
         </div>
@@ -129,13 +132,13 @@ export const SellerEditVoucherPage: FC = () => {
             <div className="bg-white p-10 rounded-[3rem] shadow-[0_20px_60px_rgba(0,0,0,0.02)] border border-[#e1f0fb]">
               <div className="flex items-center justify-between mb-8">
                 <div>
-                  <p className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] mb-1">Voucher Usage Performance</p>
+                  <p className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.2em] mb-1">Hiệu Suất Sử Dụng Voucher</p>
                   <h4 className="text-2xl font-bold text-[#0f1d25] font-['Plus_Jakarta_Sans']">
-                    {stats?.used_count} / {stats?.total_quantity || '∞'} Redeemed
+                    {stats?.used_count} / {stats?.total_quantity || '∞'} Đã dùng
                   </h4>
                 </div>
                 <div className="px-4 py-1.5 bg-[#dcfce7] text-[#166534] rounded-full text-[10px] font-bold uppercase tracking-widest">
-                  {stats?.capacity}% Capacity
+                  {stats?.capacity}% Đã phát
                 </div>
               </div>
 
@@ -148,20 +151,20 @@ export const SellerEditVoucherPage: FC = () => {
 
               <div className="grid grid-cols-4 gap-8">
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest opacity-60">Shop ID</p>
+                  <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest opacity-60">ID Shop</p>
                   <p className="text-sm font-bold text-[#0f1d25]">#{stats?.shop_id ?? shop?.id ?? '--'}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest opacity-60">Status</p>
+                  <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest opacity-60">Trạng Thái</p>
                   <p className="text-sm font-bold text-[#0f1d25] capitalize">{stats?.status}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest opacity-60">Daily Avg</p>
-                  <p className="text-sm font-bold text-[#0f1d25]">{stats?.dailyAvg} Uses</p>
+                  <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest opacity-60">TB MỖI NGÀY</p>
+                  <p className="text-sm font-bold text-[#0f1d25]">{stats?.dailyAvg} Lượt Dùng</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest opacity-60">Expires In</p>
-                  <p className="text-sm font-bold text-[#0f1d25]">{stats?.expiresIn} Days</p>
+                  <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest opacity-60">HẾT HẠN TRONG</p>
+                  <p className="text-sm font-bold text-[#0f1d25]">{stats?.expiresIn} Ngày</p>
                 </div>
               </div>
             </div>
@@ -170,13 +173,13 @@ export const SellerEditVoucherPage: FC = () => {
               <section className="space-y-8">
                 <div className="flex items-center gap-4">
                   <div className="w-8 h-8 rounded-full bg-[#e9f5ff] text-[#00629d] font-bold text-xs flex items-center justify-center">1</div>
-                  <h5 className="font-bold text-[#0f1d25] tracking-tight">Identity & Rewards</h5>
+                  <h5 className="font-bold text-[#0f1d25] tracking-tight">Định Danh & Cấu Hình</h5>
                 </div>
 
                 <div className="grid grid-cols-2 gap-10">
 
                   <div className="space-y-3">
-                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Voucher Code</label>
+                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Mã Voucher</label>
                     <input
                       type="text"
                       className="w-full px-8 py-5 bg-[#f5faff] border-2 border-transparent focus:border-[#00629d]/20 rounded-3xl text-sm font-bold text-[#0f1d25] outline-none transition-all"
@@ -185,18 +188,18 @@ export const SellerEditVoucherPage: FC = () => {
                     />
                   </div>
                   <div className="space-y-3">
-                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Discount Type</label>
+                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Loại Giảm Giá</label>
                     <Select
                       options={[
-                        { value: 'percentage', label: 'Percentage Discount' },
-                        { value: 'fixed_amount', label: 'Fixed Amount Discount' }
+                        { value: 'percentage', label: 'Giảm theo phần trăm' },
+                        { value: 'fixed_amount', label: 'Giảm số tiền cố định' }
                       ]}
                       value={formData.discount_type}
                       onChange={(val) => setFormData({ ...formData, discount_type: val as 'percentage' | 'fixed_amount' })}
                     />
                   </div>
                   <div className="space-y-3">
-                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Target Audience</label>
+                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Khách Hàng Mục Tiêu</label>
                     <Select
                       options={[...sellerVoucherTargetOptions]}
                       value={formData.target_type}
@@ -204,7 +207,7 @@ export const SellerEditVoucherPage: FC = () => {
                     />
                   </div>
                   <div className="space-y-3">
-                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Voucher Status</label>
+                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Trạng Thái Voucher</label>
                     <Select
                       options={[...sellerVoucherStatusOptions]}
                       value={formData.status}
@@ -212,7 +215,7 @@ export const SellerEditVoucherPage: FC = () => {
                     />
                   </div>
                   <div className="space-y-3">
-                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Discount Value</label>
+                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Giá Trị Giảm</label>
                     <div className="relative">
                       <input
                         type="number"
@@ -225,7 +228,7 @@ export const SellerEditVoucherPage: FC = () => {
                     </div>
                   </div>
                   <div className="space-y-3">
-                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Total Quantity</label>
+                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Tổng Số Lượng</label>
                     <input
                       type="number"
                       className="w-full px-8 py-5 bg-[#f5faff] border-2 border-transparent focus:border-[#00629d]/20 rounded-3xl text-sm font-bold text-[#0f1d25] outline-none transition-all"
@@ -239,12 +242,12 @@ export const SellerEditVoucherPage: FC = () => {
               <section className="space-y-8 pt-6 border-t border-[#f5faff]">
                 <div className="flex items-center gap-4">
                   <div className="w-8 h-8 rounded-full bg-[#e9f5ff] text-[#00629d] font-bold text-xs flex items-center justify-center">2</div>
-                  <h5 className="font-bold text-[#0f1d25] tracking-tight">Usage Constraints</h5>
+                  <h5 className="font-bold text-[#0f1d25] tracking-tight">Giới Hạn Sử Dụng</h5>
                 </div>
 
                 <div className="grid grid-cols-3 gap-6">
                   <div className="space-y-3">
-                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Min. Order Value (VND)</label>
+                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Đơn Tối Thiểu (VND)</label>
                     <div className="relative">
                       <input
                         type="number"
@@ -257,7 +260,7 @@ export const SellerEditVoucherPage: FC = () => {
                     </div>
                   </div>
                   <div className="space-y-3">
-                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Max. Discount Cap (VND)</label>
+                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Giảm Tối Đa (VND)</label>
                     <div className="relative">
                       <input
                         type="number"
@@ -270,7 +273,7 @@ export const SellerEditVoucherPage: FC = () => {
                     </div>
                   </div>
                   <div className="space-y-3">
-                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Uses Per User</label>
+                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Số Lượng Mỗi KH</label>
                     <input
                       type="number"
                       className="w-full px-8 py-5 bg-[#f5faff] border-2 border-transparent focus:border-[#00629d]/20 rounded-3xl text-sm font-bold text-[#0f1d25] outline-none transition-all"
@@ -284,12 +287,12 @@ export const SellerEditVoucherPage: FC = () => {
               <section className="space-y-8 pt-6 border-t border-[#f5faff]">
                 <div className="flex items-center gap-4">
                   <div className="w-8 h-8 rounded-full bg-[#e9f5ff] text-[#00629d] font-bold text-xs flex items-center justify-center">3</div>
-                  <h5 className="font-bold text-[#0f1d25] tracking-tight">Duration & Validity</h5>
+                  <h5 className="font-bold text-[#0f1d25] tracking-tight">Thời Gian Kích Hoạt</h5>
                 </div>
 
                 <div className="grid grid-cols-2 gap-10">
                   <div className="space-y-3">
-                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Start Date</label>
+                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Ngày Bắt Đầu</label>
                     <div className="relative">
                       <input
                         type="date"
@@ -301,7 +304,7 @@ export const SellerEditVoucherPage: FC = () => {
                     </div>
                   </div>
                   <div className="space-y-3">
-                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">End Date</label>
+                    <label className="text-[10px] font-bold text-[#707882] uppercase tracking-widest ml-2">Ngày Kết Thúc</label>
                     <div className="relative">
                       <input
                         type="date"
@@ -321,14 +324,14 @@ export const SellerEditVoucherPage: FC = () => {
                   onClick={handleArchive}
                   className="flex items-center gap-3 text-[#ba1a1a] font-bold text-xs uppercase tracking-widest hover:opacity-70 transition-all"
                 >
-                  <span className="material-symbols-outlined">delete_sweep</span> Archive this voucher forever
+                  <span className="material-symbols-outlined">delete_sweep</span> Xóa vĩnh viễn voucher này
                 </button>
                 <button
                   onClick={handleSubmit}
                   disabled={saving}
                   className="px-10 py-4 bg-[#00629d] text-white rounded-[1.5rem] text-xs font-bold uppercase tracking-widest shadow-xl shadow-blue-100 hover:scale-105 active:scale-95 transition-all"
                 >
-                  {saving ? '...' : 'Update Voucher'}
+                  {saving ? '...' : 'Lưu Thay Đổi'}
                 </button>
               </div>
             </div>
@@ -336,7 +339,7 @@ export const SellerEditVoucherPage: FC = () => {
 
           <div className="col-span-4 space-y-10">
             <div className="bg-white p-10 rounded-[2.5rem] shadow-[0_20px_60px_rgba(0,0,0,0.02)] border border-[#e1f0fb]">
-              <p className="text-xs font-bold text-[#0f1d25] mb-3">Voucher Status</p>
+              <p className="text-xs font-bold text-[#0f1d25] mb-3">Trạng Thái Voucher</p>
               <Select
                 className="mb-6"
                 options={[...sellerVoucherStatusOptions]}
@@ -344,16 +347,16 @@ export const SellerEditVoucherPage: FC = () => {
                 onChange={(val) => setFormData({ ...formData, status: val })}
               />
               <p className="text-[11px] text-[#707882] leading-relaxed mb-8">
-                This controls whether buyers can claim or apply the voucher when shopping at your store.
+                Cài đặt này cho phép người mua có thể lưu mã hoặc áp dụng khi thanh toán tại shop của bạn hay không.
               </p>
 
-              <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest mb-4 ml-2">Voucher Preview</p>
+              <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest mb-4 ml-2">Xem Trước Voucher</p>
               <div className="relative group">
                 <div className="absolute inset-x-0 bottom-0 h-4 bg-[#00629d]/10 blur-xl scale-95 transition-all group-hover:blur-2xl"></div>
                 <div className="relative bg-gradient-to-br from-[#42a5f5] to-[#00629d] p-8 rounded-[2rem] text-white overflow-hidden">
                   <div className="flex justify-between items-start relative z-10">
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80 mb-1">Coupon Code</p>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-80 mb-1">Mã Trị Giá</p>
                       <h6 className="text-xl font-black font-['JetBrains_Mono'] tracking-tight mb-6">{formData.code || 'CODE'}</h6>
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>

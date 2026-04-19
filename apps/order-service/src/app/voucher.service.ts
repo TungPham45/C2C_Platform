@@ -28,7 +28,7 @@ export class VoucherService {
   private readonly allowedTargetTypes = ['all_buyers', 'new_buyer', 'followers'] as const;
 
   async getUserVoucherContext(userId: number) {
-    const [user, follows] = await Promise.all([
+    const [user, follows, ownedShops] = await Promise.all([
       this.authPrisma.user.findUnique({
         where: { id: userId },
         select: { first_order_at: true },
@@ -37,19 +37,24 @@ export class VoucherService {
         where: { user_id: userId },
         select: { shop_id: true },
       }),
+      this.productPrisma.shop.findMany({
+        where: { owner_id: userId },
+        select: { id: true },
+      }),
     ]);
 
     return {
       first_order_at: user?.first_order_at ?? null,
       is_new_buyer: !user?.first_order_at,
       followed_shop_ids: follows.map((follow) => follow.shop_id),
+      owned_shop_ids: ownedShops.map((shop) => shop.id),
     };
   }
 
   isVoucherTargetEligible(
     voucherOrTargetType: { target_type?: string | null; shop_id?: number | null } | string | null | undefined,
     contextOrFirstOrderAt:
-      | { first_order_at?: Date | null; followed_shop_ids?: number[] }
+      | { first_order_at?: Date | null; followed_shop_ids?: number[]; owned_shop_ids?: number[] }
       | Date
       | null
       | undefined,
@@ -61,6 +66,16 @@ export class VoucherService {
         : voucherOrTargetType?.target_type;
     const resolvedShopId =
       typeof voucherOrTargetType === 'string' ? shopId : voucherOrTargetType?.shop_id ?? shopId;
+
+    if (
+      contextOrFirstOrderAt &&
+      typeof contextOrFirstOrderAt === 'object' &&
+      'owned_shop_ids' in contextOrFirstOrderAt
+    ) {
+      if (resolvedShopId != null && contextOrFirstOrderAt.owned_shop_ids?.includes(resolvedShopId)) {
+        return false;
+      }
+    }
 
     if (targetType === 'new_buyer') {
       const firstOrderAt =
@@ -115,7 +130,6 @@ export class VoucherService {
 
   async getAllVouchers() {
     return this.prisma.voucher.findMany({
-      where: { shop_id: null },
       orderBy: { created_at: 'desc' },
     });
   }
@@ -124,37 +138,10 @@ export class VoucherService {
     const voucher = await this.prisma.voucher.findUnique({
       where: { id },
     });
-    if (!voucher || voucher.shop_id != null) {
+    if (!voucher) {
       throw new NotFoundException(`Voucher with ID ${id} not found`);
     }
     return voucher;
-  }
-
-  async createVoucher(data: any) {
-    const normalizedData = this.normalizeVoucherData(data, true);
-    if (normalizedData.target_type === 'followers') {
-      throw new BadRequestException('Follower vouchers must belong to a shop');
-    }
-
-    return this.prisma.voucher.create({
-      data: {
-        ...normalizedData,
-        shop_id: null,
-      },
-    });
-  }
-
-  async updateVoucher(id: number, data: any) {
-    await this.getVoucherById(id);
-    const normalizedData = this.normalizeVoucherData(data, false);
-    if (normalizedData.target_type === 'followers') {
-      throw new BadRequestException('Follower vouchers must belong to a shop');
-    }
-
-    return this.prisma.voucher.update({
-      where: { id },
-      data: normalizedData,
-    });
   }
 
   async deleteVoucher(id: number) {
@@ -271,6 +258,9 @@ export class VoucherService {
     const userContext = await this.getUserVoucherContext(userId);
 
     if (!this.isVoucherTargetEligible(voucher, userContext)) {
+      if (voucher.shop_id != null && userContext.owned_shop_ids?.includes(voucher.shop_id)) {
+        throw new BadRequestException('Bạn không thể lưu hoặc sử dụng voucher do chính shop của mình phát hành.');
+      }
       throw new BadRequestException(this.getVoucherTargetErrorMessage(voucher.target_type));
     }
 

@@ -93,51 +93,51 @@ export const SellerVoucherManagementPage: FC = () => {
       <div className="max-w-7xl mx-auto space-y-8">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.25em] mb-2">Seller Voucher Management</p>
-            <h1 className="text-4xl font-black text-[#0f1d25] font-['Plus_Jakarta_Sans'] tracking-tight">Manage shop voucher campaigns</h1>
+            <p className="text-[10px] font-bold text-[#707882] uppercase tracking-[0.25em] mb-2">Quản Lý Voucher Của Shop</p>
+            <h1 className="text-4xl font-black text-[#0f1d25] font-['Plus_Jakarta_Sans'] tracking-tight">Quản lý chiến dịch voucher</h1>
             <p className="text-sm text-[#707882] mt-2">
-              Create and tune discounts for {shop?.name || 'your shop'}.
+              Tạo và thiết lập giảm giá cho {shop?.name || 'shop của bạn'}.
             </p>
           </div>
           <Link
             to="/seller/vouchers/new"
             className="px-6 py-3 bg-gradient-to-br from-[#00629d] to-[#42a5f5] text-white rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-blue-100 hover:scale-105 transition-all"
           >
-            <span className="material-symbols-outlined text-sm">add</span> New Shop Voucher
+            <span className="material-symbols-outlined text-sm">add</span> Tạo Voucher Mới
           </Link>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_40px_rgba(0,0,0,0.03)] border border-[#e1f0fb]">
-            <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest mb-2">Shop ID</p>
+            <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest mb-2">ID Shop</p>
             <h3 className="text-3xl font-black text-[#0f1d25] font-['Plus_Jakarta_Sans']">#{shop?.id ?? '--'}</h3>
-            <p className="text-xs text-[#707882] mt-3">All vouchers created here are attached to this shop.</p>
+            <p className="text-xs text-[#707882] mt-3">Các voucher tạo tại đây được gắn kết với shop này.</p>
           </div>
 
           <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_40px_rgba(0,0,0,0.03)] border border-[#e1f0fb]">
-            <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest mb-2">Total Vouchers</p>
+            <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest mb-2">Tổng Voucher</p>
             <h3 className="text-3xl font-black text-[#0f1d25] font-['Plus_Jakarta_Sans']">{vouchers.length}</h3>
-            <p className="text-xs text-[#707882] mt-3">Draft, scheduled, active, and paused campaigns.</p>
+            <p className="text-xs text-[#707882] mt-3">Bản nháp, đã lên lịch, đang chạy và tạm dừng.</p>
           </div>
 
           <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_40px_rgba(0,0,0,0.03)] border border-[#e1f0fb]">
-            <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest mb-2">Active Campaigns</p>
+            <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest mb-2">Đang Hoạt Động</p>
             <h3 className="text-3xl font-black text-[#0f1d25] font-['Plus_Jakarta_Sans']">{metrics.activeVouchers}</h3>
-            <p className="text-xs text-[#707882] mt-3">Vouchers buyers can currently apply at checkout.</p>
+            <p className="text-xs text-[#707882] mt-3">Voucher người mua có thể áp dụng khi thanh toán.</p>
           </div>
 
           <div className="bg-white p-8 rounded-[2.5rem] shadow-[0_8px_40px_rgba(0,0,0,0.03)] border border-[#e1f0fb]">
-            <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest mb-2">Redeemed / Budget</p>
+            <p className="text-[10px] font-bold text-[#707882] uppercase tracking-widest mb-2">Đã Dùng / Ngân Sách</p>
             <h3 className="text-3xl font-black text-[#0f1d25] font-['Plus_Jakarta_Sans']">{metrics.totalRedemptions}</h3>
-            <p className="text-xs text-[#707882] mt-3">{formatVndCompact(metrics.totalDiscountPool)} planned discount ceiling.</p>
+            <p className="text-xs text-[#707882] mt-3">{formatVndCompact(metrics.totalDiscountPool)} mức giảm tối đa.</p>
           </div>
         </div>
 
         <div className="bg-white rounded-[3rem] shadow-[0_20px_60px_rgba(0,0,0,0.02)] border border-[#e1f0fb] overflow-hidden">
           <div className="px-10 py-8 border-b border-[#f5faff] flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-[#0f1d25] font-['Plus_Jakarta_Sans']">Shop voucher registry</h2>
-              <p className="text-xs text-[#707882]">Only vouchers belonging to your current shop are shown here.</p>
+              <h2 className="text-xl font-bold text-[#0f1d25] font-['Plus_Jakarta_Sans']">Danh sách voucher của shop</h2>
+              <p className="text-xs text-[#707882]">Chỉ hiển thị các voucher thuộc về shop hiện tại của bạn.</p>
             </div>
             <div className="px-4 py-2 rounded-full bg-[#e9f5ff] text-[#00629d] text-xs font-bold uppercase tracking-widest">
               {shop?.status || 'unknown'}
@@ -150,12 +150,12 @@ export const SellerVoucherManagementPage: FC = () => {
                 <tr className="text-[#a1aab3] text-[10px] font-bold uppercase tracking-widest">
                   <th className="px-10 py-6">ID</th>
                   <th className="px-6 py-6">Shop</th>
-                  <th className="px-6 py-6">Code</th>
-                  <th className="px-6 py-6">Type & Value</th>
-                  <th className="px-6 py-6">Min Spend / Cap</th>
-                  <th className="px-6 py-6">Usage</th>
-                  <th className="px-6 py-6">Status</th>
-                  <th className="px-10 py-6 text-right">Action</th>
+                  <th className="px-6 py-6">Mã</th>
+                  <th className="px-6 py-6">Loại & K.Lượng</th>
+                  <th className="px-6 py-6">T.Thiểu / T.Đa</th>
+                  <th className="px-6 py-6">Đã Dùng</th>
+                  <th className="px-6 py-6">Trạng thái</th>
+                  <th className="px-10 py-6 text-right">Thao Tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#f5faff]">
@@ -184,8 +184,8 @@ export const SellerVoucherManagementPage: FC = () => {
                         </p>
                       </td>
                       <td className="px-6 py-6">
-                        <p className="text-xs font-semibold text-[#0f1d25]">Min: {formatVnd(voucher.min_spend)}</p>
-                        <p className="text-[10px] text-[#707882] font-medium opacity-80">Cap: {voucher.max_discount ? formatVnd(voucher.max_discount) : 'No cap'}</p>
+                        <p className="text-xs font-semibold text-[#0f1d25]">T.Thiểu: {formatVnd(voucher.min_spend)}</p>
+                        <p className="text-[10px] text-[#707882] font-medium opacity-80">T.Đa: {voucher.max_discount ? formatVnd(voucher.max_discount) : 'Không có'}</p>
                       </td>
                       <td className="px-6 py-6 w-48">
                         <div className="flex items-center gap-3">
@@ -221,7 +221,7 @@ export const SellerVoucherManagementPage: FC = () => {
                 ) : (
                   <tr>
                     <td colSpan={8} className="px-10 py-12 text-center text-sm text-[#707882]">
-                      No shop vouchers yet. Create your first campaign to start attracting buyers.
+                      Chưa có voucher nào. Khởi tạo một chiến dịch ngay để thu hút khách hàng.
                     </td>
                   </tr>
                 )}

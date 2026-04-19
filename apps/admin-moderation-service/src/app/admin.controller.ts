@@ -168,16 +168,6 @@ export class AdminController {
     return this.adminService.getVoucherById(+id);
   }
 
-  @Post('vouchers')
-  createVoucher(@Body() data: any) {
-    return this.adminService.createVoucher(data);
-  }
-
-  @Put('vouchers/:id')
-  updateVoucher(@Param('id') id: string, @Body() data: any) {
-    return this.adminService.updateVoucher(+id, data);
-  }
-
   @Delete('vouchers/:id')
   deleteVoucher(@Param('id') id: string) {
     return this.adminService.deleteVoucher(+id);

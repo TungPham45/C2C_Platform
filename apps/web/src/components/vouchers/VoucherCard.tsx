@@ -27,16 +27,16 @@ export const VoucherCard: FC<VoucherCardProps> = ({ voucher, onClaim, isClaimed,
     : `${Number(voucher.discount_value).toLocaleString('vi-VN')}đ`;
 
   const minSpendDisplay = voucher.min_spend 
-    ? `Min. spend ${Number(voucher.min_spend).toLocaleString('vi-VN')}đ` 
-    : 'No min. spend';
+    ? `Đơn tối thiểu ${Number(voucher.min_spend).toLocaleString('vi-VN')}đ` 
+    : 'Không yêu cầu đơn tối thiểu';
 
   const expiryDate = new Date(voucher.end_date).toLocaleDateString('vi-VN');
   const targetLabel =
     voucher.target_type === 'new_buyer'
-      ? 'New User Only'
+      ? 'Người dùng mới'
       : voucher.target_type === 'followers' || voucher.target_type === 'follower'
-        ? 'Followers Only'
-        : 'All Users';
+        ? 'Người theo dõi'
+        : 'Tất cả người dùng';
 
   return (
     <div className="relative flex w-full max-w-sm h-32 group">
@@ -65,35 +65,35 @@ export const VoucherCard: FC<VoucherCardProps> = ({ voucher, onClaim, isClaimed,
             </span>
             {voucher.shop_id && (
                 <span className="text-[9px] font-bold px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded uppercase">
-                    Shop Voucher
+                    Voucher Shop
                 </span>
             )}
           </div>
         </div>
 
         <div className="flex items-center justify-between mt-auto">
-          <span className="text-[10px] text-[#b5bfc9] font-medium">Exp: {expiryDate}</span>
+          <span className="text-[10px] text-[#b5bfc9] font-medium">HSD: {expiryDate}</span>
           
           {isUsed ? (
             <button
               disabled
               className="px-4 py-1.5 bg-[#e5e7eb] text-[#6b7280] text-[10px] font-black uppercase rounded-full cursor-not-allowed"
             >
-              Used
+              Đã dùng
             </button>
           ) : isClaimed ? (
             <button 
               onClick={() => onUse?.(voucher.code)}
               className="px-4 py-1.5 bg-[#00629d] text-white text-[10px] font-black uppercase rounded-full hover:bg-[#004d7c] transition-colors"
             >
-              Use Now
+              Dùng ngay
             </button>
           ) : (
             <button 
               onClick={() => onClaim?.(voucher.id)}
               className="px-4 py-1.5 border-2 border-[#00629d] text-[#00629d] text-[10px] font-black uppercase rounded-full hover:bg-[#00629d] hover:text-white transition-all"
             >
-              Claim
+              Lưu
             </button>
           )}
         </div>

@@ -311,22 +311,6 @@ export class AdminService {
     return this.requestJson<any>(`${this.orderVoucherAdminBaseUrl}/${id}`);
   }
 
-  async createVoucher(data: any) {
-    return this.requestJson<any>(this.orderVoucherAdminBaseUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-  }
-
-  async updateVoucher(id: number, data: any) {
-    return this.requestJson<any>(`${this.orderVoucherAdminBaseUrl}/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-  }
-
   async deleteVoucher(id: number) {
     return this.requestJson<any>(`${this.orderVoucherAdminBaseUrl}/${id}`, {
       method: 'DELETE',

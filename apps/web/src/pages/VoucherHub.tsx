@@ -80,10 +80,10 @@ export const VoucherHub: FC = () => {
                 {/* Header Section */}
                 <div className="bg-white border-b border-[#e9f5ff] py-16">
                     <div className="max-w-7xl mx-auto px-6">
-                        <h1 className="text-5xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25] mb-4">Voucher Hub</h1>
+                        <h1 className="text-5xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25] mb-4">Trung Tâm Voucher</h1>
                         <p className="text-lg text-[#707882] max-w-2xl leading-relaxed">
-                            Your digital sanctuary for savings. Claim exclusive marketplace rewards and 
-                            shop-specific discounts curated just for you.
+                            Nơi cung cấp các mã giảm giá hấp dẫn. Lưu các mã ưu đãi độc quyền của hệ thống và 
+                            các giảm giá riêng biệt từ shop được chọn lọc dành riêng cho bạn.
                         </p>
                     </div>
                 </div>
@@ -97,9 +97,9 @@ export const VoucherHub: FC = () => {
                                     <div className="w-10 h-10 bg-[#00629d] rounded-2xl flex items-center justify-center text-white">
                                         <span className="material-symbols-outlined">security</span>
                                     </div>
-                                    <h2 className="text-2xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">System Vouchers</h2>
+                                    <h2 className="text-2xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">Voucher Hệ Thống</h2>
                                 </div>
-                                <button className="text-sm font-bold text-[#00629d] hover:underline">View All</button>
+                                <button className="text-sm font-bold text-[#00629d] hover:underline">Xem Tất Cả</button>
                             </div>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -124,9 +124,9 @@ export const VoucherHub: FC = () => {
                         />
                         <div className="absolute inset-0 bg-gradient-to-r from-[#00629d] to-transparent"></div>
                         <div className="relative h-full flex flex-col justify-center px-16 text-white space-y-6 max-w-2xl">
-                            <span className="text-xs font-black uppercase tracking-[0.3em] bg-white/20 backdrop-blur-md w-fit px-4 py-2 rounded-full">New User Special</span>
-                            <h3 className="text-6xl font-black font-['Plus_Jakarta_Sans'] leading-tight">25% OFF <br/> Your First Order</h3>
-                            <p className="text-white/70 font-medium">Welcome to Serene. Start your journey with a massive discount on any product.</p>
+                            <span className="text-xs font-black uppercase tracking-[0.3em] bg-white/20 backdrop-blur-md w-fit px-4 py-2 rounded-full">Ưu Đãi Người Dùng Mới</span>
+                            <h3 className="text-6xl font-black font-['Plus_Jakarta_Sans'] leading-tight">GIẢM 25% <br/> Đơn Đầu Tiên</h3>
+                            <p className="text-white/70 font-medium">Chào mừng bạn đến với Serene. Bắt đầu hành trình mua sắm với giảm giá cực sốc.</p>
                         </div>
                     </div>
 
@@ -138,9 +138,9 @@ export const VoucherHub: FC = () => {
                                     <div className="w-10 h-10 bg-amber-500 rounded-2xl flex items-center justify-center text-white">
                                         <span className="material-symbols-outlined">storefront</span>
                                     </div>
-                                    <h2 className="text-2xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">Vouchers From Shops</h2>
+                                    <h2 className="text-2xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">Voucher Từ Shop</h2>
                                 </div>
-                                <button className="text-sm font-bold text-[#00629d] hover:underline hover:text-[#004d7c]">See More Shops</button>
+                                <button className="text-sm font-bold text-[#00629d] hover:underline hover:text-[#004d7c]">Xem Thêm Shop</button>
                             </div>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -163,7 +163,7 @@ export const VoucherHub: FC = () => {
                                 <div className="w-10 h-10 bg-green-500 rounded-2xl flex items-center justify-center text-white">
                                     <span className="material-symbols-outlined">inventory_2</span>
                                 </div>
-                                <h2 className="text-2xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">My Claimed Vouchers ({activeClaimedVouchers.length})</h2>
+                                <h2 className="text-2xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">Voucher Đã Lưu ({activeClaimedVouchers.length})</h2>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 opacity-75 grayscale-[0.5] hover:grayscale-0 hover:opacity-100 transition-all duration-500">
                                 {activeClaimedVouchers.map(claim => (
@@ -184,7 +184,7 @@ export const VoucherHub: FC = () => {
                                 <div className="w-10 h-10 bg-slate-500 rounded-2xl flex items-center justify-center text-white">
                                     <span className="material-symbols-outlined">task_alt</span>
                                 </div>
-                                <h2 className="text-2xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">Used Vouchers ({usedVouchers.length})</h2>
+                                <h2 className="text-2xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">Voucher Đã Dùng ({usedVouchers.length})</h2>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 opacity-70">
                                 {usedVouchers.map(claim => (
@@ -205,19 +205,19 @@ export const VoucherHub: FC = () => {
                         <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-[#fff8e1] rounded-full blur-[100px] opacity-50"></div>
                         
                         <div className="relative z-10 space-y-6">
-                            <h2 className="text-4xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">Never Miss a Saving</h2>
+                            <h2 className="text-4xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">Không Bỏ Lỡ Ưu Đãi</h2>
                             <p className="text-[#707882] max-w-lg mx-auto font-medium">
-                                Join 50,000+ shoppers who receive weekly curated vouchers and 
-                                exclusive marketplace deals directly in their inbox.
+                                Gia nhập hơn 50,000 khách hàng nhận mã giảm giá đặc biệt và 
+                                ưu đãi độc quyền qua email mỗi tuần.
                             </p>
                             <div className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto pt-6">
                                 <input 
                                     type="email" 
-                                    placeholder="Enter your email" 
+                                    placeholder="Nhập email của bạn" 
                                     className="flex-1 px-8 py-4 bg-[#f8fafc] border border-[#e9f5ff] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#00629d]/20 transition-all text-[#0f1d25] font-medium"
                                 />
                                 <button className="px-10 py-4 bg-[#00629d] text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-[#004d7c] transition-all shadow-xl shadow-[#00629d]/20">
-                                    Notify Me
+                                    Đăng Ký Nhận
                                 </button>
                             </div>
                         </div>
