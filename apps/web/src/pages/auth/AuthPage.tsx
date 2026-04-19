@@ -70,9 +70,8 @@ export const AuthPage: FC = () => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Registration failed');
 
-        setOtpPurpose('REGISTER');
-        setState('verify-otp');
-        setSuccess('Registration successful. Please enter the OTP sent to your email.');
+        setState('login');
+        setSuccess('Tạo tài khoản thành công. Bây giờ bạn có thể đăng nhập ngay!');
       }
 
       else if (state === 'forgot-password') {
