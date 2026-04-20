@@ -296,7 +296,6 @@ export class AdminService {
       where: { is_active: true },
       orderBy: { sort_order: 'asc' },
     });
-    console.log(`[AdminService] Found ${banners.length} active banners`);
     return banners;
   }
 

@@ -24,6 +24,7 @@ model User {
   carts      Cart?
   wallet     Wallet?
   verification_codes VerificationCode[]
+  notifications Notification[]
 
   @@index([email], map: "idx_users_email")
   @@map("users")
@@ -91,4 +92,20 @@ model WalletTransaction {
   wallet       Wallet    @relation(fields: [wallet_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@map("wallet_transactions")
+}
+
+model Notification {
+  id         Int       @id @default(autoincrement())
+  user_id    Int
+  title      String    @db.VarChar(255)
+  message    String    @db.Text
+  type       String?   @db.VarChar(50) // 'ORDER', 'SYSTEM', 'CHAT'
+  link       String?   @db.Text
+  is_read    Boolean?  @default(false)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id], map: "idx_notifications_user_id")
+  @@map("notifications")
 }

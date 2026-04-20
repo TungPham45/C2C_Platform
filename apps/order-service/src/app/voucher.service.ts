@@ -25,6 +25,18 @@ export class VoucherService {
     private productPrisma: ProductPrismaService,
   ) {}
 
+  private async sendNotification(data: { user_id: number; title: string; message: string; type: string; link?: string }) {
+    try {
+      const authUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:3002/api/auth';
+      const notificationUrl = authUrl.replace(/\/api\/auth\/?$/, '/api/notifications/internal');
+      await fetch(notificationUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+    } catch (e) {}
+  }
+
   private readonly allowedTargetTypes = ['all_buyers', 'new_buyer', 'followers'] as const;
 
   async getUserVoucherContext(userId: number) {
@@ -166,12 +178,36 @@ export class VoucherService {
 
   async createSellerVoucher(userId: number, data: any) {
     const shop = await this.requireActiveSellerShop(userId);
-    return this.prisma.voucher.create({
+    const voucher = await this.prisma.voucher.create({
       data: {
         ...this.normalizeVoucherData(data, true),
         shop_id: shop.id,
       },
     });
+
+    // Notify all followers about new voucher
+    try {
+      const followers = await this.productPrisma.shopFollow.findMany({
+        where: { shop_id: shop.id },
+        select: { user_id: true },
+      });
+
+      const discountText = voucher.discount_type === 'percentage'
+        ? `giảm ${voucher.discount_value}%`
+        : `giảm ₫${Number(voucher.discount_value).toLocaleString('vi-VN')}`;
+
+      for (const follower of followers) {
+        await this.sendNotification({
+          user_id: follower.user_id,
+          title: `Ư u đãi mới từ ${shop.name}!`,
+          message: `Shop "${shop.name}" vừa phát hành mã giảm giá "${voucher.code}" ${discountText}. Đổi ngay trước khi hết!`,
+          type: 'SYSTEM',
+          link: '/vouchers',
+        });
+      }
+    } catch (e) {}
+
+    return voucher;
   }
 
   async updateSellerVoucher(userId: number, id: number, data: any) {

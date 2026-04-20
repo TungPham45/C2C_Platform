@@ -2,6 +2,7 @@ import { FC, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { SellerLayout } from '../../components/layout/SellerLayout';
 import { useOrders } from '../../hooks/useOrders';
+import { resolveAssetUrl } from '../../config/api';
 import { formatVnd } from '../../utils/currency';
 import { getOrderPricing } from '../../utils/orderPricing';
 
@@ -35,6 +36,8 @@ export const SellerOrderDetail: FC = () => {
   const [trackingNumber, setTrackingNumber] = useState('');
   const [carrierName, setCarrierName] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [shippingError, setShippingError] = useState<string | null>(null);
+  const [imgErrorByItemId, setImgErrorByItemId] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const loadOrder = async () => {
@@ -44,6 +47,7 @@ export const SellerOrderDetail: FC = () => {
           setOrder(data);
           setTrackingNumber(data.tracking_number || '');
           setCarrierName(data.carrier_name || '');
+          setShippingError(null);
         }
       }
     };
@@ -52,6 +56,7 @@ export const SellerOrderDetail: FC = () => {
 
   const currentStep = statusIndex[order?.status?.toLowerCase()] ?? 0;
   const isCancelled = order?.status?.toLowerCase() === 'cancelled';
+  const shippingValid = carrierName.trim().length > 0 && trackingNumber.trim().length > 0;
 
   const advanceToNextStatus = async () => {
     if (!id || !order) return;
@@ -60,7 +65,14 @@ export const SellerOrderDetail: FC = () => {
     if (idx < 0 || idx >= flow.length - 1) return;
     const nextStatus = flow[idx + 1];
 
+    // Business rule: must input shipping info before confirming / shipping.
+    if ((nextStatus === 'confirmed' || nextStatus === 'shipped') && !shippingValid) {
+      setShippingError('Vui lòng nhập Đơn vị vận chuyển và Mã vận đơn trước khi xác nhận.');
+      return;
+    }
+
     setIsUpdating(true);
+    setShippingError(null);
     const success = await updateOrderStatus(parseInt(id), nextStatus, {
       tracking_number: trackingNumber,
       carrier_name: carrierName,
@@ -118,6 +130,157 @@ export const SellerOrderDetail: FC = () => {
   const subtotal = pricing.itemSubtotal;
   const shippingFee = pricing.shippingFee;
   const totalPaid = pricing.finalTotal;
+
+  const printShippingLabel = () => {
+    const orderId = String(id || '');
+    const safe = (v: any) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+    const items = Array.isArray(order?.items) ? order.items : [];
+    const itemsHtml = items
+      .slice(0, 12)
+      .map((it: any) => `<tr><td class="name">${safe(it.product_name)}</td><td class="qty">x${safe(it.quantity)}</td></tr>`)
+      .join('');
+
+    const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Shipping Label #${safe(orderId)}</title>
+    <style>
+      @page { size: A5; margin: 9mm; }
+      * { box-sizing: border-box; }
+      body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Noto Sans", "Liberation Sans", sans-serif; color: #0f172a; }
+      .sheet { width: 100%; }
+      .card { border: 1.5px solid #0f172a; border-radius: 14px; overflow: hidden; }
+      .pad { padding: 12px 14px; }
+      .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+      .brand { display: flex; align-items: center; gap: 10px; }
+      .logo { width: 28px; height: 28px; border-radius: 10px; background: linear-gradient(135deg, #2563eb, #38bdf8); border: 1px solid rgba(2,6,23,0.15); }
+      .brandName { font-weight: 900; letter-spacing: .02em; }
+      .badge { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(15,23,42,0.35); background: white; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+      .muted { color: #64748b; font-size: 11px; }
+      .orderCode { font-size: 18px; font-weight: 1000; letter-spacing: .06em; }
+      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .section { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+      .sectionTitle { font-size: 12px; font-weight: 900; letter-spacing: .03em; color: #0f172a; background: #f8fafc; padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
+      .kv { display: grid; grid-template-columns: 88px 1fr; gap: 6px 10px; font-size: 12px; padding: 10px; }
+      .k { color: #334155; font-weight: 800; }
+      .v { font-weight: 700; color: #0f172a; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; letter-spacing: .02em; }
+      .receiver { border: 2px solid #0f172a; }
+      .receiver .kv { grid-template-columns: 64px 1fr; }
+      .receiver .v { font-size: 13px; }
+      .addr { line-height: 1.25; }
+      .table { width: 100%; border-collapse: collapse; }
+      .table th { text-align: left; font-size: 11px; color: #334155; font-weight: 900; padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
+      .table td { font-size: 11px; padding: 7px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+      .qty { text-align: right; white-space: nowrap; font-weight: 900; }
+      .totals { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; }
+      .totalLabel { font-size: 11px; color: #334155; font-weight: 900; }
+      .totalValue { font-size: 14px; font-weight: 1000; letter-spacing: .02em; }
+      .cut { border-top: 2px dashed #94a3b8; margin: 12px 0 0; }
+      .foot { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 10px 14px 12px; }
+      .mini { font-size: 10px; color: #64748b; }
+      .barcode { height: 34px; border: 1px solid #e2e8f0; border-radius: 10px; background: repeating-linear-gradient(90deg, #0f172a 0, #0f172a 2px, transparent 2px, transparent 6px); opacity: .15; }
+      .nowrap { white-space: nowrap; }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <div class="card">
+        <div class="header pad">
+          <div>
+            <div class="brand">
+              <div class="logo"></div>
+              <div>
+                <div class="brandName">SERENE</div>
+                <div class="muted">Nhãn vận chuyển</div>
+              </div>
+            </div>
+            <div style="margin-top:10px" class="badge">
+              <span class="mono">#${safe(orderId)}</span>
+              <span class="muted">•</span>
+              <span class="muted nowrap">${safe(new Date().toLocaleString('vi-VN'))}</span>
+            </div>
+          </div>
+          <div style="text-align:right">
+            <div class="muted">Mã đơn</div>
+            <div class="orderCode mono">${safe(orderId)}</div>
+            <div style="margin-top:8px" class="barcode" aria-hidden="true"></div>
+          </div>
+        </div>
+
+        <div class="pad">
+          <div class="grid2">
+            <div class="section receiver">
+              <div class="sectionTitle">NGƯỜI NHẬN</div>
+              <div class="kv">
+                <div class="k">Tên</div><div class="v">${safe(customerName || '—')}</div>
+                <div class="k">SĐT</div><div class="v mono">${safe(phone || '—')}</div>
+                <div class="k">Địa chỉ</div><div class="v addr">${safe(addressLines || order.shipping_address || '—')}</div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="sectionTitle">VẬN CHUYỂN</div>
+              <div class="kv">
+                <div class="k">ĐVVC</div><div class="v">${safe(carrierName || '—')}</div>
+                <div class="k">Mã VĐ</div><div class="v mono">${safe(trackingNumber || '—')}</div>
+                <div class="k">Thu hộ</div><div class="v">${safe('0')} VND</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="height:10px"></div>
+
+          <div class="section">
+            <div class="sectionTitle">HÀNG TRONG GÓI (${safe(Math.min(items.length, 12))}${items.length > 12 ? '+' : ''})</div>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Sản phẩm</th>
+                  <th style="width:72px; text-align:right">SL</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsHtml || '<tr><td class="muted">Không có sản phẩm.</td><td></td></tr>'}
+              </tbody>
+            </table>
+            <div class="totals">
+              <div class="totalLabel">Tổng thanh toán</div>
+              <div class="totalValue">${safe(totalPaid.toLocaleString('vi-VN'))} VND</div>
+            </div>
+          </div>
+
+          <div class="cut"></div>
+        </div>
+
+        <div class="foot">
+          <div class="mini">
+            Vui lòng kiểm tra <b>ĐVVC</b> và <b>Mã vận đơn</b> trước khi bàn giao.
+          </div>
+          <div class="mini mono">SERENE • LABEL</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      window.onload = () => { window.print(); };
+    </script>
+  </body>
+</html>`;
+
+    // NOTE: Avoid `noopener,noreferrer` here; some browsers block document.write() into that window.
+    const w = window.open('', '_blank', 'width=700,height=900');
+    if (!w) return;
+    try {
+      w.opener = null;
+    } catch {
+      // ignore
+    }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  };
 
   return (
     <SellerLayout pageTitle={`Chi tiết đơn hàng #${id}`}>
@@ -208,7 +371,10 @@ export const SellerOrderDetail: FC = () => {
                 <div className="flex gap-4 pt-4 border-t border-[#e4e9f0]">
                   <button
                     onClick={advanceToNextStatus}
-                    disabled={isUpdating}
+                    disabled={
+                      isUpdating ||
+                      ((order.status?.toLowerCase() === 'pending' || order.status?.toLowerCase() === 'confirmed') && !shippingValid)
+                    }
                     className="flex-1 h-14 bg-[#00629d] text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-[#004e7c] transition-all shadow-lg shadow-blue-900/10 disabled:opacity-50"
                   >
                     <span className="material-symbols-outlined text-xl">{getNextActionIcon()}</span>
@@ -237,6 +403,18 @@ export const SellerOrderDetail: FC = () => {
                   </div>
                 </div>
               )}
+
+              {shippingError && (
+                <div className="mt-4 rounded-2xl border border-[#ffdad6] bg-[#ffdad6]/30 p-4 text-sm font-semibold text-[#ba1a1a] flex items-start gap-3">
+                  <span className="material-symbols-outlined mt-0.5">info</span>
+                  <div className="min-w-0">
+                    <p>{shippingError}</p>
+                    <p className="mt-1 text-xs font-medium text-[#707882]">
+                      Mẹo: nhập đúng ĐVVC + mã vận đơn để người mua theo dõi hành trình.
+                    </p>
+                  </div>
+                </div>
+              )}
             </section>
 
             {/* Shipping Info (only show when status needs it) */}
@@ -252,7 +430,10 @@ export const SellerOrderDetail: FC = () => {
                     <input
                       type="text"
                       value={carrierName}
-                      onChange={(e) => setCarrierName(e.target.value)}
+                      onChange={(e) => {
+                        setCarrierName(e.target.value);
+                        setShippingError(null);
+                      }}
                       placeholder="VD: Giao hàng nhanh, J&T..."
                       className="w-full h-14 px-6 bg-[#f5faff] border border-transparent focus:bg-white focus:border-[#00629d]/20 rounded-2xl outline-none transition-all text-sm font-medium"
                     />
@@ -262,7 +443,10 @@ export const SellerOrderDetail: FC = () => {
                     <input
                       type="text"
                       value={trackingNumber}
-                      onChange={(e) => setTrackingNumber(e.target.value)}
+                      onChange={(e) => {
+                        setTrackingNumber(e.target.value);
+                        setShippingError(null);
+                      }}
                       placeholder="Nhập mã vận đơn từ nhà vận chuyển"
                       className="w-full h-14 px-6 bg-[#f5faff] border border-transparent focus:bg-white focus:border-[#00629d]/20 rounded-2xl outline-none transition-all font-mono text-sm"
                     />
@@ -278,7 +462,28 @@ export const SellerOrderDetail: FC = () => {
                 {order.items.map((item: any) => (
                   <div key={item.id} className="flex gap-6 py-5 first:pt-0 last:pb-0 items-center">
                     <div className="w-20 h-20 rounded-2xl bg-[#f5faff] flex-shrink-0 flex items-center justify-center overflow-hidden">
-                      <span className="material-symbols-outlined text-[#bfc7d3] text-4xl">inventory_2</span>
+                      {(() => {
+                        const src = resolveAssetUrl(item.product_image_url || item.product_thumbnail_url || '');
+                        const hasErr = !!imgErrorByItemId[String(item.id)];
+                        if (!src || hasErr) {
+                          return (
+                            <span className="material-symbols-outlined text-[#bfc7d3] text-4xl">
+                              inventory_2
+                            </span>
+                          );
+                        }
+                        return (
+                          <img
+                            src={src}
+                            alt={item.product_name || 'Sản phẩm'}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                            onError={() =>
+                              setImgErrorByItemId((prev) => ({ ...prev, [String(item.id)]: true }))
+                            }
+                          />
+                        );
+                      })()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="font-bold text-[#0f1d25] text-sm line-clamp-1">{item.product_name}</h4>
@@ -371,7 +576,12 @@ export const SellerOrderDetail: FC = () => {
             </section>
 
             {/* Print Label */}
-            <button className="w-full py-4 bg-white border border-[#dbeaf5] rounded-2xl font-bold text-sm text-[#00629d] flex items-center justify-center gap-2 hover:bg-[#f5faff] transition-all">
+            <button
+              type="button"
+              onClick={printShippingLabel}
+              className="w-full py-4 bg-white border border-[#dbeaf5] rounded-2xl font-bold text-sm text-[#00629d] flex items-center justify-center gap-2 hover:bg-[#f5faff] transition-all"
+              title={!shippingValid ? 'Bạn nên nhập ĐVVC + mã vận đơn để nhãn đầy đủ.' : 'In nhãn vận chuyển'}
+            >
               <span className="material-symbols-outlined text-lg">print</span>
               In nhãn vận chuyển
             </button>

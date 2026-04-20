@@ -760,4 +760,61 @@ export class OrderService {
     const parsed = Number(value ?? 0);
     return Number.isFinite(parsed) ? this.roundCurrency(parsed) : 0;
   }
+
+
+  async getSingleShopAnalytics(shopId: number, days: number = 10) {
+    const dt = new Date();
+    dt.setDate(dt.getDate() - days);
+
+    // Get all orders not cancelled in the last `days`
+    const orders = await this.prisma.shopOrder.findMany({
+      where: {
+        shop_id: shopId,
+        status: { not: 'cancelled' },
+        created_at: { gte: dt }
+      },
+      select: {
+        id: true,
+        subtotal: true,
+        created_at: true
+      }
+    });
+
+    let totalOrders = orders.length;
+    let totalRevenue = 0;
+
+    // Initialize trend data mapping (last N days)
+    const trendMap = new Map<string, { orders: number; revenue: number }>();
+    const today = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+      const iterDate = new Date(today);
+      iterDate.setDate(iterDate.getDate() - i);
+      const key = `${iterDate.getDate()}/${iterDate.getMonth() + 1}`;
+      trendMap.set(key, { orders: 0, revenue: 0 });
+    }
+
+    for (const o of orders) {
+      const revenue = Number(o.subtotal) || 0;
+      totalRevenue += revenue;
+
+      const oDate = new Date(o.created_at || new Date());
+      const key = `${oDate.getDate()}/${oDate.getMonth() + 1}`;
+
+      if (trendMap.has(key)) {
+        const current = trendMap.get(key)!;
+        trendMap.set(key, {
+          orders: current.orders + 1,
+          revenue: current.revenue + revenue
+        });
+      }
+    }
+
+    const trendData = Array.from(trendMap.entries()).map(([date, data]) => ({
+      date,
+      orders: data.orders,
+      revenue: data.revenue
+    }));
+
+    return { totalOrders, totalRevenue, trendData };
+  }
 }

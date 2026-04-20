@@ -1,4 +1,4 @@
-import { FC, useEffect } from 'react';
+import { FC, useEffect, useMemo, useState } from 'react';
 import { SellerLayout } from '../../components/layout/SellerLayout';
 import { useOrders } from '../../hooks/useOrders';
 import { Link } from 'react-router-dom';
@@ -7,10 +7,42 @@ import { getOrderPricing } from '../../utils/orderPricing';
 
 export const SellerOrderManagement: FC = () => {
   const { orders, fetchSellerOrders, loading, error } = useOrders();
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     fetchSellerOrders();
   }, [fetchSellerOrders]);
+
+  const filteredOrders = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return orders;
+
+    return orders.filter((order: any) => {
+      const id = String(order?.id ?? '').toLowerCase();
+      const status = String(order?.status ?? '').toLowerCase();
+      const carrier = String(order?.carrier_name ?? '').toLowerCase();
+      const tracking = String(order?.tracking_number ?? '').toLowerCase();
+      const shippingAddress = String(order?.shipping_address ?? '').toLowerCase();
+      const customerName = String(order?.shipping_address ?? '').split(',')[0]?.trim().toLowerCase() || '';
+      const itemNames = Array.isArray(order?.items)
+        ? order.items
+            .map((it: any) => String(it?.product_name ?? '').toLowerCase())
+            .join(' ')
+        : '';
+
+      // Allow searching "#1", "1", "SER-0001" (if used), etc.
+      const normalizedIdTokens = [`#${id}`, id];
+      return (
+        normalizedIdTokens.some((t) => t.includes(q)) ||
+        status.includes(q) ||
+        customerName.includes(q) ||
+        shippingAddress.includes(q) ||
+        carrier.includes(q) ||
+        tracking.includes(q) ||
+        itemNames.includes(q)
+      );
+    });
+  }, [orders, query]);
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -37,9 +69,22 @@ export const SellerOrderManagement: FC = () => {
             <span className="material-symbols-outlined text-slate-400">search</span>
             <input 
               type="text" 
-              placeholder="Tìm kiếm đơn hàng..." 
+              placeholder="Tìm theo mã đơn, khách hàng, sản phẩm, vận đơn..." 
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
               className="bg-transparent border-none text-sm w-full focus:ring-0 outline-none" 
             />
+            {!!query.trim() && (
+              <button
+                type="button"
+                onClick={() => setQuery('')}
+                className="w-8 h-8 rounded-full hover:bg-white/70 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors"
+                aria-label="Xoá tìm kiếm"
+                title="Xoá"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -72,15 +117,17 @@ export const SellerOrderManagement: FC = () => {
                     <p className="mt-4 text-[#707882] font-bold">Đang tải đơn hàng...</p>
                   </td>
                 </tr>
-              ) : orders.length === 0 ? (
+              ) : filteredOrders.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-8 py-20 text-center">
                     <span className="material-symbols-outlined text-6xl text-[#dbeaf5]">local_shipping</span>
-                    <p className="mt-4 text-[#707882] font-bold">Chưa có đơn hàng nào.</p>
+                    <p className="mt-4 text-[#707882] font-bold">
+                      {orders.length === 0 ? 'Chưa có đơn hàng nào.' : 'Không tìm thấy đơn hàng phù hợp.'}
+                    </p>
                   </td>
                 </tr>
               ) : (
-                orders.map((order) => {
+                filteredOrders.map((order) => {
                   const pricing = getOrderPricing(order);
                   return (
                   <tr key={order.id} className="hover:bg-[#f5faff]/30 transition-colors">

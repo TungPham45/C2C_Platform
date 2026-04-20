@@ -1,116 +1,234 @@
-import { FC, ReactNode } from 'react';
-import { NavLink, Link, useLocation } from 'react-router-dom';
+import { FC, ReactNode, useEffect, useState } from 'react';
+import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
+import { NotificationBell } from './NotificationBell';
+
+const PRIMARY = '#1d4ed8';
 
 interface SellerLayoutProps {
   children: ReactNode;
   pageTitle?: string;
 }
 
-export const SellerLayout: FC<SellerLayoutProps> = ({ children, pageTitle = 'Serene Seller' }) => {
+export const SellerLayout: FC<SellerLayoutProps> = ({ children }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [user, setUser] = useState<{ full_name?: string; email?: string; role?: string } | null>(null);
 
-  const getNavLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-      isActive
-        ? 'bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 shadow-sm'
-        : 'text-slate-600 dark:text-slate-400 hover:bg-blue-100/50 dark:hover:bg-slate-900/50'
-    }`;
+  useEffect(() => {
+    const readUser = () => {
+      const raw = localStorage.getItem('c2c_user');
+      if (raw) {
+        try {
+          setUser(JSON.parse(raw));
+        } catch {
+          setUser(null);
+        }
+      }
+    };
+    readUser();
+
+    // Listen for updates from Settings page
+    const onStorage = () => readUser();
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('user-updated', onStorage);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('user-updated', onStorage);
+    };
+  }, []);
 
   const isProductsActive =
     location.pathname.startsWith('/seller/products') ||
     location.pathname.startsWith('/seller/add-product') ||
     location.pathname.startsWith('/seller/edit-product');
 
+  const navBase =
+    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors';
+  const navInactive = 'text-slate-600 hover:bg-white/70 hover:text-slate-900';
+  const navActiveStyle = { backgroundColor: PRIMARY } as const;
+
+  const handleLogout = () => {
+    localStorage.removeItem('c2c_token');
+    localStorage.removeItem('c2c_user');
+    navigate('/login');
+  };
+
+  const displayName = user?.full_name || user?.email?.split('@')[0] || 'Người bán';
+  const roleLabel = user?.role === 'admin' ? 'QUẢN TRỊ' : 'NGƯỜI BÁN';
+
   return (
-    <div className="bg-[#f5faff] text-[#0f1d25] min-h-screen font-['Inter']">
-      <aside className="w-64 h-screen fixed left-0 top-0 bg-blue-50 dark:bg-slate-950 flex flex-col p-4 z-50">
-        <div className="mb-8 px-4">
-          <h1 className="text-xl font-bold text-blue-900 dark:text-blue-100 font-['Plus_Jakarta_Sans']">{pageTitle}</h1>
-          <p className="text-xs text-slate-500 font-medium tracking-wide">Seller Center</p>
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900 font-['Inter',system-ui,sans-serif]">
+      {/* Sidebar */}
+      <aside className="fixed left-0 top-0 z-50 flex h-screen w-[260px] flex-col border-r border-slate-200/80 bg-[#eef3f9] px-3 py-6">
+        <div className="mb-8 px-3">
+          <h1 className="text-lg font-bold tracking-tight text-slate-900">Serene Curator</h1>
+          <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            Kênh người bán
+          </p>
         </div>
 
-        <nav className="flex-1 space-y-1 font-medium text-sm">
-          <NavLink to="/seller" end className={getNavLinkClass}>
-            <span className="material-symbols-outlined">dashboard</span> Overview
+        <nav className="flex flex-1 flex-col gap-0.5 text-sm">
+          <NavLink
+            to="/seller/center"
+            end
+            className={({ isActive }) => `${navBase} ${isActive ? '' : navInactive}`}
+            style={({ isActive }) => (isActive ? navActiveStyle : undefined)}
+          >
+            <span className="material-symbols-outlined text-[20px]">dashboard</span>
+            Tổng quan
           </NavLink>
 
-          <NavLink to="/seller/orders" className={getNavLinkClass}>
-            <span className="material-symbols-outlined">shopping_cart</span> Orders
+          <NavLink
+            to="/seller/orders"
+            className={({ isActive }) => `${navBase} ${isActive ? '' : navInactive}`}
+            style={({ isActive }) => (isActive ? navActiveStyle : undefined)}
+          >
+            <span className="material-symbols-outlined text-[20px]">shopping_cart</span>
+            Đơn hàng
           </NavLink>
 
           <NavLink
             to="/seller/products"
-            className={() =>
-              `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                isProductsActive
-                  ? 'bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-blue-100/50 dark:hover:bg-slate-900/50'
-              }`
-            }
+            className={() => `${navBase} ${isProductsActive ? '' : navInactive}`}
+            style={isProductsActive ? navActiveStyle : undefined}
           >
-            <span className="material-symbols-outlined">inventory_2</span> Products
+            <span className="material-symbols-outlined text-[20px]">category</span>
+            Sản phẩm
           </NavLink>
 
-          <NavLink to="/seller/vouchers" className={getNavLinkClass}>
-            <span className="material-symbols-outlined">confirmation_number</span> Vouchers
+          <NavLink
+            to="/seller/vouchers"
+            className={({ isActive }) => `${navBase} ${isActive ? '' : navInactive}`}
+            style={({ isActive }) => (isActive ? navActiveStyle : undefined)}
+          >
+            <span className="material-symbols-outlined text-[20px]">confirmation_number</span>
+            Voucher
           </NavLink>
 
-          <NavLink to="/seller/categories" className={getNavLinkClass}>
-            <span className="material-symbols-outlined">category_search</span> Shop Categories
+          <NavLink
+            to="/seller/categories"
+            className={({ isActive }) => `${navBase} ${isActive ? '' : navInactive}`}
+            style={({ isActive }) => (isActive ? navActiveStyle : undefined)}
+          >
+            <span className="material-symbols-outlined text-[20px]">category_search</span>
+            Danh mục Shop
           </NavLink>
 
-          <NavLink to="/seller/chat" className={getNavLinkClass}>
-            <span className="material-symbols-outlined">chat</span> Messages
+          <NavLink
+            to="/seller/analytics"
+            className={({ isActive }) => `${navBase} ${isActive ? '' : navInactive}`}
+            style={({ isActive }) => (isActive ? navActiveStyle : undefined)}
+          >
+            <span className="material-symbols-outlined text-[20px]">monitoring</span>
+            Phân tích
           </NavLink>
 
-          <a href="#" className="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-60">
-            <span className="material-symbols-outlined">layers</span> Inventory
-          </a>
+          <NavLink
+            to="/seller/reviews"
+            className={({ isActive }) => `${navBase} ${isActive ? '' : navInactive}`}
+            style={({ isActive }) => (isActive ? navActiveStyle : undefined)}
+          >
+            <span className="material-symbols-outlined text-[20px]">reviews</span>
+            Đánh giá
+          </NavLink>
 
-          <a href="#" className="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-60">
-            <span className="material-symbols-outlined">monitoring</span> Analytics
-          </a>
+          <NavLink
+            to="/seller/chat"
+            className={({ isActive }) => `${navBase} ${isActive ? '' : navInactive}`}
+            style={({ isActive }) => (isActive ? navActiveStyle : undefined)}
+          >
+            <span className="material-symbols-outlined text-[20px]">chat</span>
+            Tin nhắn
+          </NavLink>
 
-          <a href="#" className="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-60">
-            <span className="material-symbols-outlined">settings</span> Settings
-          </a>
+          <NavLink
+            to="/seller/inventory"
+            className={({ isActive }) => `${navBase} ${isActive ? '' : navInactive}`}
+            style={({ isActive }) => (isActive ? navActiveStyle : undefined)}
+          >
+            <span className="material-symbols-outlined text-[20px]">layers</span>
+            Kho hàng
+          </NavLink>
         </nav>
 
-        <div className="mt-auto border-t border-blue-100/50 pt-4">
-          <a href="#" className="flex items-center gap-3 px-4 py-3 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-60">
-            <span className="material-symbols-outlined">help</span> Support
-          </a>
+        <Link
+          to="/seller/add-product"
+          className="mx-2 mb-4 flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold text-white shadow-md transition hover:brightness-105 active:scale-[0.99]"
+          style={{ backgroundColor: PRIMARY, boxShadow: '0 6px 20px rgba(29,78,216,0.35)' }}
+        >
+          <span className="material-symbols-outlined text-[20px]">add_circle</span>
+          Đăng sản phẩm
+        </Link>
+
+        <div className="mt-auto space-y-0.5 border-t border-slate-200/80 pt-4">
+          <NavLink
+            to="/seller/settings"
+            className={({ isActive }) => `${navBase} w-full text-left ${isActive ? '' : 'text-slate-600 hover:bg-white/70'}`}
+            style={({ isActive }) => (isActive ? navActiveStyle : undefined)}
+          >
+            <span className="material-symbols-outlined text-[20px]">settings</span>
+            Cài đặt
+          </NavLink>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className={`${navBase} w-full text-left text-slate-600 hover:bg-red-50 hover:text-red-700`}
+          >
+            <span className="material-symbols-outlined text-[20px]">logout</span>
+            Đăng xuất
+          </button>
         </div>
       </aside>
 
-      <header className="fixed top-0 right-0 w-[calc(100%-16rem)] h-16 bg-white/80 backdrop-blur-md z-40 flex items-center justify-between px-8 shadow-sm">
-        <div className="flex items-center gap-4 flex-1 max-w-xl">
-          <div className="relative w-full">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#707882]">search</span>
+      {/* Top header */}
+      <header className="fixed left-[260px] right-0 top-0 z-40 flex h-16 items-center gap-6 border-b border-slate-200/90 bg-white px-6 shadow-[0_1px_0_rgba(15,23,42,0.04)]">
+        <div className="mx-auto flex w-full max-w-6xl flex-1 items-center justify-center px-4">
+          <div className="relative w-full max-w-xl">
+            <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-lg text-slate-400">
+              search
+            </span>
             <input
-              type="text"
-              placeholder="Search seller tools or products..."
-              className="w-full bg-[#e9f5ff] border-none rounded-full pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-[#00629d]/20 outline-none"
+              type="search"
+              placeholder="Tìm kiếm sản phẩm, đơn hàng..."
+              className="w-full rounded-full border border-slate-200 bg-slate-50 py-2 pl-10 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-200 focus:bg-white focus:ring-2 focus:ring-blue-100"
             />
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <Link to="/" className="flex items-center gap-2 text-sm font-semibold text-[#00629d] bg-[#e9f5ff] px-4 py-2 rounded-full hover:bg-blue-100 transition-colors">
-            <span className="material-symbols-outlined text-[18px]">home</span>
-            Home
-          </Link>
-          <div className="flex items-center gap-4 text-[#707882]">
-            <button className="hover:text-[#00629d] transition-colors"><span className="material-symbols-outlined">notifications</span></button>
-            <button className="hover:text-[#00629d] transition-colors"><span className="material-symbols-outlined">chat_bubble</span></button>
-            <button className="hover:text-[#00629d] transition-colors"><span className="material-symbols-outlined">account_circle</span></button>
-          </div>
-          <button className="bg-[#00629d] text-white px-6 py-2 rounded-full text-sm font-semibold hover:opacity-90 transition-opacity">
-            Sell More
+
+        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+          <NotificationBell />
+          <button
+            type="button"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100"
+            aria-label="Trợ giúp"
+          >
+            <span className="material-symbols-outlined text-[22px]">help</span>
           </button>
+          <div className="hidden h-8 w-px bg-slate-200 sm:block" />
+          <div className="hidden items-center gap-3 sm:flex">
+            <div className="text-right leading-tight">
+              <p className="text-sm font-semibold text-slate-900">{displayName}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{roleLabel}</p>
+            </div>
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white"
+              style={{ backgroundColor: PRIMARY }}
+            >
+              {displayName.charAt(0).toUpperCase()}
+            </div>
+          </div>
+          <Link
+            to="/"
+            className="ml-1 rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+          >
+            Về shop
+          </Link>
         </div>
       </header>
 
-      <main className="ml-64 pt-24 pb-32 px-8">{children}</main>
+      <main className="ml-[260px] min-h-screen pt-16">
+        <div className="px-6 py-8 lg:px-10">{children}</div>
+      </main>
     </div>
   );
 };

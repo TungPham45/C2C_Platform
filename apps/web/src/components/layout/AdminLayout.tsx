@@ -21,8 +21,9 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children, pageTitle = 'Seren
   return (
     <div className="bg-[#f5faff] text-[#0f1d25] min-h-screen font-['Inter'] selection:bg-[#cfe5ff]">
       {/* Sidebar */}
-      <aside className="w-72 h-screen fixed left-0 top-0 bg-[#f5faff] border-r border-[#e1f0fb] flex flex-col p-6 z-50">
-        <div className="mb-10 px-2">
+      <aside className="w-72 h-screen fixed left-0 top-0 bg-[#f5faff] border-r border-[#e1f0fb] flex flex-col z-50 overflow-hidden">
+        {/* Logo - fixed */}
+        <div className="flex-shrink-0 px-6 pt-6 pb-3">
           <div className="flex items-center gap-2 mb-1">
             <div className="w-8 h-8 bg-gradient-to-br from-[#00629d] to-[#42a5f5] rounded-lg flex items-center justify-center">
               <span className="material-symbols-outlined text-white text-xl">shield_person</span>
@@ -34,7 +35,8 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children, pageTitle = 'Seren
           <p className="text-[10px] text-[#707882] font-bold uppercase tracking-[0.2em] ml-10">Trung tâm điều khiển</p>
         </div>
         
-        <nav className="flex-1 space-y-2 text-sm">
+        {/* Nav - scrollable */}
+        <nav className="flex-1 overflow-y-auto px-6 py-2 space-y-2 text-sm">
           <NavLink to="/admin" end className={getNavLinkClass}>
             <span className="material-symbols-outlined">dashboard</span> Tổng quan
           </NavLink>
@@ -89,22 +91,25 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children, pageTitle = 'Seren
           </a>
         </nav>
         
-        <div className="mt-auto bg-white/40 backdrop-blur-sm rounded-2xl p-4 border border-white/60">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-full bg-[#cfe5ff] flex items-center justify-center text-[#00629d] font-bold">
-              AD
+        {/* Footer - fixed */}
+        <div className="flex-shrink-0 px-6 pb-6 pt-3 border-t border-[#e1f0fb]">
+          <div className="bg-white/40 backdrop-blur-sm rounded-2xl p-4 border border-white/60">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-[#cfe5ff] flex items-center justify-center text-[#00629d] font-bold">
+                AD
+              </div>
+              <div>
+                <p className="text-xs font-bold text-[#0f1d25]">Quản trị viên</p>
+                <p className="text-[10px] text-[#707882]">Quyền tối cao</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-bold text-[#0f1d25]">Quản trị viên</p>
-              <p className="text-[10px] text-[#707882]">Quyền tối cao</p>
-            </div>
+            <Link to="/" className="w-full py-2 mb-2 text-xs font-semibold text-[#00629d] bg-[#e9f5ff] hover:bg-[#d0e9ff] rounded-lg transition-colors flex items-center justify-center gap-2">
+              <span className="material-symbols-outlined text-sm">home</span> Về Trang Chủ
+            </Link>
+            <button className="w-full py-2 text-xs font-semibold text-[#ba1a1a] hover:bg-[#ffdad6] rounded-lg transition-colors flex items-center justify-center gap-2">
+              <span className="material-symbols-outlined text-sm">logout</span> Đăng xuất
+            </button>
           </div>
-          <Link to="/" className="w-full py-2 mb-2 text-xs font-semibold text-[#00629d] bg-[#e9f5ff] hover:bg-[#d0e9ff] rounded-lg transition-colors flex items-center justify-center gap-2">
-            <span className="material-symbols-outlined text-sm">home</span> Về Trang Chủ
-          </Link>
-          <button className="w-full py-2 text-xs font-semibold text-[#ba1a1a] hover:bg-[#ffdad6] rounded-lg transition-colors flex items-center justify-center gap-2">
-            <span className="material-symbols-outlined text-sm">logout</span> Đăng xuất
-          </button>
         </div>
       </aside>
 

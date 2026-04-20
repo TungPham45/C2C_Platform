@@ -53,6 +53,7 @@ model Product {
   thumbnail_url String?   @db.Text
   rating        Decimal?  @default(0) @db.Decimal(3, 2)
   sold_count    Int?      @default(0)
+  view_count    Int?      @default(0)
   status        String?   @default("pending_approval") @db.VarChar(50) // 'pending_approval', 'active', 'hidden', 'banned', 'rejected'
   moderation_note String? @db.Text
   created_at    DateTime? @default(now()) @db.Timestamp(6)
@@ -171,12 +172,15 @@ model Review {
   user_id       Int
   product_id    Int
   shop_order_id Int
-  rating        Int
+  rating        Int       // 1-5
   comment       String?   @db.Text
-  media_urls    Json?
+  media_urls    Json?     // ["url1", "url2"]
+  seller_reply  String?   @db.Text
+  replied_at    DateTime? @db.Timestamp(6)
   created_at    DateTime? @default(now()) @db.Timestamp(6)
 
   product       Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
 
+  @@unique([user_id, product_id, shop_order_id])
   @@map("reviews")
 }

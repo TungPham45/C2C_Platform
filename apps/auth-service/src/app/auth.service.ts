@@ -1,4 +1,4 @@
-import { Injectable, Inject, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { EmailService } from './email.service';
@@ -38,6 +38,8 @@ export class AuthService {
         email: user.email,
         full_name: user.full_name,
         role: user.role,
+        phone: user.phone,
+        avatar_url: user.avatar_url,
         shop: null
       }
     };
@@ -115,6 +117,9 @@ export class AuthService {
     await this.verifyOtp(email, code, 'RESET_PASSWORD');
 
     const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) throw new NotFoundException('User not found');
+    if (!newPassword || newPassword.length < 6) throw new BadRequestException('Mật khẩu mới phải có ít nhất 6 ký tự');
+
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     await this.prisma.user.update({
@@ -146,11 +151,14 @@ export class AuthService {
   }
 
   async getAdminStats() {
-    const activeUsers = await this.prisma.user.count({
-      where: { status: 'active' },
-    });
+    const [totalUsers, activeUsers, pendingVerification, suspended] = await Promise.all([
+      this.prisma.user.count(),
+      this.prisma.user.count({ where: { status: 'active' } }),
+      this.prisma.user.count({ where: { status: 'pending_verification' } }),
+      this.prisma.user.count({ where: { status: { in: ['suspended', 'banned'] } } }),
+    ]);
 
-    return { activeUsers };
+    return { totalUsers, activeUsers, pendingVerification, suspended };
   }
 
   async getAllUsers() {
@@ -184,6 +192,31 @@ export class AuthService {
       data: { status },
       select: { id: true, status: true },
     });
+  }
+
+  async updateProfile(userId: number, data: { full_name?: string; phone?: string; avatar_url?: string }) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const updateData: any = {};
+    if (data.full_name !== undefined) updateData.full_name = data.full_name;
+    if (data.phone !== undefined) {
+      const phoneVal = data.phone?.trim() || null;
+      // Check if phone is already used by another user
+      if (phoneVal) {
+        const existing = await this.prisma.user.findFirst({ where: { phone: phoneVal, id: { not: userId } } });
+        if (existing) throw new BadRequestException('Số điện thoại này đã được sử dụng bởi tài khoản khác');
+      }
+      updateData.phone = phoneVal;
+    }
+    if (data.avatar_url !== undefined) updateData.avatar_url = data.avatar_url;
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: { id: true, email: true, full_name: true, phone: true, avatar_url: true, role: true },
+    });
+    return updated;
   }
 
   async getUserGrowthAnalytics(timeframe?: string) {

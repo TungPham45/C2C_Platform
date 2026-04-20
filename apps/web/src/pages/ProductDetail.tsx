@@ -3,7 +3,10 @@ import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useProducts } from '../hooks/useProducts';
 import { useCart } from '../hooks/useCart';
+import { useReviews, ReviewsData } from '../hooks/useReviews';
 import { formatVnd, formatPriceRange } from '../utils/currency';
+import { resolveAssetUrl } from '../config/api';
+
 
 export const ProductDetailPage: FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -19,8 +22,11 @@ export const ProductDetailPage: FC = () => {
   const [isStartingChat, setIsStartingChat] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [reviewsData, setReviewsData] = useState<ReviewsData | null>(null);
+  const [reviewPage, setReviewPage] = useState(1);
 
   const { addToCart } = useCart();
+  const { fetchProductReviews } = useReviews();
 
   useEffect(() => {
     const userStr = localStorage.getItem('c2c_user');
@@ -48,10 +54,13 @@ export const ProductDetailPage: FC = () => {
              }
           }
         }
+        // Fetch reviews
+        const revData = await fetchProductReviews(parseInt(id), 1, 10);
+        if (revData) setReviewsData(revData);
       }
     };
     loadProduct();
-  }, [id, fetchProductDetail]);
+  }, [id, fetchProductDetail, fetchProductReviews]);
 
   // Derive attribute groups from variants
   const attributeGroups = useMemo(() => {
@@ -237,6 +246,46 @@ export const ProductDetailPage: FC = () => {
   return (
     <MarketplaceLayout>
       <div className="bg-[#f9fafc] min-h-screen pb-20 font-['Inter']">
+
+        {/* ── Add to Cart Toast ── */}
+        <div className={`fixed bottom-6 right-6 z-[999] transition-all duration-500 ${showToast ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+          <div className="flex items-center gap-4 bg-[#0f1d25] text-white px-5 py-4 rounded-2xl shadow-2xl shadow-black/20 min-w-[300px]">
+            {/* Product thumb */}
+            <div className="w-12 h-12 rounded-xl overflow-hidden bg-white/10 flex-shrink-0">
+              {selectedImage ? (
+                <img src={selectedImage} alt={product?.name} className="w-full h-full object-cover" />
+              ) : (
+                <span className="material-symbols-outlined text-white flex items-center justify-center h-full">inventory_2</span>
+              )}
+            </div>
+            {/* Text */}
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-[#42a5f5]">Đã thêm vào giỏ hàng</p>
+              <p className="text-sm font-bold truncate mt-0.5">{product?.name}</p>
+              <p className="text-[11px] text-white/60 mt-0.5">Số lượng: {quantity}</p>
+            </div>
+            {/* Cart icon */}
+            <div className="w-9 h-9 bg-[#00629d] rounded-xl flex items-center justify-center flex-shrink-0">
+              <span className="material-symbols-outlined text-white text-[20px]">shopping_bag</span>
+            </div>
+          </div>
+          {/* Progress bar */}
+          <div className="h-1 bg-white/10 rounded-full mt-1 overflow-hidden">
+            <div
+              className="h-full bg-[#42a5f5] rounded-full"
+              style={{
+                animation: showToast ? 'shrink 3s linear forwards' : 'none',
+              }}
+            />
+          </div>
+          <style>{`
+            @keyframes shrink {
+              from { width: 100%; }
+              to { width: 0%; }
+            }
+          `}</style>
+        </div>
+
         <div className="max-w-[1280px] mx-auto px-8 py-8">
           
           {/* Breadcrumb */}
@@ -292,19 +341,19 @@ export const ProductDetailPage: FC = () => {
               {/* Reviews & Sales Badge */}
               <div className="flex items-center gap-4 mb-6">
                  <div className="flex items-center gap-1 text-[#ffb952]">
-                   <span className="material-symbols-outlined text-[16px] fill-current">star</span>
-                   <span className="material-symbols-outlined text-[16px] fill-current">star</span>
-                   <span className="material-symbols-outlined text-[16px] fill-current">star</span>
-                   <span className="material-symbols-outlined text-[16px] fill-current">star</span>
-                   <span className="material-symbols-outlined text-[16px] fill-current">star_half</span>
+                   {[1,2,3,4,5].map(s => (
+                     <span key={s} className="material-symbols-outlined text-[16px] fill-current">
+                       {s <= Math.floor(reviewsData?.avg_rating || 0) ? 'star' : s - 0.5 <= (reviewsData?.avg_rating || 0) ? 'star_half' : 'star'}
+                     </span>
+                   ))}
                  </div>
                  <div className="text-sm">
-                   <span className="font-bold text-[#0f1d25] mr-1">4.9</span>
-                   <span className="text-[#707882]">(1.248 đánh giá)</span>
+                   <span className="font-bold text-[#0f1d25] mr-1">{reviewsData?.avg_rating?.toFixed(1) || '0.0'}</span>
+                   <span className="text-[#707882]">({reviewsData?.total || 0} đánh giá)</span>
                  </div>
                  <div className="w-[1px] h-4 bg-[#dbeaf5]"></div>
                  <div className="text-sm">
-                   <span className="font-bold text-[#0f1d25] mr-1">2.4k</span>
+                   <span className="font-bold text-[#0f1d25] mr-1">{product.sold_count || 0}</span>
                    <span className="text-[#707882]">Đã bán</span>
                  </div>
               </div>
@@ -454,8 +503,11 @@ export const ProductDetailPage: FC = () => {
               <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-[#e4e9f0]">
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-14 h-14 bg-[#e0efff] rounded-full flex items-center justify-center text-[#00629d] overflow-hidden">
-                    {/* Simulated Logo based on actual product data if possible, using icon for now */}
-                    <span className="material-symbols-outlined text-3xl">storefront</span>
+                    {product.shop?.logo_url ? (
+                      <img src={resolveAssetUrl(product.shop.logo_url)} alt="Shop Logo" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="material-symbols-outlined text-3xl">storefront</span>
+                    )}
                   </div>
                   <div>
                     <h4 className="font-bold text-[#0f1d25] text-lg text-truncate max-w-[180px]">{product.shop?.name || `Shop #${product.shop_id}`}</h4>
@@ -470,11 +522,14 @@ export const ProductDetailPage: FC = () => {
                   </div>
                   <div className="bg-[#f0f7ff] rounded-xl p-4">
                     <p className="text-[10px] font-black uppercase tracking-widest text-[#707882] mb-1">Đánh giá</p>
-                    <p className="text-xl font-black text-[#0f1d25]">4.9/5.0</p>
+                    <p className="text-xl font-black text-[#0f1d25]">{Number(product.shop?.rating || 0).toFixed(1)}/5.0</p>
                   </div>
                 </div>
 
-                <Link to={`/shop/${product.shop_id}`} className="w-full py-3 bg-[#e4e9f0] hover:bg-[#dbeaf5] text-[#00629d] rounded-xl font-bold transition-colors block text-center mt-6">
+                <Link
+                  to={`/shop/${product.shop_id}`}
+                  className="w-full py-3 bg-[#e4e9f0] hover:bg-[#dbeaf5] text-[#00629d] rounded-xl font-bold transition-colors text-center block"
+                >
                   Xem cửa hàng
                 </Link>
               </div>
@@ -518,100 +573,119 @@ export const ProductDetailPage: FC = () => {
             <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
               <div>
                 <h2 className="text-3xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25] mb-2">Đánh giá từ cộng đồng</h2>
-                <p className="text-[#707882] text-sm font-medium">Dựa trên 1.248 đơn hàng đã xác nhận</p>
+                <p className="text-[#707882] text-sm font-medium">Dựa trên {reviewsData?.total || 0} đơn hàng đã xác nhận</p>
               </div>
-              <div className="bg-white px-8 py-6 rounded-[2rem] shadow-sm border border-[#e4e9f0] flex items-center gap-8 min-w-[340px]">
-                <div className="text-center">
-                  <div className="text-[#00629d] text-5xl font-black font-['Plus_Jakarta_Sans'] leading-none">4.9</div>
-                  <div className="text-[10px] font-black uppercase tracking-widest text-[#707882] mt-2">TRÊN 5</div>
-                </div>
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="flex text-[#ffb952]"><span className="material-symbols-outlined text-[12px] fill-current">star</span><span className="material-symbols-outlined text-[12px] fill-current">star</span><span className="material-symbols-outlined text-[12px] fill-current">star</span><span className="material-symbols-outlined text-[12px] fill-current">star</span><span className="material-symbols-outlined text-[12px] fill-current">star</span></div>
-                    <div className="flex-1 h-1.5 bg-[#f0f3f8] rounded-full overflow-hidden"><div className="w-[92%] h-full bg-[#00629d] rounded-full"></div></div>
-                    <span className="text-[#707882] font-semibold">92%</span>
+              {(reviewsData?.total || 0) > 0 && (
+                <div className="bg-white px-8 py-6 rounded-[2rem] shadow-sm border border-[#e4e9f0] flex items-center gap-8 min-w-[340px]">
+                  <div className="text-center">
+                    <div className="text-[#00629d] text-5xl font-black font-['Plus_Jakarta_Sans'] leading-none">{reviewsData?.avg_rating?.toFixed(1)}</div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-[#707882] mt-2">TRÊN 5</div>
                   </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="flex text-[#ffb952]"><span className="material-symbols-outlined text-[12px] fill-current">star</span><span className="material-symbols-outlined text-[12px] fill-current">star</span><span className="material-symbols-outlined text-[12px] fill-current">star</span><span className="material-symbols-outlined text-[12px] fill-current">star</span><span className="material-symbols-outlined text-[12px] text-[#e4e9f0] fill-current">star</span></div>
-                    <div className="flex-1 h-1.5 bg-[#f0f3f8] rounded-full overflow-hidden"><div className="w-[6%] h-full bg-[#00629d] rounded-full"></div></div>
-                    <span className="text-[#707882] font-semibold">6%</span>
+                  <div className="flex-1 space-y-2">
+                    {[5,4,3,2,1].map(star => {
+                      const count = reviewsData?.rating_distribution?.[star] || 0;
+                      const pct = (reviewsData?.total || 0) > 0 ? Math.round((count / (reviewsData?.total || 1)) * 100) : 0;
+                      return (
+                        <div key={star} className="flex items-center gap-2 text-xs">
+                          <div className="flex items-center gap-0.5 text-[#ffb952] w-16">
+                            <span className="text-[#707882] font-bold w-3">{star}</span>
+                            <span className="material-symbols-outlined text-[12px] fill-current">star</span>
+                          </div>
+                          <div className="flex-1 h-1.5 bg-[#f0f3f8] rounded-full overflow-hidden">
+                            <div className="h-full bg-[#00629d] rounded-full transition-all" style={{ width: `${pct}%` }}></div>
+                          </div>
+                          <span className="text-[#707882] font-semibold w-8 text-right">{pct}%</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-              {/* Review 1 */}
-              <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-[#e4e9f0]">
-                <div className="flex items-start justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-[#e0efff] text-[#00629d] rounded-full flex items-center justify-center font-bold">J</div>
-                    <div>
-                      <p className="font-bold text-[#0f1d25] text-sm">J***n</p>
-                      <p className="text-xs text-[#707882]">Oct 12, 2023</p>
-                    </div>
-                  </div>
-                  <div className="flex text-[#ffb952]"><span className="material-symbols-outlined text-[16px] fill-current">star</span><span className="material-symbols-outlined text-[16px] fill-current">star</span><span className="material-symbols-outlined text-[16px] fill-current">star</span><span className="material-symbols-outlined text-[16px] fill-current">star</span><span className="material-symbols-outlined text-[16px] fill-current">star</span></div>
-                </div>
-                <div className="inline-block px-2 py-1 bg-[#f0f3f8] text-[#707882] text-[9px] font-black uppercase tracking-widest rounded mb-4">
-                  VARIANT: ARCTIC MIST / ALUMINUM
-                </div>
-                <p className="text-[#404751] text-sm leading-relaxed mb-6">
-                  Tổng thể mà nói sản phẩm rất tốt, đóng gói cẩn thận, giao hàng nhanh. Sẽ mua lại lần sau.
-                </p>
-                <div className="flex gap-3">
-                  <div className="w-16 h-16 rounded-xl bg-slate-200 overflow-hidden"><img src="https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?q=80&w=200&auto=format&fit=crop" className="w-full h-full object-cover" alt="review pic" /></div>
-                  <div className="w-16 h-16 rounded-xl bg-[#f0f3f8] flex items-center justify-center text-[#00629d] border border-[#e4e9f0] cursor-pointer hover:bg-[#e0efff]"><span className="material-symbols-outlined">play_circle</span></div>
-                </div>
+            {(!reviewsData || reviewsData.total === 0) ? (
+              <div className="bg-white rounded-[2rem] p-12 shadow-sm border border-[#e4e9f0] text-center">
+                <span className="material-symbols-outlined text-5xl text-[#dbeaf5] mb-4 block">rate_review</span>
+                <h3 className="text-lg font-bold text-[#0f1d25] mb-2">Chưa có đánh giá nào</h3>
+                <p className="text-sm text-[#707882]">Hãy là người đầu tiên đánh giá sản phẩm này!</p>
               </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                  {reviewsData.reviews.map(rev => {
+                    const initial = `U${rev.user_id}`;
+                    const maskedName = `Người dùng ***${String(rev.user_id).slice(-2)}`;
+                    const dateStr = rev.created_at ? new Date(rev.created_at).toLocaleDateString('vi-VN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+                    const mediaUrls = Array.isArray(rev.media_urls) ? rev.media_urls : [];
+                    return (
+                      <div key={rev.id} className="bg-white rounded-[2rem] p-8 shadow-sm border border-[#e4e9f0]">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-[#e0efff] text-[#00629d] rounded-full flex items-center justify-center font-bold text-sm">{initial[0]}</div>
+                            <div>
+                              <p className="font-bold text-[#0f1d25] text-sm">{maskedName}</p>
+                              <p className="text-xs text-[#707882]">{dateStr}</p>
+                            </div>
+                          </div>
+                          <div className="flex text-[#ffb952]">
+                            {[1,2,3,4,5].map(s => (
+                              <span key={s} className={`material-symbols-outlined text-[16px] fill-current ${s <= rev.rating ? 'text-[#ffb952]' : 'text-[#e4e9f0]'}`}>star</span>
+                            ))}
+                          </div>
+                        </div>
+                        {rev.comment && (
+                          <p className="text-[#404751] text-sm leading-relaxed mb-4">{rev.comment}</p>
+                        )}
+                        {mediaUrls.length > 0 && (
+                          <div className="flex gap-3 mb-4">
+                            {mediaUrls.map((url: string, idx: number) => (
+                              <div key={idx} className="w-16 h-16 rounded-xl bg-slate-200 overflow-hidden">
+                                <img src={url} className="w-full h-full object-cover" alt={`review ${idx + 1}`} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {rev.seller_reply && (
+                          <div className="mt-4 p-4 bg-[#f5faff] rounded-xl border border-[#e0efff]">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="material-symbols-outlined text-[#00629d] text-sm">storefront</span>
+                              <span className="text-xs font-bold text-[#00629d]">Phản hồi từ người bán</span>
+                              {rev.replied_at && <span className="text-[10px] text-[#707882]">• {new Date(rev.replied_at).toLocaleDateString('vi-VN')}</span>}
+                            </div>
+                            <p className="text-sm text-[#404751] leading-relaxed">{rev.seller_reply}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
 
-              {/* Review 2 */}
-              <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-[#e4e9f0]">
-                <div className="flex items-start justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-[#f0f3f8] text-[#404751] rounded-full flex items-center justify-center font-bold">A</div>
-                    <div>
-                      <p className="font-bold text-[#0f1d25] text-sm">a***b</p>
-                      <p className="text-xs text-[#707882]">Nov 05, 2023</p>
-                    </div>
+                {reviewsData.total > reviewsData.limit && (
+                  <div className="flex justify-center">
+                    <button
+                      onClick={async () => {
+                        const nextPage = reviewPage + 1;
+                        setReviewPage(nextPage);
+                        const data = await fetchProductReviews(parseInt(id!), nextPage, 10);
+                        if (data) {
+                          setReviewsData(prev => prev ? {
+                            ...data,
+                            reviews: [...prev.reviews, ...data.reviews]
+                          } : data);
+                        }
+                      }}
+                      className="px-8 py-3 rounded-full border-2 border-[#00629d] text-[#00629d] font-bold text-sm hover:bg-[#f0f7ff] transition-colors"
+                    >
+                      Xem thêm đánh giá ({reviewsData.total - reviewsData.reviews.length} còn lại)
+                    </button>
                   </div>
-                  <div className="flex text-[#ffb952]"><span className="material-symbols-outlined text-[16px] fill-current">star</span><span className="material-symbols-outlined text-[16px] fill-current">star</span><span className="material-symbols-outlined text-[16px] fill-current">star</span><span className="material-symbols-outlined text-[16px] fill-current">star</span><span className="material-symbols-outlined text-[16px] fill-current">star</span></div>
-                </div>
-                <div className="inline-block px-2 py-1 bg-[#f0f3f8] text-[#707882] text-[9px] font-black uppercase tracking-widest rounded mb-4">
-                  VARIANT: ONYX / POLISHED CHROME
-                </div>
-                <p className="text-[#404751] text-sm leading-relaxed mb-6">
-                  Chất lượng xuất sắc, cảm giác rất chắc chắn và cao cấp. Rất hài lòng với sản phẩm, đáng để đầu tư.
-                </p>
-                <div className="flex gap-3">
-                  <div className="w-16 h-16 rounded-xl bg-slate-200 overflow-hidden"><img src="https://images.unsplash.com/photo-1541558869434-2ce522ce1cb0?q=80&w=200&auto=format&fit=crop" className="w-full h-full object-cover" alt="review pic" /></div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-center">
-              <button className="px-8 py-3 rounded-full border-2 border-[#00629d] text-[#00629d] font-bold text-sm hover:bg-[#f0f7ff] transition-colors">
-                Xem tất cả 1.248 đánh giá
-              </button>
-            </div>
+                )}
+              </>
+            )}
           </div>
 
         </div>
       </div>
-
-      {/* Toast Notification */}
-      <div 
-        className={`fixed bottom-8 left-1/2 -translate-x-1/2 bg-[#0f1d25] text-white px-8 py-4 rounded-full shadow-2xl shadow-black/20 flex items-center gap-4 transition-all duration-300 z-50 ${
-          showToast ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'
-        }`}
-      >
-        <span className="material-symbols-outlined text-[#4caf50]">check_circle</span>
-        <span className="font-semibold text-sm">Đã thêm vào giỏ hàng thành công!</span>
-        <Link to="/cart" className="ml-4 text-xs font-bold text-[#42a5f5] uppercase tracking-wider hover:opacity-80">
-          Xem Giỏ
-        </Link>
-      </div>
-
     </MarketplaceLayout>
   );
 };

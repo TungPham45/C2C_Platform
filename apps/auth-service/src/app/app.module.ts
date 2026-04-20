@@ -4,6 +4,8 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { PrismaService } from './prisma.service';
 import { EmailService } from './email.service';
+import { NotificationsController } from './notifications.controller';
+import { NotificationsService } from './notifications.service';
 
 @Module({
   imports: [
@@ -13,7 +15,7 @@ import { EmailService } from './email.service';
       signOptions: { expiresIn: '7d' },
     }),
   ],
-  controllers: [AuthController],
-  providers: [AuthService, PrismaService, EmailService],
+  controllers: [AuthController, NotificationsController],
+  providers: [AuthService, PrismaService, EmailService, NotificationsService],
 })
 export class AppModule {}

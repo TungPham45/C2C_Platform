@@ -53,6 +53,13 @@ export class AuthController {
     return this.authService.getAdminStats();
   }
 
+  @Put('profile')
+  updateProfile(@Headers() headers: any, @Body() data: any) {
+    const userId = headers['x-user-id'];
+    if (!userId) throw new UnauthorizedException('Missing x-user-id');
+    return this.authService.updateProfile(parseInt(userId, 10), data);
+  }
+
   @Get('internal/admin/users')
   getAllUsers(@Headers() headers: Record<string, string | string[] | undefined>) {
     this.requireInternalAccess(headers);

@@ -14,4 +14,4 @@ import { AuthPrismaService } from './auth-prisma.service';
   controllers: [OrderController, CartController, VoucherController],
   providers: [OrderService, CartService, PrismaService, ProductPrismaService, VoucherService, AuthPrismaService],
 })
-export class AppModule {}
+export class AppModule { }
