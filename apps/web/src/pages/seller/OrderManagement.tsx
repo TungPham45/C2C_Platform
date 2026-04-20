@@ -2,6 +2,8 @@ import { FC, useEffect, useMemo, useState } from 'react';
 import { SellerLayout } from '../../components/layout/SellerLayout';
 import { useOrders } from '../../hooks/useOrders';
 import { Link } from 'react-router-dom';
+import { formatVnd } from '../../utils/currency';
+import { getOrderPricing } from '../../utils/orderPricing';
 
 export const SellerOrderManagement: FC = () => {
   const { orders, fetchSellerOrders, loading, error } = useOrders();
@@ -125,7 +127,9 @@ export const SellerOrderManagement: FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredOrders.map((order) => (
+                filteredOrders.map((order) => {
+                  const pricing = getOrderPricing(order);
+                  return (
                   <tr key={order.id} className="hover:bg-[#f5faff]/30 transition-colors">
                     <td className="px-8 py-6 font-black text-[#00629d]">#{order.id}</td>
                     <td className="px-8 py-6 text-sm text-[#404751]">
@@ -136,7 +140,7 @@ export const SellerOrderManagement: FC = () => {
                         {order.shipping_address.split(',')[0]}
                       </div>
                     </td>
-                    <td className="px-8 py-6 font-black text-[#0f1d25]">{Number(order.subtotal).toLocaleString('vi-VN')} VND</td>
+                    <td className="px-8 py-6 font-black text-[#0f1d25]">{formatVnd(pricing.finalTotal)}</td>
                     <td className="px-8 py-6">
                       <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider ${getStatusColor(order.status)}`}>
                         {order.status}
@@ -151,7 +155,7 @@ export const SellerOrderManagement: FC = () => {
                       </Link>
                     </td>
                   </tr>
-                ))
+                )})
               )}
             </tbody>
           </table>

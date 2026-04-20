@@ -23,8 +23,23 @@ model Shop {
 
   products    Product[]
   categories  Category[]
+  followers   ShopFollow[]
 
   @@map("shops")
+}
+
+model ShopFollow {
+  id         Int       @id @default(autoincrement())
+  shop_id    Int
+  user_id    Int
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+
+  shop       Shop      @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+
+  @@unique([shop_id, user_id], map: "uq_shop_follows_shop_user")
+  @@index([shop_id], map: "idx_shop_follows_shop")
+  @@index([user_id], map: "idx_shop_follows_user")
+  @@map("shop_follows")
 }
 
 model Product {
@@ -51,6 +66,8 @@ model Product {
   attribute_values ProductAttributeValue[]
   reviews       Review[]
 
+  shop_categories Category[] @relation("ProductToShopCategory")
+
   @@map("products")
 }
 
@@ -72,6 +89,8 @@ model Category {
   shop       Shop?      @relation(fields: [shop_id], references: [id], onDelete: Cascade)
   products   Product[]
   attribute_defs AttributeDefinition[]
+
+  shop_products Product[] @relation("ProductToShopCategory")
 
   @@map("categories")
 }

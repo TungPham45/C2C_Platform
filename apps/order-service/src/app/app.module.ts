@@ -5,10 +5,13 @@ import { CartController } from './cart.controller';
 import { CartService } from './cart.service';
 import { PrismaService } from './prisma.service';
 import { ProductPrismaService } from './product-prisma.service';
+import { VoucherController } from './voucher.controller';
+import { VoucherService } from './voucher.service';
+import { AuthPrismaService } from './auth-prisma.service';
 
 @Module({
   imports: [],
-  controllers: [OrderController, CartController],
-  providers: [OrderService, CartService, PrismaService, ProductPrismaService],
+  controllers: [OrderController, CartController, VoucherController],
+  providers: [OrderService, CartService, PrismaService, ProductPrismaService, VoucherService, AuthPrismaService],
 })
 export class AppModule {}

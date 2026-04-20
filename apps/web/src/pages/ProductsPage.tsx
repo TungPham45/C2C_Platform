@@ -1,6 +1,7 @@
 import { FC, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
+import { formatVnd, formatPriceRange } from '../utils/currency';
 
 type SortKey = 'popular' | 'newest' | 'best-selling' | 'price';
 type ViewMode = 'grid' | 'list';
@@ -17,6 +18,7 @@ interface Product {
   created_at?: string | null;
   shop: { id?: number; name: string; rating: number | string | null };
   images: Array<{ image_url: string }>;
+  variants?: any[];
 }
 
 interface Category {
@@ -44,7 +46,7 @@ const toNumber = (value: string | number | null | undefined) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const formatPrice = (value: string | number | null | undefined) => `${toNumber(value).toLocaleString('vi-VN')} VND`;
+const formatPrice = (product: Product) => formatPriceRange(product.base_price, product.variants);
 const formatRating = (product: Product) => {
   const rating = toNumber(product.rating ?? product.shop?.rating ?? 0);
   return rating > 0 ? rating.toFixed(1) : 'New';
@@ -363,9 +365,9 @@ export const ProductsPage: FC = () => {
                           const isOwnProduct = myShopId !== null && myShopId === Number(product.shop_id);
                           const target = isOwnProduct ? `/seller/edit-product/${product.id}` : `/product/${product.id}`;
                           if (viewMode === 'list') {
-                            return <Link key={product.id} to={target} className="group flex flex-col gap-5 rounded-[2rem] border border-[#e8eef5] p-4 transition hover:border-[#cbdced] hover:shadow-[0_18px_40px_rgba(15,29,37,0.05)] sm:flex-row"><div className="relative w-full overflow-hidden rounded-[1.5rem] bg-[#f3f7fb] sm:w-[230px]"><div className="aspect-[4/5] sm:h-full"><img src={getImage(product)} alt={product.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" /></div>{isOwnProduct && <div className="absolute right-3 top-3 rounded-full bg-white/90 p-2 text-[#0f1d25] shadow-sm"><span className="material-symbols-outlined text-[16px]">edit</span></div>}</div><div className="flex min-w-0 flex-1 flex-col justify-between py-1"><div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8ea0b0]">{product.shop.name}</p><h3 className="mt-2 text-xl font-bold text-[#0f1d25] transition group-hover:text-[#00629d]">{product.name}</h3></div><div className="mt-6 flex flex-wrap items-center justify-between gap-4"><div className="text-2xl font-black text-[#0f1d25]">{formatPrice(product.base_price)}</div><div className="flex flex-wrap items-center gap-4 text-sm text-[#5d6a75]"><span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-[#f39a1f]">star</span>{formatRating(product)}</span><span>{formatSold(product.sold_count)}</span></div></div></div></Link>;
+                            return <Link key={product.id} to={target} className="group flex flex-col gap-5 rounded-[2rem] border border-[#e8eef5] p-4 transition hover:border-[#cbdced] hover:shadow-[0_18px_40px_rgba(15,29,37,0.05)] sm:flex-row"><div className="relative w-full overflow-hidden rounded-[1.5rem] bg-[#f3f7fb] sm:w-[230px]"><div className="aspect-[4/5] sm:h-full"><img src={getImage(product)} alt={product.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" /></div>{isOwnProduct && <div className="absolute right-3 top-3 rounded-full bg-white/90 p-2 text-[#0f1d25] shadow-sm"><span className="material-symbols-outlined text-[16px]">edit</span></div>}</div><div className="flex min-w-0 flex-1 flex-col justify-between py-1"><div><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8ea0b0]">{product.shop.name}</p><h3 className="mt-2 text-xl font-bold text-[#0f1d25] transition group-hover:text-[#00629d]">{product.name}</h3></div><div className="mt-6 flex flex-wrap items-center justify-between gap-4"><div className="text-2xl font-black text-[#0f1d25]">{formatPrice(product)}</div><div className="flex flex-wrap items-center gap-4 text-sm text-[#5d6a75]"><span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-[#f39a1f]">star</span>{formatRating(product)}</span><span>{formatSold(product.sold_count)}</span></div></div></div></Link>;
                           }
-                          return <Link key={product.id} to={target} className="group rounded-[2rem] border border-[#e8eef5] p-4 transition hover:border-[#cbdced] hover:shadow-[0_18px_40px_rgba(15,29,37,0.05)]"><div className="relative overflow-hidden rounded-[1.5rem] bg-[#f3f7fb]"><div className="aspect-[4/5]"><img src={getImage(product)} alt={product.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]" /></div>{isOwnProduct && <div className="absolute right-3 top-3 rounded-full bg-white/92 p-2 text-[#0f1d25] shadow-sm"><span className="material-symbols-outlined text-[16px]">edit</span></div>}</div><div className="px-1 pt-5"><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8ea0b0]">{product.shop.name}</p><h3 className="mt-2 min-h-[56px] text-lg font-bold leading-7 text-[#0f1d25] transition group-hover:text-[#00629d] line-clamp-2">{product.name}</h3><div className="mt-4 text-2xl font-black text-[#0f1d25]">{formatPrice(product.base_price)}</div><div className="mt-4 flex items-center justify-between border-t border-[#eef3f8] pt-4 text-sm text-[#5d6a75]"><span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-[#f39a1f]">star</span>{formatRating(product)}</span><span>{formatSold(product.sold_count)}</span></div></div></Link>;
+                          return <Link key={product.id} to={target} className="group rounded-[2rem] border border-[#e8eef5] p-4 transition hover:border-[#cbdced] hover:shadow-[0_18px_40px_rgba(15,29,37,0.05)]"><div className="relative overflow-hidden rounded-[1.5rem] bg-[#f3f7fb]"><div className="aspect-[4/5]"><img src={getImage(product)} alt={product.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]" /></div>{isOwnProduct && <div className="absolute right-3 top-3 rounded-full bg-white/92 p-2 text-[#0f1d25] shadow-sm"><span className="material-symbols-outlined text-[16px]">edit</span></div>}</div><div className="px-1 pt-5"><p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#8ea0b0]">{product.shop.name}</p><h3 className="mt-2 min-h-[56px] text-lg font-bold leading-7 text-[#0f1d25] transition group-hover:text-[#00629d] line-clamp-2">{product.name}</h3><div className="mt-4 text-2xl font-black text-[#0f1d25]">{formatPrice(product)}</div><div className="mt-4 flex items-center justify-between border-t border-[#eef3f8] pt-4 text-sm text-[#5d6a75]"><span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px] text-[#f39a1f]">star</span>{formatRating(product)}</span><span>{formatSold(product.sold_count)}</span></div></div></Link>;
                         })}
                       </div>
                       <div className="mt-12 flex items-center justify-center gap-2">

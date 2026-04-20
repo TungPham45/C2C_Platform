@@ -1,5 +1,6 @@
 import { FC, ReactNode, useEffect, useState } from 'react';
 import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
+import { NotificationBell } from './NotificationBell';
 
 const PRIMARY = '#1d4ed8';
 
@@ -96,6 +97,24 @@ export const SellerLayout: FC<SellerLayoutProps> = ({ children }) => {
           </NavLink>
 
           <NavLink
+            to="/seller/vouchers"
+            className={({ isActive }) => `${navBase} ${isActive ? '' : navInactive}`}
+            style={({ isActive }) => (isActive ? navActiveStyle : undefined)}
+          >
+            <span className="material-symbols-outlined text-[20px]">confirmation_number</span>
+            Voucher
+          </NavLink>
+
+          <NavLink
+            to="/seller/categories"
+            className={({ isActive }) => `${navBase} ${isActive ? '' : navInactive}`}
+            style={({ isActive }) => (isActive ? navActiveStyle : undefined)}
+          >
+            <span className="material-symbols-outlined text-[20px]">category_search</span>
+            Danh mục Shop
+          </NavLink>
+
+          <NavLink
             to="/seller/analytics"
             className={({ isActive }) => `${navBase} ${isActive ? '' : navInactive}`}
             style={({ isActive }) => (isActive ? navActiveStyle : undefined)}
@@ -177,14 +196,7 @@ export const SellerLayout: FC<SellerLayoutProps> = ({ children }) => {
         </div>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-4">
-          <button
-            type="button"
-            className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100"
-            aria-label="Thông báo"
-          >
-            <span className="material-symbols-outlined text-[22px]">notifications</span>
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
-          </button>
+          <NotificationBell />
           <button
             type="button"
             className="flex h-10 w-10 items-center justify-center rounded-full text-slate-600 transition hover:bg-slate-100"

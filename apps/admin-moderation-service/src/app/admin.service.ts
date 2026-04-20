@@ -14,6 +14,10 @@ export class AdminService {
   private readonly orderBaseUrl =
     process.env.ORDER_SERVICE_BASE_URL ?? 'http://localhost:3004/api/orders';
 
+  private readonly orderServiceRootUrl = this.orderBaseUrl.replace(/\/api\/orders\/?$/, '');
+
+  private readonly orderVoucherAdminBaseUrl = `${this.orderServiceRootUrl}/api/vouchers/internal/admin`;
+
   private readonly internalServiceToken =
     process.env.INTERNAL_SERVICE_TOKEN ?? 'internal-dev-token';
 
@@ -72,7 +76,23 @@ export class AdminService {
   }
 
   async getUsers() {
-    return this.requestJson<Array<any>>(`${this.authBaseUrl}/internal/admin/users`);
+    const [users, shops] = await Promise.all([
+      this.requestJson<Array<any>>(`${this.authBaseUrl}/internal/admin/users`),
+      this.requestJson<Array<{ owner_id: number | null, status: string | null }>>(
+        `${this.productBaseUrl}/internal/admin/shops`
+      ).catch(() => []),
+    ]);
+
+    const sellerIds = new Set(
+      shops.filter(s => s.owner_id !== null).map(s => s.owner_id)
+    );
+
+    return users.map(user => {
+      if (user.role === 'user' && sellerIds.has(user.id)) {
+        return { ...user, role: 'seller' };
+      }
+      return user;
+    });
   }
 
   async updateUserStatus(id: number, status: string) {
@@ -272,10 +292,11 @@ export class AdminService {
   }
 
   async getActiveBanners() {
-    return this.prisma.banner.findMany({
+    const banners = await this.prisma.banner.findMany({
       where: { is_active: true },
       orderBy: { sort_order: 'asc' },
     });
+    return banners;
   }
 
   async createBanner(data: { title: string; image_url: string; target_url?: string; is_active?: boolean; sort_order?: number }) {
@@ -294,6 +315,38 @@ export class AdminService {
   async deleteBanner(id: number) {
     return this.prisma.banner.delete({
       where: { id },
+    });
+  }
+
+  // --- VOUCHERS ---
+
+  async getAllVouchers() {
+    return this.requestJson<Array<any>>(this.orderVoucherAdminBaseUrl);
+  }
+
+  async getVoucherById(id: number) {
+    return this.requestJson<any>(`${this.orderVoucherAdminBaseUrl}/${id}`);
+  }
+
+  async createVoucher(data: any) {
+    return this.requestJson<any>(this.orderVoucherAdminBaseUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateVoucher(id: number, data: any) {
+    return this.requestJson<any>(`${this.orderVoucherAdminBaseUrl}/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteVoucher(id: number) {
+    return this.requestJson<any>(`${this.orderVoucherAdminBaseUrl}/${id}`, {
+      method: 'DELETE',
     });
   }
 }

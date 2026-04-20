@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useOrders } from '../hooks/useOrders';
 import { useReviews } from '../hooks/useReviews';
+import { formatVnd } from '../utils/currency';
+import { getOrderPricing } from '../utils/orderPricing';
 
 const ORDER_STEPS = [
   { key: 'pending',   label: 'Đã đặt hàng',  icon: 'receipt_long' },
@@ -165,9 +167,10 @@ export const BuyerOrderDetail: FC = () => {
   const addressLines = addressParts.slice(1, -1).join(', ');
   const phone = addressParts[addressParts.length - 1] || '';
 
-  const subtotal = Number(order.subtotal) || 0;
-  const shippingFee = Number(order.shipping_fee) || 0;
-  const totalPaid = subtotal + shippingFee;
+  const pricing = getOrderPricing(order);
+  const subtotal = pricing.itemSubtotal;
+  const shippingFee = pricing.shippingFee;
+  const totalPaid = pricing.finalTotal;
 
   const paymentLabel = order.checkout_session?.payment_method === 'cod'
     ? 'Thanh toán khi nhận hàng'
@@ -302,7 +305,7 @@ export const BuyerOrderDetail: FC = () => {
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className="font-black text-[#0f1d25] text-base">
-                        {Number(item.price_at_purchase).toLocaleString('vi-VN')} VND
+                        {formatVnd(item.price_at_purchase)}
                       </p>
                       {order.status?.toLowerCase() === 'delivered' && !reviewedItems.has(item.id) && (
                         <button
@@ -332,7 +335,7 @@ export const BuyerOrderDetail: FC = () => {
                 <div>
                   <p className="text-[10px] text-[#707882] font-bold uppercase tracking-widest">Tổng cộng</p>
                   <p className="text-2xl font-black text-[#0f1d25] font-['Plus_Jakarta_Sans'] mt-0.5">
-                    {totalPaid.toLocaleString('vi-VN')} VND
+                    {formatVnd(totalPaid)}
                   </p>
                 </div>
                 {order.status?.toLowerCase() === 'delivered' && (
@@ -432,20 +435,20 @@ export const BuyerOrderDetail: FC = () => {
               <div className="border-t border-[#e4e9f0] pt-5 space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-[#707882]">Tạm tính</span>
-                  <span className="font-bold text-[#0f1d25]">{subtotal.toLocaleString('vi-VN')} VND</span>
+                  <span className="font-bold text-[#0f1d25]">{formatVnd(subtotal)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-[#707882]">Phí vận chuyển</span>
-                  <span className="font-bold text-[#0f1d25]">{shippingFee.toLocaleString('vi-VN')} VND</span>
+                  <span className="font-bold text-[#0f1d25]">{formatVnd(shippingFee)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-[#00629d] font-bold">Voucher</span>
-                  <span className="text-[#00629d] font-bold">-0 VND</span>
+                  <span className="text-[#00629d] font-bold">-{formatVnd(pricing.totalVoucherDiscount)}</span>
                 </div>
               </div>
               <div className="border-t border-[#e4e9f0] mt-5 pt-5 flex justify-between items-baseline">
                 <span className="text-sm font-bold text-[#0f1d25]">Tổng thanh toán</span>
-                <span className="text-xl font-black text-[#00629d] font-['Plus_Jakarta_Sans']">{totalPaid.toLocaleString('vi-VN')} VND</span>
+                <span className="text-xl font-black text-[#00629d] font-['Plus_Jakarta_Sans']">{formatVnd(totalPaid)}</span>
               </div>
               <button className="w-full mt-6 py-3.5 bg-[#e0efff] text-[#00629d] rounded-xl font-bold text-sm hover:bg-[#cfe5ff] transition-all flex items-center justify-center gap-2">
                 <span className="material-symbols-outlined text-lg">download</span>

@@ -1,12 +1,13 @@
 import { FC, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
-import { PRODUCT_API_URL } from '../config/api';
+import { PRODUCT_API_URL, resolveAssetUrl } from '../config/api';
 
 interface ShopData {
   id: string;
   name: string;
   description?: string;
+  logo_url?: string;
   status: 'active' | 'pending' | 'suspended';
 }
 
@@ -15,6 +16,7 @@ interface UserProfile {
   email: string;
   full_name?: string;
   role: string;
+  avatar_url?: string;
   shop?: ShopData | null;
 }
 
@@ -79,6 +81,7 @@ export const ProfilePage: FC = () => {
   const shopName = shopDetail?.name ?? (user.shop as any)?.name;
   const shopDescription = shopDetail?.description ?? (user.shop as any)?.description;
   const shopId = shopDetail?.id ?? (user.shop as any)?.id;
+  const shopLogo = shopDetail?.logo_url ?? (user.shop as any)?.logo_url;
   const statusCfg = shopStatus ? STATUS_CONFIG[shopStatus] : null;
 
   return (
@@ -101,8 +104,12 @@ export const ProfilePage: FC = () => {
         {/* ── Avatar + Name strip ── */}
         <div className="flex items-end gap-6 px-8 -mt-12 mb-10 relative z-10">
           {/* Avatar */}
-          <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-[#00629d] to-[#42a5f5] flex items-center justify-center shadow-xl shadow-blue-500/30 border-4 border-white text-white text-3xl font-black font-['Plus_Jakarta_Sans'] shrink-0">
-            {initials}
+          <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-[#00629d] to-[#42a5f5] flex items-center justify-center shadow-xl shadow-blue-500/30 border-4 border-white text-white text-3xl font-black font-['Plus_Jakarta_Sans'] shrink-0 overflow-hidden relative group">
+            {user.avatar_url ? (
+              <img src={resolveAssetUrl(user.avatar_url)} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              initials
+            )}
           </div>
 
           <div className="pb-0 flex-1">
@@ -250,8 +257,12 @@ export const ProfilePage: FC = () => {
                 <div className="bg-gradient-to-r from-[#00629d] to-[#42a5f5] px-7 py-6 relative overflow-hidden">
                   <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full blur-xl" />
                   <div className="relative z-10 flex items-center gap-5">
-                    <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center shadow-lg">
-                      <span className="material-symbols-outlined text-white text-3xl">storefront</span>
+                    <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center shadow-lg overflow-hidden border border-white/40">
+                      {shopLogo ? (
+                        <img src={resolveAssetUrl(shopLogo)} alt="Shop Logo" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="material-symbols-outlined text-white text-3xl">storefront</span>
+                      )}
                     </div>
                     <div className="flex-1">
                       <p className="text-white/70 text-xs font-bold uppercase tracking-widest mb-1">Cửa hàng của tôi</p>

@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useState, useCallback } from 'react';
+import { FC, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { SellerLayout } from '../../components/layout/SellerLayout';
 import { PRODUCT_API_URL } from '../../config/api';
@@ -7,135 +7,19 @@ import { useProducts } from '../../hooks/useProducts';
 
 const PRIMARY = '#1d4ed8';
 
-type CatNode = {
-  id: number;
-  parent_id: number | null;
-  name: string;
-  children: CatNode[];
-};
-
-function buildCategoryTree(flat: Array<{ id: number; parent_id: number | null; name: string }>): CatNode[] {
-  const map = new Map<number, CatNode>();
-  flat.forEach((c) => map.set(c.id, { id: c.id, parent_id: c.parent_id, name: c.name, children: [] }));
-  const roots: CatNode[] = [];
-  flat.forEach((c) => {
-    const node = map.get(c.id)!;
-    const pid = c.parent_id;
-    if (pid == null || !map.has(pid)) roots.push(node);
-    else map.get(pid)!.children.push(node);
-  });
-  return roots;
-}
-
-const TreeRow: FC<{
-  node: CatNode;
-  depth: number;
-  expanded: Set<number>;
-  toggle: (id: number) => void;
-  selectedId: number | null;
-  onSelect: (id: number) => void;
-}> = ({ node, depth, expanded, toggle, selectedId, onSelect }) => {
-  const hasChildren = node.children.length > 0;
-  const isOpen = expanded.has(node.id);
-  const isSelected = selectedId === node.id;
-
-  return (
-    <div className="select-none">
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => onSelect(node.id)}
-        onKeyDown={(e) => e.key === 'Enter' && onSelect(node.id)}
-        className={`flex cursor-pointer items-center gap-2 rounded-lg py-2 pr-2 text-sm transition ${
-          isSelected ? 'border border-blue-600 bg-blue-50/80 text-blue-800' : 'border border-transparent text-slate-700 hover:bg-slate-50'
-        }`}
-        style={{ paddingLeft: 8 + depth * 16 }}
-      >
-        {hasChildren ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggle(node.id);
-            }}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-white"
-          >
-            <span className="material-symbols-outlined text-[18px]">{isOpen ? 'expand_more' : 'chevron_right'}</span>
-          </button>
-        ) : (
-          <span className="inline-block w-7 shrink-0" />
-        )}
-        <span
-          className={`material-symbols-outlined text-[18px] ${depth === 0 ? 'text-slate-500' : 'text-blue-600'}`}
-        >
-          {depth === 0 ? 'folder' : 'smartphone'}
-        </span>
-        <span className={`min-w-0 flex-1 truncate font-medium ${depth > 0 ? 'text-blue-700' : ''}`}>{node.name}</span>
-        {depth >= 2 && <span className="shrink-0 text-[10px] font-semibold text-slate-400">—</span>}
-      </div>
-      {hasChildren && isOpen && (
-        <div className="border-l border-slate-200/90 ml-4">
-          {node.children.map((ch) => (
-            <TreeRow
-              key={ch.id}
-              node={ch}
-              depth={depth + 1}
-              expanded={expanded}
-              toggle={toggle}
-              selectedId={selectedId}
-              onSelect={onSelect}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
 export const SellerCenterPage: FC = () => {
   const [userName, setUserName] = useState('');
   const [shopStatus, setShopStatus] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'tools'>('overview');
+  const { orders, fetchSellerOrders } = useOrders();
+  const { products, fetchShopProducts } = useProducts();
+  const [unreadSellerMessages, setUnreadSellerMessages] = useState(0);
+
   const [metrics, setMetrics] = useState({
     activeProducts: 0,
     pendingProducts: 0,
     totalRevenue: '0',
     pendingOrders: 0,
   });
-  const [categories, setCategories] = useState<CatNode[]>([]);
-  const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
-  const [selectedCatId, setSelectedCatId] = useState<number | null>(null);
-
-  type AttrOption = { id: number; value_name: string; sort_order?: number | null };
-  type AttrDef = {
-    id: number;
-    category_id: number;
-    name: string;
-    input_type?: string | null;
-    is_required?: boolean | null;
-    sort_order?: number | null;
-    options?: AttrOption[];
-  };
-
-  const [attrDefs, setAttrDefs] = useState<AttrDef[]>([]);
-  const [attrsLoading, setAttrsLoading] = useState(false);
-  const [attrsError, setAttrsError] = useState<string | null>(null);
-  const [attrSelections, setAttrSelections] = useState<Record<number, string | string[]>>({});
-
-  const { orders, fetchSellerOrders } = useOrders();
-  const { products, fetchShopProducts } = useProducts();
-  const [unreadSellerMessages, setUnreadSellerMessages] = useState(0);
-
-  const toggle = useCallback((id: number) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const collapseAll = useCallback(() => setExpanded(new Set()), []);
 
   useEffect(() => {
     const userStr = localStorage.getItem('c2c_user');
@@ -144,7 +28,7 @@ export const SellerCenterPage: FC = () => {
         const user = JSON.parse(userStr);
         setUserName(user.full_name || user.email.split('@')[0]);
       } catch {
-        /* ignore */
+        setUserName('');
       }
     }
 
@@ -161,23 +45,42 @@ export const SellerCenterPage: FC = () => {
 
         const res = await fetch(`${PRODUCT_API_URL}/seller/metrics`, { headers });
         if (res.ok) setMetrics(await res.json());
-
-        const catRes = await fetch(`${PRODUCT_API_URL}/categories/all`);
-        if (catRes.ok) {
-          const list = await catRes.json();
-          const tree = buildCategoryTree(Array.isArray(list) ? list : []);
-          setCategories(tree);
-          if (tree[0]) {
-            setExpanded(new Set([tree[0].id]));
-            setSelectedCatId(tree[0].id);
-          }
-        }
       } catch (err) {
         console.error('Fetch error', err);
       }
     };
+
     fetchData();
-  }, []);
+    fetchSellerOrders();
+  }, [fetchSellerOrders]);
+
+  const recentOrders = useMemo(() => orders.slice(0, 4), [orders]);
+
+  const getStatusColor = (status: string) => {
+    switch ((status || '').toLowerCase()) {
+      case 'pending':
+        return 'bg-[#fff8e5] text-[#ffb952]';
+      case 'shipped':
+        return 'bg-[#cfe5ff] text-[#00629d]';
+      case 'delivered':
+        return 'bg-[#e1f9f1] text-[#00a67e]';
+      case 'cancelled':
+        return 'bg-[#ffdad6] text-[#ba1a1a]';
+      default:
+        return 'bg-[#f5faff] text-[#707882]';
+    }
+  };
+
+  const getOrderLabel = (order: any) => {
+    if (!Array.isArray(order?.items) || order.items.length === 0) {
+      return 'Don hang moi';
+    }
+
+    const firstItemName = order.items[0]?.product_name || 'San pham';
+    const remainingItems = order.items.length - 1;
+    return remainingItems > 0 ? `${firstItemName} +${remainingItems} san pham` : firstItemName;
+  };
+
 
   useEffect(() => {
     // Dashboard needs quick counts; fetch lightweight lists in background.
@@ -209,64 +112,6 @@ export const SellerCenterPage: FC = () => {
     const interval = setInterval(fetchUnread, 6000);
     return () => clearInterval(interval);
   }, []);
-
-  useEffect(() => {
-    const fetchAttrs = async () => {
-      if (!selectedCatId) return;
-      try {
-        setAttrsLoading(true);
-        setAttrsError(null);
-        const res = await fetch(`${PRODUCT_API_URL}/categories/${selectedCatId}/attributes`);
-        if (!res.ok) throw new Error('Không thể tải thuộc tính cho danh mục này');
-        const data = (await res.json()) as AttrDef[];
-        setAttrDefs(Array.isArray(data) ? data : []);
-        setAttrSelections({});
-      } catch (e: any) {
-        setAttrDefs([]);
-        setAttrSelections({});
-        setAttrsError(e?.message || 'Lỗi tải thuộc tính');
-      } finally {
-        setAttrsLoading(false);
-      }
-    };
-    fetchAttrs();
-  }, [selectedCatId]);
-
-  const selectedCatName = useMemo(() => {
-    const find = (nodes: CatNode[], id: number | null): string | null => {
-      if (id == null) return null;
-      for (const n of nodes) {
-        if (n.id === id) return n.name;
-        const inChild = find(n.children, id);
-        if (inChild) return inChild;
-      }
-      return null;
-    };
-    return find(categories, selectedCatId) || 'SẢN PHẨM';
-  }, [categories, selectedCatId]);
-
-  const toLabel = (inputType?: string | null, options?: AttrOption[]) => {
-    const t = String(inputType || '').toLowerCase();
-    if (t.includes('multi')) return 'MULTIPLE CHOICE';
-    if (t.includes('dropdown') || (options && options.length > 0)) return 'DROPDOWN';
-    if (t.includes('number')) return 'NUMBER';
-    if (t.includes('text')) return 'TEXT';
-    return options && options.length > 0 ? 'DROPDOWN' : 'TEXT';
-  };
-
-  const isMulti = (def: AttrDef) => String(def.input_type || '').toLowerCase().includes('multi');
-
-  const previewAttrs = useMemo(() => {
-    const requiredFirst = [...attrDefs].sort((a, b) => {
-      const ar = a.is_required ? 1 : 0;
-      const br = b.is_required ? 1 : 0;
-      if (br !== ar) return br - ar;
-      return Number(a.sort_order || 0) - Number(b.sort_order || 0);
-    });
-    return requiredFirst.slice(0, 3);
-  }, [attrDefs]);
-
-  const rootCount = categories.length;
 
   const orderCounts = useMemo(() => {
     const base = { pending: 0, shipped: 0, delivered: 0, cancelled: 0, other: 0 };
@@ -362,33 +207,7 @@ export const SellerCenterPage: FC = () => {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="mb-6 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setActiveTab('overview')}
-          className={`rounded-full px-4 py-2 text-sm font-bold transition ${
-            activeTab === 'overview' ? 'text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-          }`}
-          style={activeTab === 'overview' ? { backgroundColor: PRIMARY } : undefined}
-        >
-          Tổng quan
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('tools')}
-          className={`rounded-full px-4 py-2 text-sm font-bold transition ${
-            activeTab === 'tools' ? 'text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-          }`}
-          style={activeTab === 'tools' ? { backgroundColor: PRIMARY } : undefined}
-        >
-          Công cụ
-        </button>
-      </div>
 
-      {activeTab === 'overview' ? (
-        <>
-          {/* KPI cards — like Shopee overview */}
           <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[
               {
@@ -532,279 +351,10 @@ export const SellerCenterPage: FC = () => {
               )}
             </div>
           </div>
-        </>
-      ) : (
-        <>
-          <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {[
-              {
-                title: 'Sản phẩm đang bán',
-                value: String(metrics.activeProducts),
-                sub: 'Đang hoạt động',
-                subClass: 'text-slate-500',
-              },
-              {
-                title: 'Nhóm danh mục gốc',
-                value: String(rootCount || '—'),
-                sub: 'Trên nền tảng Serene',
-                subClass: 'text-slate-500',
-              },
-              {
-                title: 'Gợi ý thuộc tính',
-                value: String(attrDefs.length),
-                sub: 'Theo danh mục đang chọn',
-                subClass: 'text-slate-500',
-              },
-              {
-                title: 'Đơn cần xử lý',
-                value: String(metrics.pendingOrders),
-                sub: 'Từ Order Service',
-                subClass: 'text-slate-500',
-              },
-            ].map((card) => (
-              <div
-                key={card.title}
-                className="rounded-xl border border-slate-200/90 bg-white px-5 py-4 shadow-sm"
-                style={{ boxShadow: '0 1px 2px rgba(15,23,42,0.04)', borderBottom: `3px solid ${PRIMARY}` }}
-              >
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{card.title}</p>
-                <p className="mt-2 text-3xl font-bold tabular-nums text-slate-900">{card.value}</p>
-                <p className={`mt-1 text-xs font-medium ${card.subClass}`}>{card.sub}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            {/* Left: category tree */}
-            <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex items-center justify-between gap-2">
-                <h2 className="text-base font-bold text-slate-900">Cấu trúc danh mục</h2>
-                <button type="button" onClick={collapseAll} className="text-sm font-semibold" style={{ color: PRIMARY }}>
-                  Thu gọn tất cả
-                </button>
-              </div>
-              <p className="mb-4 text-xs text-slate-500">
-                Danh mục nền tảng dùng khi đăng sản phẩm. Chọn một nhóm để xem gợi ý thuộc tính bên phải.
-              </p>
-              <div className="max-h-[420px] overflow-y-auto pr-1">
-                {categories.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-slate-500">Đang tải danh mục…</p>
-                ) : (
-                  categories.map((n) => (
-                    <TreeRow
-                      key={n.id}
-                      node={n}
-                      depth={0}
-                      expanded={expanded}
-                      toggle={toggle}
-                      selectedId={selectedCatId}
-                      onSelect={setSelectedCatId}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Right: attribute table */}
-            <div className="rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-base font-bold text-slate-900">Gợi ý thuộc tính</h2>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className="rounded-md px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white"
-                    style={{ backgroundColor: PRIMARY }}
-                  >
-                    {selectedCatName}
-                  </span>
-                  <Link to="/seller/add-product" className="text-sm font-semibold" style={{ color: PRIMARY }}>
-                    + Thêm sản phẩm
-                  </Link>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto rounded-lg border border-slate-100">
-                <table className="w-full min-w-[480px] text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50/90">
-                      <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                        Tên thuộc tính
-                      </th>
-                      <th className="px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                        Kiểu dữ liệu
-                      </th>
-                      <th className="px-3 py-2.5 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                        Bắt buộc
-                      </th>
-                      <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                        Thao tác
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {attrsLoading ? (
-                      <tr>
-                        <td colSpan={4} className="px-3 py-10 text-center text-sm text-slate-500">
-                          Đang tải thuộc tính…
-                        </td>
-                      </tr>
-                    ) : attrsError ? (
-                      <tr>
-                        <td colSpan={4} className="px-3 py-10 text-center text-sm font-semibold text-red-600">
-                          {attrsError}
-                        </td>
-                      </tr>
-                    ) : attrDefs.length === 0 ? (
-                      <tr>
-                        <td colSpan={4} className="px-3 py-10 text-center text-sm text-slate-500">
-                          Danh mục này chưa cấu hình thuộc tính. Bạn vẫn có thể đăng sản phẩm với mô tả chi tiết.
-                        </td>
-                      </tr>
-                    ) : (
-                      attrDefs.map((def) => {
-                        const typeLabel = toLabel(def.input_type, def.options);
-                        const required = !!def.is_required;
-                        return (
-                          <tr key={def.id} className="hover:bg-slate-50/80">
-                            <td className="px-3 py-3">
-                              <p className="font-semibold text-slate-900">{def.name}</p>
-                              <p className="text-xs text-slate-500">
-                                {required ? 'Bắt buộc nhập khi đăng sản phẩm' : 'Khuyến nghị điền để tăng chuyển đổi'}
-                              </p>
-                            </td>
-                            <td className="px-3 py-3">
-                              <span
-                                className="inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white"
-                                style={{ backgroundColor: PRIMARY }}
-                              >
-                                {typeLabel}
-                              </span>
-                            </td>
-                            <td className="px-3 py-3 text-center">
-                              <span className={`material-symbols-outlined text-[20px] ${required ? 'text-blue-600' : 'text-slate-300'}`}>
-                                {required ? 'check_circle' : 'remove_circle_outline'}
-                              </span>
-                            </td>
-                            <td className="px-3 py-3 text-right text-slate-400">
-                              <button
-                                type="button"
-                                className="p-1 hover:text-blue-600"
-                                title="Thiết lập thuộc tính (sắp ra mắt)"
-                                disabled
-                              >
-                                <span className="material-symbols-outlined text-[20px]">settings</span>
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50/80 p-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-600">Mẫu xem trước bộ lọc</p>
-                <div className="mt-3 flex flex-wrap gap-3">
-                  {previewAttrs.length === 0 ? (
-                    <p className="text-sm text-slate-500">Chọn danh mục để xem preview thuộc tính.</p>
-                  ) : (
-                    previewAttrs.map((def) => {
-                      const label = toLabel(def.input_type, def.options);
-                      const multi = isMulti(def);
-                      const key = def.id;
-                      const options = def.options ?? [];
-
-                      return (
-                        <div key={key} className="min-w-[160px] flex-1">
-                          <label className="text-[10px] font-semibold uppercase text-slate-500">
-                            {def.name}
-                            {def.is_required ? <span className="ml-1 text-red-500">*</span> : null}
-                          </label>
-
-                          {label === 'DROPDOWN' ? (
-                            <select
-                              value={typeof attrSelections[key] === 'string' ? (attrSelections[key] as string) : ''}
-                              onChange={(e) => setAttrSelections((prev) => ({ ...prev, [key]: e.target.value }))}
-                              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100"
-                            >
-                              <option value="">Chọn…</option>
-                              {options.map((op) => (
-                                <option key={op.id} value={String(op.id)}>
-                                  {op.value_name}
-                                </option>
-                              ))}
-                            </select>
-                          ) : multi && options.length > 0 ? (
-                            <div className="mt-1 flex flex-wrap gap-2">
-                              {options.slice(0, 6).map((op) => {
-                                const selected =
-                                  Array.isArray(attrSelections[key]) && (attrSelections[key] as string[]).includes(String(op.id));
-                                return (
-                                  <button
-                                    key={op.id}
-                                    type="button"
-                                    onClick={() =>
-                                      setAttrSelections((prev) => {
-                                        const cur = Array.isArray(prev[key]) ? (prev[key] as string[]) : [];
-                                        const idStr = String(op.id);
-                                        const next = selected ? cur.filter((x) => x !== idStr) : [...cur, idStr];
-                                        return { ...prev, [key]: next };
-                                      })
-                                    }
-                                    className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                                      selected ? 'text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                                    }`}
-                                    style={selected ? { backgroundColor: PRIMARY } : undefined}
-                                  >
-                                    {op.value_name}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          ) : label === 'NUMBER' ? (
-                            <input
-                              inputMode="numeric"
-                              value={typeof attrSelections[key] === 'string' ? (attrSelections[key] as string) : ''}
-                              onChange={(e) => setAttrSelections((prev) => ({ ...prev, [key]: e.target.value }))}
-                              placeholder="Nhập số…"
-                              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100"
-                            />
-                          ) : (
-                            <input
-                              value={typeof attrSelections[key] === 'string' ? (attrSelections[key] as string) : ''}
-                              onChange={(e) => setAttrSelections((prev) => ({ ...prev, [key]: e.target.value }))}
-                              placeholder="Nhập…"
-                              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-100"
-                            />
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Tip box */}
-          <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50/90 p-5 shadow-sm">
-            <div className="flex gap-3">
-              <span className="material-symbols-outlined shrink-0 text-2xl text-blue-600">lightbulb</span>
-              <div>
-                <p className="font-bold text-slate-900">Mẹo quản lý</p>
-                <p className="mt-1 text-sm leading-relaxed text-slate-600">
-                  Khi đăng sản phẩm, hãy chọn đúng danh mục con nhất có thể: khách tìm kiếm dễ hơn và hệ thống gợi ý thuộc tính
-                  (màu, dung lượng, size…) sẽ khớp với ngành hàng của bạn.
-                </p>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
       <p className="mt-8 text-center text-xs text-slate-400">
         Xin chào, <span className="font-semibold text-slate-600">{userName}</span> — chúc bạn một ngày bán hàng hiệu quả.
       </p>
+
     </SellerLayout>
   );
 };

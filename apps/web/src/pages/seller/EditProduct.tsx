@@ -15,6 +15,7 @@ export const EditProductPage: FC = () => {
   // Category specific state
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [categoryPath, setCategoryPath] = useState('');
+  const [initialVariantsMap, setInitialVariantsMap] = useState<GeneratedVariant[]>([]);
   const [attributeValues, setAttributeValues] = useState<Record<number, string>>({});
   const [formData, setFormData] = useState({
     name: '',
@@ -24,6 +25,10 @@ export const EditProductPage: FC = () => {
     base_stock: '100',
     images: [] as string[],
   });
+
+  const [shopCategories, setShopCategories] = useState<any[]>([]);
+  const [selectedShopCategories, setSelectedShopCategories] = useState<number[]>([]);
+  const [isShopCategoryLoading, setIsShopCategoryLoading] = useState(false);
 
   const [hasVariants, setHasVariants] = useState(false);
   const [variantsMap, setVariantsMap] = useState<GeneratedVariant[]>([]);
@@ -107,6 +112,11 @@ export const EditProductPage: FC = () => {
             images: imageUrls.length > 0 ? imageUrls : [], 
           });
 
+          // Hydrate selected shop categories
+          if (data.shop_categories) {
+            setSelectedShopCategories(data.shop_categories.map((c: any) => c.id));
+          }
+
           // Hydrate category path — build breadcrumb from the categories tree
           if (data.category_id) {
             try {
@@ -158,10 +168,11 @@ export const EditProductPage: FC = () => {
                 price: v.price_override?.toString() || '',
                 stock: v.stock_quantity?.toString() || '0',
                 sku: v.sku?.replace(/-v\d+$/, '') || '',
-                image: resolveAssetUrl(v.image_url) || ''
+                image: (v.images && v.images.length > 0) ? resolveAssetUrl(v.images[0].image_url) : ''
               };
             });
             setVariantsMap(hydratedVariants);
+            setInitialVariantsMap(hydratedVariants);
           }
 
           // Hydrate attribute values
@@ -242,7 +253,8 @@ export const EditProductPage: FC = () => {
           images: formData.images,
           has_variants: hasVariants,
           variants: hasVariants ? variantsMap : [],
-          attributeValues: attributeValues
+          attributeValues: attributeValues,
+          shop_category_ids: selectedShopCategories
         })
       });
       if (res.ok) {
@@ -256,6 +268,53 @@ export const EditProductPage: FC = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    const fetchShopCategories = async () => {
+      setIsShopCategoryLoading(true);
+      try {
+        const token = localStorage.getItem('c2c_token');
+        const res = await fetch(`${PRODUCT_API_URL}/seller/categories`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setShopCategories(data.filter((c: any) => c.is_active));
+        }
+      } catch (err) {
+        console.error('Failed to fetch shop categories:', err);
+      } finally {
+        setIsShopCategoryLoading(false);
+      }
+    };
+    fetchShopCategories();
+
+  }, [isLoading]);
+
+  const getPreviewPrice = () => {
+    if (hasVariants && variantsMap.length > 0) {
+      const prices = variantsMap.map(v => Number(v.price) || 0).filter(p => p > 0);
+      if (prices.length > 0) {
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        
+        const format = (p: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p);
+        
+        if (minPrice === maxPrice) {
+          return format(minPrice);
+        }
+        return `${format(minPrice)} - ${format(maxPrice)}`;
+      }
+    }
+    
+    if (formData.base_price) {
+      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(formData.base_price));
+    }
+    
+    return '₫ 0';
   };
 
   if (isLoading) {
@@ -446,6 +505,39 @@ export const EditProductPage: FC = () => {
                 onClose={() => setIsCategoryModalOpen(false)} 
                 onConfirm={(id, path) => { setFormData({...formData, category_id: id}); setCategoryPath(path); setAttributeValues({}); }} 
               />
+
+              {/* Shop Categories Selection */}
+              <div className="mt-8">
+                <label className="block text-sm font-semibold text-[#404751] mb-2 uppercase tracking-wider text-[10px]">Danh mục riêng của Shop</label>
+                <div className="bg-[#f5faff] rounded-xl p-4 border border-[#e1f0fb]">
+                  {isShopCategoryLoading ? (
+                    <p className="text-xs text-[#707882] animate-pulse">Đang tải danh mục của bạn...</p>
+                  ) : shopCategories.length === 0 ? (
+                    <p className="text-xs text-[#707882] italic">Bạn chưa tạo danh mục riêng nào. <span className="text-[#00629d] cursor-pointer font-bold hover:underline" onClick={() => navigate('/seller/categories')}>Tạo ngay</span></p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {shopCategories.map(cat => (
+                        <button
+                          key={cat.id}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setSelectedShopCategories(prev => 
+                              prev.includes(cat.id) ? prev.filter(id => id !== cat.id) : [...prev, cat.id]
+                            );
+                          }}
+                          className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border-2 ${
+                            selectedShopCategories.includes(cat.id)
+                              ? 'bg-[#00629d] text-white border-[#00629d] shadow-sm'
+                              : 'bg-white text-[#707882] border-slate-100 hover:border-[#00629d]/20'
+                          }`}
+                        >
+                          {cat.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -483,6 +575,7 @@ export const EditProductPage: FC = () => {
             setHasVariants={setHasVariants}
             onVariantsChange={setVariantsMap}
             initialGroups={variantGroups}
+            initialVariants={initialVariantsMap}
           />
 
           {/* Card 4: Shipping */}
@@ -613,7 +706,7 @@ export const EditProductPage: FC = () => {
                   <h4 className="text-xs font-bold line-clamp-2">{formData.name || 'Tên sản phẩm của bạn sẽ hiển thị tại đây'}</h4>
                   <div className="flex items-baseline gap-2">
                     <span className="text-[#00629d] font-bold text-sm">
-                      {formData.base_price ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(formData.base_price)) : '₫ 0.000'}
+                      {getPreviewPrice()}
                     </span>
                   </div>
                 </div>

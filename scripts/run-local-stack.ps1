@@ -21,7 +21,7 @@ npm.cmd run db:sync
 
 foreach ($App in $Apps) {
   Write-Host "Dang mo terminal cho: $App" -ForegroundColor Cyan
-  $Command = "`$env:NX_DAEMON='false'; & '$NxCmd' serve $App"
+  $Command = "`$env:NX_DAEMON='false'; `$env:NX_ISOLATE_PLUGINS='false'; & '$NxCmd' serve $App"
   Start-Process powershell `
     -WorkingDirectory $RepoRoot `
     -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $Command

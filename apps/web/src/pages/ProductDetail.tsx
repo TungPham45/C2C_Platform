@@ -4,6 +4,9 @@ import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useProducts } from '../hooks/useProducts';
 import { useCart } from '../hooks/useCart';
 import { useReviews, ReviewsData } from '../hooks/useReviews';
+import { formatVnd, formatPriceRange } from '../utils/currency';
+import { resolveAssetUrl } from '../config/api';
+
 
 export const ProductDetailPage: FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -243,6 +246,46 @@ export const ProductDetailPage: FC = () => {
   return (
     <MarketplaceLayout>
       <div className="bg-[#f9fafc] min-h-screen pb-20 font-['Inter']">
+
+        {/* ── Add to Cart Toast ── */}
+        <div className={`fixed bottom-6 right-6 z-[999] transition-all duration-500 ${showToast ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+          <div className="flex items-center gap-4 bg-[#0f1d25] text-white px-5 py-4 rounded-2xl shadow-2xl shadow-black/20 min-w-[300px]">
+            {/* Product thumb */}
+            <div className="w-12 h-12 rounded-xl overflow-hidden bg-white/10 flex-shrink-0">
+              {selectedImage ? (
+                <img src={selectedImage} alt={product?.name} className="w-full h-full object-cover" />
+              ) : (
+                <span className="material-symbols-outlined text-white flex items-center justify-center h-full">inventory_2</span>
+              )}
+            </div>
+            {/* Text */}
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-[#42a5f5]">Đã thêm vào giỏ hàng</p>
+              <p className="text-sm font-bold truncate mt-0.5">{product?.name}</p>
+              <p className="text-[11px] text-white/60 mt-0.5">Số lượng: {quantity}</p>
+            </div>
+            {/* Cart icon */}
+            <div className="w-9 h-9 bg-[#00629d] rounded-xl flex items-center justify-center flex-shrink-0">
+              <span className="material-symbols-outlined text-white text-[20px]">shopping_bag</span>
+            </div>
+          </div>
+          {/* Progress bar */}
+          <div className="h-1 bg-white/10 rounded-full mt-1 overflow-hidden">
+            <div
+              className="h-full bg-[#42a5f5] rounded-full"
+              style={{
+                animation: showToast ? 'shrink 3s linear forwards' : 'none',
+              }}
+            />
+          </div>
+          <style>{`
+            @keyframes shrink {
+              from { width: 100%; }
+              to { width: 0%; }
+            }
+          `}</style>
+        </div>
+
         <div className="max-w-[1280px] mx-auto px-8 py-8">
           
           {/* Breadcrumb */}
@@ -315,13 +358,12 @@ export const ProductDetailPage: FC = () => {
                  </div>
               </div>
 
-              {/* Price Banner */}
               <div className="bg-[#f0f7ff] rounded-2xl p-6 mb-8 flex items-baseline gap-4">
                  <span className="text-4xl font-black text-[#00629d] font-['Plus_Jakarta_Sans']">
-                   {getPrice().toLocaleString('vi-VN')} <span className="text-2xl">VND</span>
+                   {selectedVariant ? formatVnd(getPrice()) : formatPriceRange(product.base_price, product.variants)}
                  </span>
                  <span className="text-lg font-semibold text-[#707882] line-through">
-                   {(getPrice() * 1.4).toLocaleString('vi-VN')} ₫
+                   {formatVnd(getPrice() * 1.4)}
                  </span>
                  <span className="text-xs font-bold text-[#d32f2f] uppercase tracking-wider">GIẢM 30%</span>
               </div>
@@ -461,8 +503,11 @@ export const ProductDetailPage: FC = () => {
               <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-[#e4e9f0]">
                 <div className="flex items-center gap-4 mb-6">
                   <div className="w-14 h-14 bg-[#e0efff] rounded-full flex items-center justify-center text-[#00629d] overflow-hidden">
-                    {/* Simulated Logo based on actual product data if possible, using icon for now */}
-                    <span className="material-symbols-outlined text-3xl">storefront</span>
+                    {product.shop?.logo_url ? (
+                      <img src={resolveAssetUrl(product.shop.logo_url)} alt="Shop Logo" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="material-symbols-outlined text-3xl">storefront</span>
+                    )}
                   </div>
                   <div>
                     <h4 className="font-bold text-[#0f1d25] text-lg text-truncate max-w-[180px]">{product.shop?.name || `Shop #${product.shop_id}`}</h4>

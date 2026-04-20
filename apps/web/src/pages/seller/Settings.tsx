@@ -143,7 +143,7 @@ export const SettingsPage: FC = () => {
 
       // Sync localStorage and notify layout header
       const currentUser = JSON.parse(localStorage.getItem('c2c_user') || '{}');
-      const merged = { ...currentUser, ...updatedUser };
+      const merged = { ...currentUser, ...updatedUser, shop: updatedShop };
       localStorage.setItem('c2c_user', JSON.stringify(merged));
       setUser(merged);
       window.dispatchEvent(new Event('user-updated'));

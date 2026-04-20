@@ -10,6 +10,10 @@ import { AnalyticsPage } from '../pages/seller/Analytics';
 import { InventoryPage } from '../pages/seller/Inventory';
 import { SettingsPage } from '../pages/seller/Settings';
 import { ReviewsPage } from '../pages/seller/Reviews';
+import { SellerVoucherManagementPage } from '../pages/seller/VoucherManagement';
+import { SellerCreateVoucherPage } from '../pages/seller/CreateVoucher';
+import { SellerEditVoucherPage } from '../pages/seller/EditVoucher';
+import { ShopCategoriesPage } from '../pages/seller/ShopCategories';
 import { CheckoutPage } from '../pages/CheckoutPage';
 import { OrderSuccess } from '../pages/OrderSuccess';
 import { MyPurchasesPage } from '../pages/MyPurchases';
@@ -22,6 +26,7 @@ import { CartPage } from '../pages/CartPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { AuthPage } from '../pages/auth/AuthPage';
 import { MessagesPage } from '../pages/MessagesPage';
+import { VoucherHub } from '../pages/VoucherHub';
 import AdminDashboard from '../pages/admin/AdminDashboard';
 import ProductModeration from '../pages/admin/ProductModeration';
 import ShopModeration from '../pages/admin/ShopModeration';
@@ -31,6 +36,9 @@ import UserAnalytics from '../pages/admin/UserAnalytics';
 import ShopSalesAnalytics from '../pages/admin/ShopSalesAnalytics';
 import CategoryManagement from '../pages/admin/CategoryManagement';
 import { BannersAdminPage } from '../pages/admin/BannersAdminPage';
+import { VoucherList } from '../pages/admin/VoucherManagement/VoucherList';
+import { CreateVoucher } from '../pages/admin/VoucherManagement/CreateVoucher';
+import { EditVoucher } from '../pages/admin/VoucherManagement/EditVoucher';
 import { SellerProtectedRoute } from '../components/auth/SellerProtectedRoute';
 import { BuyerProtectedRoute } from '../components/auth/BuyerProtectedRoute';
 import { AdminProtectedRoute } from '../components/auth/AdminProtectedRoute';
@@ -44,6 +52,7 @@ export function App() {
       <Route path="/category/:slug" element={<ProductsPage />} />
       <Route path="/product/:id" element={<ProductDetailPage />} />
       <Route path="/shop/:id" element={<ShopPage />} />
+      <Route path="/vouchers" element={<VoucherHub />} />
       <Route path="/login" element={<AuthPage />} />
       <Route path="/register" element={<AuthPage />} />
 
@@ -55,6 +64,10 @@ export function App() {
         <Route path="/seller" element={<Navigate to="/seller/center" replace />} />
         <Route path="/seller/center" element={<SellerCenterPage />} />
         <Route path="/seller/products" element={<ProductManagementPage />} />
+        <Route path="/seller/vouchers" element={<SellerVoucherManagementPage />} />
+        <Route path="/seller/vouchers/new" element={<SellerCreateVoucherPage />} />
+        <Route path="/seller/vouchers/edit/:id" element={<SellerEditVoucherPage />} />
+        <Route path="/seller/categories" element={<ShopCategoriesPage />} />
         <Route path="/seller/add-product" element={<AddProductPage />} />
         <Route path="/seller/edit-product/:id" element={<EditProductPage />} />
         <Route path="/seller/orders" element={<SellerOrderManagement />} />
@@ -86,6 +99,9 @@ export function App() {
         <Route path="/admin/applications" element={<ShopModeration />} />
         <Route path="/admin/shops" element={<ShopManagement />} />
         <Route path="/admin/banners" element={<BannersAdminPage />} />
+        <Route path="/admin/vouchers" element={<VoucherList />} />
+        <Route path="/admin/vouchers/new" element={<CreateVoucher />} />
+        <Route path="/admin/vouchers/edit/:id" element={<EditVoucher />} />
         <Route path="/admin/users" element={<AccountManagement />} />
         <Route path="/admin/analytics/users" element={<UserAnalytics />} />
         <Route path="/admin/analytics/shop-sales" element={<ShopSalesAnalytics />} />

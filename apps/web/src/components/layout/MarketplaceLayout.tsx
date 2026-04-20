@@ -1,7 +1,9 @@
 import { FC, ReactNode, useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '../../hooks/useCart';
-import { FaFacebookF, FaInstagram, FaTwitter, FaYoutube } from "react-icons/fa";
+import { NotificationBell } from './NotificationBell';
+import { SearchBar } from './SearchBar';
+import { FaFacebookF, FaInstagram, FaTwitter, FaYoutube } from "react-icons/fa6";
 interface MarketplaceLayoutProps {
   children: ReactNode;
   /** Replaces the default marketplace search field (e.g. “Search in this shop…”). */
@@ -83,28 +85,10 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({
             </span>
           </Link>
 
-          {/* Search Bar */}
           <div
             className={`hidden md:flex items-center flex-1 justify-center ${storefrontHeader ? 'mx-4 lg:mx-10' : 'max-w-xl mx-12'}`}
           >
-            {searchSlot ?? (
-              <div className="w-full relative group max-w-xl">
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm sản phẩm, cửa hàng..."
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      const val = e.currentTarget.value.trim();
-                      if (val) navigate(`/products?q=${encodeURIComponent(val)}`);
-                    }
-                  }}
-                  className="w-full h-11 pl-12 pr-4 bg-[#f5faff]/50 border border-transparent focus:bg-white focus:border-[#00629d]/10 rounded-2xl text-sm outline-none transition-all placeholder:text-[#707882]/50"
-                />
-                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#707882] group-focus-within:text-[#00629d] transition-colors">
-                  search
-                </span>
-              </div>
-            )}
+            {searchSlot ?? <SearchBar />}
           </div>
 
           {/* Mobile search icon when storefront uses custom slot */}
@@ -139,6 +123,7 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({
             <div className="flex items-center gap-2 sm:gap-3">
               {currentUser?.role !== 'admin' && (
                 <>
+                  {currentUser && !storefrontHeader && <NotificationBell />}
                   {!storefrontHeader && (
                     <Link
                       to="/messages"
@@ -167,15 +152,8 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({
                 </>
               )}
 
-              {storefrontHeader && (
-                <button
-                  type="button"
-                  className="relative w-10 h-10 flex items-center justify-center text-[#1a2b3c] hover:bg-[#EBF4FF] rounded-full transition-colors"
-                  aria-label="Thông báo"
-                >
-                  <span className="material-symbols-outlined text-[22px]">notifications</span>
-                  <span className="absolute top-2 right-2 w-2 h-2 bg-[#ba1a1a] rounded-full ring-2 ring-white" />
-                </button>
+              {storefrontHeader && currentUser && (
+                <NotificationBell />
               )}
 
               {currentUser ? (
@@ -220,6 +198,10 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({
                             >
                               <span className="material-symbols-outlined text-[#2b82c9] text-lg">receipt_long</span>
                               Đơn mua
+                            </Link>
+                            <Link to="/vouchers" className="flex items-center gap-3 px-5 py-3 hover:bg-[#EBF4FF] transition-colors text-sm font-bold text-[#0f1d25]">
+                              <span className="material-symbols-outlined text-[#2b82c9] text-lg">confirmation_number</span>
+                              Mã giảm giá
                             </Link>
                           </>
                         )}
@@ -275,6 +257,10 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({
                             >
                               <span className="material-symbols-outlined text-[#00629d] text-lg">receipt_long</span>
                               Đơn mua
+                            </Link>
+                            <Link to="/vouchers" className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]">
+                              <span className="material-symbols-outlined text-[#00629d] text-lg">confirmation_number</span>
+                              Mã giảm giá
                             </Link>
                           </>
                         )}

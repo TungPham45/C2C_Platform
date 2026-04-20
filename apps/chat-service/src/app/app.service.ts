@@ -10,6 +10,20 @@ export class AppService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  private async sendNotification(data: { user_id: number; title: string; message: string; type: string; link?: string }) {
+    try {
+      const authUrl = this.authServiceUrl;
+      const notificationUrl = authUrl.replace(/\/api\/auth\/?$/, '/api/notifications/internal');
+      await fetch(notificationUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+    } catch (e) {
+      this.logger.warn('[CHAT NOTIFICATION ERROR]', e);
+    }
+  }
+
   private async fetchUserNames(userIds: number[]): Promise<Record<number, string>> {
     const map: Record<number, string> = {};
     if (!userIds.length) return map;
@@ -155,6 +169,16 @@ export class AppService {
     await this.prisma.conversations.update({
       where: { id: conversationId },
       data: updateData
+    });
+
+    const receiverId = senderRole === 'buyer' ? conv.seller_id : conv.buyer_id;
+    // Tự động bắn thông báo chéo cho bên nhận
+    await this.sendNotification({
+      user_id: receiverId,
+      title: 'Có tin nhắn mới',
+      message: content.length > 50 ? content.substring(0, 50) + '...' : content,
+      type: 'CHAT',
+      link: senderRole === 'buyer' ? `/seller/chat` : `/messages`
     });
 
     return this.prisma.messages.create({

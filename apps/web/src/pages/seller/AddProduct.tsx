@@ -24,6 +24,10 @@ export const AddProductPage: FC = () => {
     images: [] as string[],
   });
 
+  const [shopCategories, setShopCategories] = useState<any[]>([]);
+  const [selectedShopCategories, setSelectedShopCategories] = useState<number[]>([]);
+  const [isShopCategoryLoading, setIsShopCategoryLoading] = useState(false);
+
   const [hasVariants, setHasVariants] = useState(false);
   const [variantsMap, setVariantsMap] = useState<GeneratedVariant[]>([]);
 
@@ -107,6 +111,7 @@ export const AddProductPage: FC = () => {
     }
 
     if (!formData.name || !finalBasePrice) return alert('Vui lòng điền tên và giá sản phẩm');
+    console.log('[AddProduct] Submitting variants:', JSON.stringify(hasVariants ? variantsMap : [], null, 2));
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem('c2c_token');
@@ -126,7 +131,8 @@ export const AddProductPage: FC = () => {
           images: formData.images,
           has_variants: hasVariants,
           variants: hasVariants ? variantsMap : [],
-          attributeValues: attributeValues
+          attributeValues: attributeValues,
+          shop_category_ids: selectedShopCategories
         })
       });
       if (res.ok) {
@@ -142,6 +148,57 @@ export const AddProductPage: FC = () => {
     }
   };
 
+  useEffect(() => {
+    const fetchShopCategories = async () => {
+      setIsShopCategoryLoading(true);
+      try {
+        const token = localStorage.getItem('c2c_token');
+        const res = await fetch(`${PRODUCT_API_URL}/seller/categories`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setShopCategories(data.filter((c: any) => c.is_active));
+        }
+      } catch (err) {
+        console.error('Failed to fetch shop categories:', err);
+      } finally {
+        setIsShopCategoryLoading(false);
+      }
+    };
+    fetchShopCategories();
+  }, []);
+
+  const hasGoodImages = formData.images.length >= 3;
+  const hasGoodName = formData.name.length >= 25 && formData.name.length <= 100;
+  const hasCategory = formData.category_id !== 0;
+  const hasGoodDescription = formData.description.length >= 50;
+
+  const progressScore = (hasGoodImages ? 25 : 0) + (hasGoodName ? 25 : 0) + (hasCategory ? 25 : 0) + (hasGoodDescription ? 25 : 0);
+
+  const getPreviewPrice = () => {
+    if (hasVariants && variantsMap.length > 0) {
+      const prices = variantsMap.map(v => Number(v.price) || 0).filter(p => p > 0);
+      if (prices.length > 0) {
+        const minPrice = Math.min(...prices);
+        const maxPrice = Math.max(...prices);
+        
+        const format = (p: number) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(p);
+        
+        if (minPrice === maxPrice) {
+          return format(minPrice);
+        }
+        return `${format(minPrice)} - ${format(maxPrice)}`;
+      }
+    }
+    
+    if (formData.base_price) {
+      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(formData.base_price));
+    }
+    
+    return '₫ 0';
+  };
+
   return (
     <SellerLayout pageTitle="Serene Seller">
       <div className="grid grid-cols-12 gap-8 max-w-screen-2xl mx-auto">
@@ -155,29 +212,37 @@ export const AddProductPage: FC = () => {
               </h3>
               <ul className="space-y-4">
                 <li className="flex gap-3 text-sm text-[#404751]">
-                  <span className="material-symbols-outlined text-[#ba1a1a] text-[20px]">error</span>
-                  <span>Thêm ít nhất 3 hình ảnh sản phẩm chất lượng cao</span>
+                  <span className={`material-symbols-outlined text-[20px] ${hasGoodImages ? 'text-[#00629d]' : 'text-[#ba1a1a]'}`}>
+                    {hasGoodImages ? 'check_circle' : 'error'}
+                  </span>
+                  <span className={hasGoodImages ? 'opacity-50 transition-opacity' : 'transition-opacity'}>Thêm ít nhất 3 hình ảnh sản phẩm chất lượng cao</span>
                 </li>
                 <li className="flex gap-3 text-sm text-[#404751]">
-                  <span className="material-symbols-outlined text-[#ba1a1a] text-[20px]">error</span>
-                  <span>Tên sản phẩm nên từ 25-100 kí tự để tối ưu tìm kiếm</span>
-                </li>
-                <li className="flex gap-3 text-sm text-[#404751] opacity-50">
-                  <span className="material-symbols-outlined text-[20px]">check_circle</span>
-                  <span>Chọn đúng ngành hàng kinh doanh</span>
+                  <span className={`material-symbols-outlined text-[20px] ${hasGoodName ? 'text-[#00629d]' : 'text-[#ba1a1a]'}`}>
+                    {hasGoodName ? 'check_circle' : 'error'}
+                  </span>
+                  <span className={hasGoodName ? 'opacity-50 transition-opacity' : 'transition-opacity'}>Tên sản phẩm nên từ 25-100 kí tự để tối ưu tìm kiếm</span>
                 </li>
                 <li className="flex gap-3 text-sm text-[#404751]">
-                  <span className="material-symbols-outlined text-[#707882] text-[20px]">pending</span>
-                  <span>Mô tả sản phẩm chi tiết & công dụng</span>
+                  <span className={`material-symbols-outlined text-[20px] ${hasCategory ? 'text-[#00629d]' : 'text-[#ba1a1a]'}`}>
+                    {hasCategory ? 'check_circle' : 'error'}
+                  </span>
+                  <span className={hasCategory ? 'opacity-50 transition-opacity' : 'transition-opacity'}>Chọn đúng ngành hàng kinh doanh</span>
+                </li>
+                <li className="flex gap-3 text-sm text-[#404751]">
+                  <span className={`material-symbols-outlined text-[20px] ${hasGoodDescription ? 'text-[#00629d]' : 'text-[#ba1a1a]'}`}>
+                    {hasGoodDescription ? 'check_circle' : 'error'}
+                  </span>
+                  <span className={hasGoodDescription ? 'opacity-50 transition-opacity' : 'transition-opacity'}>Mô tả sản phẩm chi tiết & công dụng</span>
                 </li>
               </ul>
               
               <div className="mt-6 pt-6 border-t border-[#bfc7d3]/20">
                 <p className="text-xs text-[#707882] font-medium">Độ hoàn thiện thông tin</p>
-                <div className="w-full bg-[#e1f0fb] h-1.5 rounded-full mt-2">
-                  <div className="bg-[#00629d] w-1/3 h-full rounded-full"></div>
+                <div className="w-full bg-[#e1f0fb] h-1.5 rounded-full mt-2 overflow-hidden">
+                  <div className="bg-[#00629d] h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${progressScore}%` }}></div>
                 </div>
-                <p className="text-[10px] text-[#00629d] mt-1 text-right font-bold">35%</p>
+                <p className="text-[10px] text-[#00629d] mt-1 text-right font-bold transition-all">{progressScore}%</p>
               </div>
             </div>
           </div>
@@ -320,6 +385,45 @@ export const AddProductPage: FC = () => {
                     {categoryPath || 'Chọn ngành hàng chính xác nhất...'}
                   </span>
                   <span className="material-symbols-outlined text-[#707882] group-hover:text-[#00629d] transition-colors">edit</span>
+                </div>
+              </div>
+
+              {/* Shop Categories Selection */}
+              <div>
+                <label className="block text-sm font-semibold text-[#404751] mb-2 uppercase tracking-wider text-[10px]">Danh mục riêng của Shop</label>
+                <div className="bg-[#f5faff] rounded-xl p-4 border border-[#e1f0fb]">
+                  {isShopCategoryLoading ? (
+                    <p className="text-xs text-[#707882] animate-pulse">Đang tải danh mục của bạn...</p>
+                  ) : shopCategories.length === 0 ? (
+                    <p className="text-xs text-[#707882] italic">Bạn chưa tạo danh mục riêng nào. <span className="text-[#00629d] cursor-pointer font-bold hover:underline" onClick={() => navigate('/seller/categories')}>Tạo ngay</span></p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {shopCategories.map(cat => (
+                        <button
+                          key={cat.id}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setSelectedShopCategories(prev => 
+                              prev.includes(cat.id) ? prev.filter(id => id !== cat.id) : [...prev, cat.id]
+                            );
+                          }}
+                          className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all border-2 ${
+                            selectedShopCategories.includes(cat.id)
+                              ? 'bg-[#00629d] text-white border-[#00629d] shadow-sm'
+                              : 'bg-white text-[#707882] border-slate-100 hover:border-[#00629d]/20'
+                          }`}
+                        >
+                          {cat.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {shopCategories.length > 0 && (
+                    <p className="text-[10px] text-[#707882] mt-3 italic flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px]">info</span>
+                      Chọn các danh mục trong shop để người mua dễ dàng lọc sản phẩm.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -499,11 +603,7 @@ export const AddProductPage: FC = () => {
                   </div>
                   <h4 className="text-xs font-bold line-clamp-2">{formData.name || 'Tên sản phẩm của bạn sẽ hiển thị tại đây'}</h4>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-[#00629d] font-bold text-sm">
-                      {formData.base_price
-                        ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(formData.base_price))
-                        : '₫ 0.000'}
-                    </span>
+                    <span className="text-[#00629d] font-bold text-sm">{getPreviewPrice()}</span>
                   </div>
                 </div>
               </div>

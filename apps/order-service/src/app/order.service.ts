@@ -2,12 +2,30 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException 
 import { PrismaService } from './prisma.service';
 import { ProductPrismaService } from './product-prisma.service';
 
+import { AuthPrismaService } from './auth-prisma.service';
+import { VoucherService } from './voucher.service';
+
 @Injectable()
 export class OrderService {
   constructor(
     private prisma: PrismaService,
-    private productPrisma: ProductPrismaService
-  ) {}
+    private productPrisma: ProductPrismaService,
+    private voucherService: VoucherService
+  ) { }
+
+  private async sendNotification(data: { user_id: number; title: string; message: string; type: string; link?: string }) {
+    try {
+      const authUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:3002/api/auth';
+      const notificationUrl = authUrl.replace(/\/api\/auth\/?$/, '/api/notifications/internal');
+      await fetch(notificationUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+    } catch (e) {
+      console.error('[ORDER NOTIFICATION ERROR]', e);
+    }
+  }
 
   private async attachProductAssetsToOrders<T extends { items?: any[] }>(orders: T[]): Promise<T[]> {
     const allItems = orders.flatMap(o => (Array.isArray(o.items) ? o.items : []));
@@ -52,7 +70,7 @@ export class OrderService {
     const missingItems = allItems.filter(it => !variantMap.has(Number(it?.product_variant_id)));
     const missingProductNames = Array.from(new Set(missingItems.map(it => it.product_name).filter(Boolean)));
     const productNameMap = new Map<string, { product_id?: number | null; product_thumbnail_url?: string | null }>();
-    
+
     if (missingProductNames.length > 0) {
       const fallbackProducts = await this.productPrisma.product.findMany({
         where: { name: { in: missingProductNames } },
@@ -70,19 +88,107 @@ export class OrderService {
       ...o,
       items: Array.isArray(o.items)
         ? o.items.map((it: any) => {
-            const vid = Number(it?.product_variant_id);
-            const assets = variantMap.get(vid);
-            const fallback = (!assets || !assets.product_id) ? productNameMap.get(it?.product_name || '') : null;
-            
-            return {
-              ...it,
-              product_id: assets?.product_id ?? fallback?.product_id ?? null,
-              product_thumbnail_url: assets?.product_thumbnail_url ?? fallback?.product_thumbnail_url ?? null,
-              product_image_url: assets?.product_image_url ?? null,
-            };
-          })
+          const vid = Number(it?.product_variant_id);
+          const assets = variantMap.get(vid);
+          const fallback = (!assets || !assets.product_id) ? productNameMap.get(it?.product_name || '') : null;
+
+          return {
+            ...it,
+            product_id: assets?.product_id ?? fallback?.product_id ?? null,
+            product_thumbnail_url: assets?.product_thumbnail_url ?? fallback?.product_thumbnail_url ?? null,
+            product_image_url: assets?.product_image_url ?? null,
+          };
+        })
         : o.items,
     }));
+  }
+
+  // =============================================================
+  // CHECKOUT VOUCHERS — returns eligible claimed vouchers for checkout
+  // =============================================================
+  async getCheckoutVouchers(userId: number, data: any) {
+    const shopOrders: Array<{ shop_id: number; shipping_fee: number; items: any[] }> = data.shop_orders || [];
+
+    // Calculate order-level subtotals
+    let orderSubtotal = 0;
+    let totalShippingFee = 0;
+    const shopSubtotals: Record<number, number> = {};
+
+    for (const shopOrder of shopOrders) {
+      const subtotal = (shopOrder.items || []).reduce(
+        (sum: number, item: any) => sum + Number(item.price_at_purchase || 0) * Number(item.quantity || 1),
+        0,
+      );
+      shopSubtotals[shopOrder.shop_id] = subtotal;
+      orderSubtotal += subtotal;
+      totalShippingFee += Number(shopOrder.shipping_fee || 0);
+    }
+
+    // Fetch user's claimed vouchers that are still active
+    const claims = await this.prisma.userVoucherClaim.findMany({
+      where: {
+        user_id: userId,
+        used_at: null,
+        voucher: {
+          status: 'active',
+          start_date: { lte: new Date() },
+          end_date: { gte: new Date() },
+        },
+      },
+      include: { voucher: true },
+    });
+
+    const userContext = await this.voucherService.getUserVoucherContext(userId);
+
+    // Separate into platform and shop vouchers
+    const platformVouchers: any[] = [];
+    const shopVoucherGroups: Record<number, any[]> = {};
+
+    for (const claim of claims) {
+      const v = claim.voucher;
+      if (!this.voucherService.isVoucherActiveNow(v)) continue;
+      if (!this.voucherService.isVoucherTargetEligible(v, userContext)) continue;
+
+      if (v.shop_id == null) {
+        // Platform voucher — qualifies against order subtotal
+        if (this.voucherService.meetsMinSpend(v, orderSubtotal)) {
+          platformVouchers.push({
+            claim_id: claim.id,
+            claimed_at: claim.claimed_at,
+            qualifying_amount: orderSubtotal,
+            estimated_discount: this.voucherService.calculateDiscount(v, orderSubtotal),
+            voucher: v,
+          });
+        }
+      } else {
+        // Shop voucher — qualifies against the shop's subtotal
+        const shopSub = shopSubtotals[v.shop_id] ?? 0;
+        if (shopSub > 0 && this.voucherService.meetsMinSpend(v, shopSub)) {
+          if (!shopVoucherGroups[v.shop_id]) shopVoucherGroups[v.shop_id] = [];
+          shopVoucherGroups[v.shop_id].push({
+            claim_id: claim.id,
+            claimed_at: claim.claimed_at,
+            qualifying_amount: shopSub,
+            estimated_discount: this.voucherService.calculateDiscount(v, shopSub),
+            voucher: v,
+          });
+        }
+      }
+    }
+
+    return {
+      summary: {
+        order_subtotal: orderSubtotal,
+        total_shipping_fee: totalShippingFee,
+        total_before_vouchers: orderSubtotal + totalShippingFee,
+      },
+      platform_vouchers: platformVouchers,
+      shop_vouchers: Object.entries(shopVoucherGroups).map(([shopId, vouchers]) => ({
+        shop_id: Number(shopId),
+        subtotal: shopSubtotals[Number(shopId)] ?? 0,
+        vouchers,
+      })),
+    };
   }
 
   async createOrder(userId: number, data: any) {
@@ -159,6 +265,20 @@ export class OrderService {
         include: { items: true },
       });
       createdOrders.push(created);
+
+      // Notify Seller
+      try {
+        const shopInfo = await this.productPrisma.shop.findUnique({ where: { id: created.shop_id }, select: { owner_id: true }});
+        if (shopInfo?.owner_id) {
+          await this.sendNotification({
+            user_id: shopInfo.owner_id,
+            title: 'Khách hàng vừa đặt đơn mới',
+            message: `Shop của bạn có một đơn hàng mới (ID: ${created.id}) trị giá ₫${created.subtotal}. Vui lòng kiểm tra và xử lý.`,
+            type: 'ORDER',
+            link: '/seller/orders',
+          });
+        }
+      } catch (e) {}
     }
 
     // ============================================================
@@ -172,6 +292,7 @@ export class OrderService {
             decrement: item.quantity,
           },
         },
+        include: { product: true }
       });
 
       if (variant.product_id) {
@@ -183,6 +304,22 @@ export class OrderService {
             }
           }
         });
+      }
+
+      // Check Low Stock Threshold Trigger
+      if (variant.stock_quantity !== null && variant.stock_quantity <= 5) {
+        try {
+           const shopInfo = await this.productPrisma.shop.findUnique({ where: { id: variant.product?.shop_id || -1 }, select: { owner_id: true }});
+           if (shopInfo?.owner_id) {
+             await this.sendNotification({
+               user_id: shopInfo.owner_id,
+               title: 'Hàng sắp hết trong kho',
+               message: `Sản phẩm "${item.product_name}" hiện chỉ còn ${variant.stock_quantity} sản phẩm. Hãy nhập thêm hàng ngay!`,
+               type: 'SYSTEM',
+               link: '/seller/inventory',
+             });
+           }
+        } catch(e) {}
       }
     }
 
@@ -197,6 +334,17 @@ export class OrderService {
         }
       });
     }
+
+    // Notify Buyer that their order is successful
+    try {
+      await this.sendNotification({
+        user_id: userId,
+        title: 'Đặt hàng thành công!',
+        message: `Đơn hàng của bạn trị giá ₫${checkoutSession.total_payment} đã được tạo và chuyển cho người bán.`,
+        type: 'ORDER',
+        link: '/orders',
+      });
+    } catch(e) {}
 
     return {
       id: checkoutSession.id,
@@ -305,7 +453,27 @@ export class OrderService {
     const updatedOrder = await this.prisma.shopOrder.update({
       where: { id: orderId },
       data,
+      include: { checkout_session: true }
     });
+
+    // Notify Buyer
+    try {
+      if (updatedOrder.checkout_session?.user_id) {
+        let statusVN = status;
+        if (status === 'confirmed') statusVN = 'đã được xác nhận';
+        else if (status === 'shipped') statusVN = 'đang được giao';
+        else if (status === 'delivered') statusVN = 'đã giao thành công';
+        else if (status === 'cancelled') statusVN = 'đã bị hủy';
+
+        await this.sendNotification({
+          user_id: updatedOrder.checkout_session.user_id,
+          title: `Cập nhật đơn hàng #${orderId}`,
+          message: `Đơn hàng của bạn ${statusVN}.`,
+          type: 'ORDER',
+          link: '/orders',
+        });
+      }
+    } catch (e) {}
 
     // 4. Stock Adjustment Logic
     // NOTE: Stock is already deducted at order creation time (createOrder),
@@ -401,7 +569,7 @@ export class OrderService {
 
     let totalOrders = orders.length;
     let totalRevenue = 0;
-    
+
     // Initialize trend data mapping (last N days)
     const trendMap = new Map<string, { orders: number; revenue: number }>();
     const today = new Date();
@@ -415,10 +583,10 @@ export class OrderService {
     for (const o of orders) {
       const revenue = Number(o.subtotal) || 0;
       totalRevenue += revenue;
-      
+
       const oDate = new Date(o.created_at || new Date());
       const key = `${oDate.getDate()}/${oDate.getMonth() + 1}`;
-      
+
       if (trendMap.has(key)) {
         const current = trendMap.get(key)!;
         trendMap.set(key, {

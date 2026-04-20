@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { PRODUCT_API_URL, resolveAssetUrl } from '../../config/api';
 
 export interface GeneratedVariant {
   id: string; // e.g. "Màu:Đỏ|Kích cỡ:200GB"
@@ -24,6 +25,7 @@ interface VariantBuilderProps {
   setHasVariants: (val: boolean) => void;
   onVariantsChange: (variants: GeneratedVariant[]) => void;
   initialGroups?: VariantGroup[];
+  initialVariants?: GeneratedVariant[];
 }
 
 export const VariantBuilder: React.FC<VariantBuilderProps> = ({ 
@@ -31,7 +33,8 @@ export const VariantBuilder: React.FC<VariantBuilderProps> = ({
   baseStock, setBaseStock,
   hasVariants, setHasVariants,
   onVariantsChange,
-  initialGroups = []
+  initialGroups = [],
+  initialVariants = []
 }) => {
   
   const [groups, setGroups] = useState<VariantGroup[]>(initialGroups);
@@ -45,6 +48,39 @@ export const VariantBuilder: React.FC<VariantBuilderProps> = ({
 
   const [variantsMap, setVariantsMap] = useState<Record<string, GeneratedVariant>>({});
   const [groupImages, setGroupImages] = useState<Record<string, string>>({});
+  
+  // Sync variantsMap if initialVariants changes (hydration)
+  useEffect(() => {
+    if (initialVariants && initialVariants.length > 0) {
+      setVariantsMap(prev => {
+        const next = { ...prev };
+        let hasChanges = false;
+        initialVariants.forEach(v => {
+          if (!next[v.id]) {
+             next[v.id] = v;
+             hasChanges = true;
+          }
+        });
+        return hasChanges ? next : prev;
+      });
+      
+      if (groups.length > 0) {
+        setGroupImages(prev => {
+          const next = { ...prev };
+          let changed = false;
+          const g1 = groups[0].name;
+          initialVariants.forEach(v => {
+            if (v.image && v.attributes[g1] && !next[v.attributes[g1]]) {
+              next[v.attributes[g1]] = v.image;
+              changed = true;
+            }
+          });
+          return changed ? next : prev;
+        });
+      }
+    }
+  }, [initialVariants, groups]);
+
   const variantImageInputRef = React.useRef<HTMLInputElement>(null);
   const [activeUploadKey, setActiveUploadKey] = useState<string | null>(null);
 
@@ -154,10 +190,35 @@ export const VariantBuilder: React.FC<VariantBuilderProps> = ({
     }));
   };
 
-  const handleVariantImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [isUploadingVariantImage, setIsUploadingVariantImage] = useState(false);
+
+  const handleVariantImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0] && activeUploadKey) {
-      const objectUrl = URL.createObjectURL(e.target.files[0]);
-      setGroupImages(prev => ({ ...prev, [activeUploadKey]: objectUrl }));
+      const file = e.target.files[0];
+      const token = localStorage.getItem('c2c_token');
+      
+      const fd = new FormData();
+      fd.append('file', file);
+      setIsUploadingVariantImage(true);
+      
+      try {
+        const res = await fetch(`${PRODUCT_API_URL}/upload`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: fd,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setGroupImages(prev => ({ ...prev, [activeUploadKey]: resolveAssetUrl(data.url) }));
+        } else {
+          alert('Failed to upload variant image');
+        }
+      } catch (err) {
+        console.error('Variant image upload error:', err);
+        alert('Network error during image upload');
+      } finally {
+        setIsUploadingVariantImage(false);
+      }
     }
     if (variantImageInputRef.current) variantImageInputRef.current.value = '';
   };
@@ -330,16 +391,18 @@ export const VariantBuilder: React.FC<VariantBuilderProps> = ({
                       {printFirstCol && group1 && (
                         <td rowSpan={group2Length} className="p-4 border-r border-[#e1f0fb] text-center align-middle bg-white group relative">
                           <span className="font-semibold text-[#0f1d25] block mb-2">{combo[group1]}</span>
-                          <div 
-                            onClick={() => { setActiveUploadKey(combo[group1]); variantImageInputRef.current?.click(); }}
-                            className="w-12 h-12 bg-[#e9f5ff] rounded-md mx-auto flex items-center justify-center border border-[#bfc7d3]/20 cursor-pointer hover:bg-[#e1f0fb] overflow-hidden"
-                          >
-                            {groupImages[combo[group1]] ? (
-                              <img src={groupImages[combo[group1]]} className="w-full h-full object-cover" alt="" />
-                            ) : (
-                              <span className="material-symbols-outlined text-[#707882] text-xl">add_photo_alternate</span>
-                            )}
-                          </div>
+                            <div 
+                              onClick={() => { if (!isUploadingVariantImage) { setActiveUploadKey(combo[group1]); variantImageInputRef.current?.click(); } }}
+                              className={`w-12 h-12 bg-[#e9f5ff] rounded-md mx-auto flex items-center justify-center border border-[#bfc7d3]/20 transition-colors overflow-hidden ${isUploadingVariantImage && activeUploadKey === combo[group1] ? 'cursor-wait opacity-50' : 'cursor-pointer hover:bg-[#e1f0fb]'}`}
+                            >
+                              {isUploadingVariantImage && activeUploadKey === combo[group1] ? (
+                                <span className="material-symbols-outlined text-[#00629d] animate-spin text-xl">progress_activity</span>
+                              ) : groupImages[combo[group1]] ? (
+                                <img src={groupImages[combo[group1]]} className="w-full h-full object-cover" alt="" />
+                              ) : (
+                                <span className="material-symbols-outlined text-[#707882] text-xl">add_photo_alternate</span>
+                              )}
+                            </div>
                         </td>
                       )}
                       

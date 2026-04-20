@@ -2,6 +2,9 @@ import { FC, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useOrders } from '../hooks/useOrders';
+import { formatVnd } from '../utils/currency';
+import { getOrderPricing } from '../utils/orderPricing';
+import { resolveAssetUrl } from '../config/api';
 
 const statusConfig: Record<string, { label: string; color: string; icon: string }> = {
   pending:    { label: 'CHờ Xử LÝ',     color: 'bg-[#fff8e5] text-[#e09110] border-[#ffb952]/30', icon: 'schedule' },
@@ -12,11 +15,9 @@ const statusConfig: Record<string, { label: string; color: string; icon: string 
 };
 
 const sidebarItems = [
-  { label: 'Lịch sử đơn hàng', icon: 'receipt_long', path: '/orders', active: true },
-  { label: 'Yêu thích',       icon: 'favorite',     path: '#', active: false },
-  { label: 'Thanh toán',       icon: 'credit_card', path: '#', active: false },
-  { label: 'Cài đặt',         icon: 'settings',     path: '#', active: false },
-  { label: 'Trung tâm hỗ trợ', icon: 'help',        path: '#', active: false },
+  { label: 'Hồ sơ của tôi',    icon: 'person',        path: '/profile',  active: false },
+  { label: 'Lịch sử đơn hàng', icon: 'receipt_long',  path: '/orders',   active: true },
+  { label: 'Tin nhắn',         icon: 'chat',          path: '/messages', active: false },
 ];
 
 export const MyPurchasesPage: FC = () => {
@@ -197,6 +198,7 @@ export const MyPurchasesPage: FC = () => {
                   const status = statusConfig[order.status?.toLowerCase()] || statusConfig.pending;
                   const orderDate = new Date(order.created_at).toLocaleDateString('vi-VN', { year: 'numeric', month: 'long', day: 'numeric' });
                   const customerName = order.shipping_address?.split(',')[0] || 'Order';
+                  const pricing = getOrderPricing(order);
 
                   return (
                     <div key={order.id} className="bg-white rounded-[2rem] border border-[#e4e9f0] shadow-sm overflow-hidden hover:shadow-md transition-shadow">
@@ -222,8 +224,16 @@ export const MyPurchasesPage: FC = () => {
                       <div className="px-8 py-5 divide-y divide-[#f0f3f8]">
                         {(order.items || []).map((item: any) => (
                           <div key={item.id} className="flex items-center gap-5 py-4 first:pt-0 last:pb-0">
-                            <div className="w-20 h-20 bg-[#f0f3f8] rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden">
-                              <span className="material-symbols-outlined text-3xl text-[#bfc7d3]">inventory_2</span>
+                            <div className="w-20 h-20 bg-[#f0f3f8] border border-[#e4e9f0] rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+                              {(item.product_image_url || item.product_thumbnail_url) ? (
+                                <img 
+                                  src={resolveAssetUrl(item.product_image_url || item.product_thumbnail_url)} 
+                                  alt={item.product_name} 
+                                  className="w-full h-full object-cover" 
+                                />
+                              ) : (
+                                <span className="material-symbols-outlined text-3xl text-[#bfc7d3]">inventory_2</span>
+                              )}
                             </div>
                             <div className="flex-1 min-w-0">
                               <h4 className="font-bold text-sm text-[#0f1d25] line-clamp-1">{item.product_name}</h4>
@@ -238,7 +248,7 @@ export const MyPurchasesPage: FC = () => {
                             </div>
                             <div className="text-right flex-shrink-0">
                               <p className="font-black text-[#00629d] text-sm">
-                                {Number(item.price_at_purchase).toLocaleString('vi-VN')} VND
+                                {formatVnd(item.price_at_purchase)}
                               </p>
                               <p className="text-[10px] text-[#707882] font-semibold mt-0.5">SL: {item.quantity}</p>
                             </div>
@@ -251,7 +261,7 @@ export const MyPurchasesPage: FC = () => {
                         <div>
                           <p className="text-[10px] text-[#707882] font-bold uppercase tracking-widest">Tổng cộng</p>
                           <p className="text-xl font-black text-[#0f1d25] font-['Plus_Jakarta_Sans']">
-                            {Number(order.subtotal).toLocaleString('vi-VN')} VND
+                            {formatVnd(pricing.finalTotal)}
                           </p>
                         </div>
                         <div className="flex items-center gap-3">

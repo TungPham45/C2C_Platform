@@ -38,6 +38,9 @@ export default defineConfig(() => ({
     allowedHosts,
     proxy,
   },
+  optimizeDeps: {
+    include: ['react-icons/fa6'],
+  },
   plugins: [react(), nxViteTsPaths(), nxCopyAssetsPlugin(['*.md'])],
   // Uncomment this if you are using workers.
   // worker: {
