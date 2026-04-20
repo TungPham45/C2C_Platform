@@ -217,10 +217,20 @@ export class OrderService {
     });
   }
 
-  async getSellerOrders(shopId: number) {
+  async getSellerOrders(userId: number) {
+    // Look up the shop owned by this user (from product DB)
+    const shop = await this.productPrisma.shop.findFirst({
+      where: { owner_id: userId },
+      select: { id: true },
+    });
+
+    if (!shop) {
+      return [];
+    }
+
     return this.prisma.shopOrder.findMany({
       where: {
-        shop_id: shopId,
+        shop_id: shop.id,
       },
       include: {
         items: true,
