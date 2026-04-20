@@ -1292,6 +1292,7 @@ export class ProductService {
         description: true,
         logo_url: true,
         rating: true,
+        owner_id: true,
         status: true,
         created_at: true,
         _count: {

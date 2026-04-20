@@ -112,6 +112,34 @@ export const ShopPage: FC = () => {
     }
   };
 
+  const handleChat = async () => {
+    const token = localStorage.getItem('c2c_token');
+    if (!token) {
+      navigate('/login', { state: { from: `/shop/${shopId}` } });
+      return;
+    }
+    if (!shop?.owner_id) {
+      alert("Cửa hàng này chưa cập nhật đầy đủ thông tin.");
+      return;
+    }
+    try {
+      const res = await fetch('/api/chat/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ shop_id: shopId, seller_id: shop.owner_id })
+      });
+      const data = await res.json();
+      if (res.ok && data.id) {
+        navigate(`/messages?convId=${data.id}`);
+      } else {
+        alert("Lỗi kết nối đoạn chat");
+      }
+    } catch (err) {
+      alert("Lỗi kết nối");
+    }
+  };
+
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [shopId]);
@@ -398,6 +426,7 @@ export const ShopPage: FC = () => {
                 </button>
                 <button
                   type="button"
+                  onClick={handleChat}
                   className="h-9 sm:h-10 px-5 sm:px-7 rounded-full text-xs sm:text-sm font-semibold text-[#3d4f5f] bg-white/65 backdrop-blur-sm border border-white/90 hover:bg-white/90 transition active:scale-[0.98] shadow-sm"
                 >
                   Chat
