@@ -7,9 +7,16 @@ interface Voucher {
   discount_value: string;
   min_spend: string;
   max_discount?: string;
+  start_date: string;
   end_date: string;
   target_type: string;
   shop_id?: number;
+  total_quantity?: number;
+  max_per_user?: number;
+  _count?: {
+    claims: number;
+  };
+  claims?: any[];
 }
 
 interface VoucherCardProps {
@@ -17,10 +24,21 @@ interface VoucherCardProps {
   onClaim?: (id: number) => void;
   isClaimed?: boolean;
   isUsed?: boolean;
-  onUse?: (code: string) => void;
+  onUse?: (voucher: Voucher) => void;
 }
 
 export const VoucherCard: FC<VoucherCardProps> = ({ voucher, onClaim, isClaimed, isUsed, onUse }) => {
+  const now = new Date();
+  const startDate = new Date(voucher.start_date);
+  const endDate = new Date(voucher.end_date);
+  
+  const isExpired = now > endDate;
+  const isComingSoon = now < startDate;
+  const isOutOfStock = voucher.total_quantity ? (voucher._count?.claims || 0) >= voucher.total_quantity : false;
+  const isFullyClaimedByUser = voucher.claims ? voucher.claims.length >= (voucher.max_per_user || 1) : false;
+  
+  const isInactive = isExpired || isComingSoon || isOutOfStock;
+
   const isPercentage = voucher.discount_type === 'percentage';
   const discountDisplay = isPercentage 
     ? `${parseFloat(voucher.discount_value)}%` 
@@ -30,7 +48,7 @@ export const VoucherCard: FC<VoucherCardProps> = ({ voucher, onClaim, isClaimed,
     ? `Đơn tối thiểu ${Number(voucher.min_spend).toLocaleString('vi-VN')}đ` 
     : 'Không yêu cầu đơn tối thiểu';
 
-  const expiryDate = new Date(voucher.end_date).toLocaleDateString('vi-VN');
+  const expiryDate = endDate.toLocaleDateString('vi-VN');
   const targetLabel =
     voucher.target_type === 'new_buyer'
       ? 'Người dùng mới'
@@ -38,12 +56,17 @@ export const VoucherCard: FC<VoucherCardProps> = ({ voucher, onClaim, isClaimed,
         ? 'Người theo dõi'
         : 'Tất cả người dùng';
 
+  let statusBadge = null;
+  if (isExpired) statusBadge = { label: 'Hết hạn', color: 'bg-red-100 text-red-600' };
+  else if (isComingSoon) statusBadge = { label: 'Sắp diễn ra', color: 'bg-blue-100 text-blue-600' };
+  else if (isOutOfStock) statusBadge = { label: 'Hết lượt', color: 'bg-slate-100 text-slate-600' };
+
   return (
-    <div className="relative flex w-full max-w-sm h-32 group">
+    <div className={`relative flex w-full max-w-sm h-32 group ${isInactive ? 'opacity-60' : ''}`}>
       {/* Left side (Discount) */}
-      <div className="flex flex-col items-center justify-center w-28 bg-white border-y border-l border-[#e9f5ff] rounded-l-2xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1 bg-[#00629d]"></div>
-        <div className="text-2xl font-black text-[#00629d]">{discountDisplay}</div>
+      <div className={`flex flex-col items-center justify-center w-28 bg-white border-y border-l border-[#e9f5ff] rounded-l-2xl relative overflow-hidden ${isInactive ? 'grayscale' : ''}`}>
+        <div className={`absolute top-0 left-0 w-full h-1 ${isInactive ? 'bg-slate-400' : 'bg-[#00629d]'}`}></div>
+        <div className={`text-2xl font-black ${isInactive ? 'text-slate-400' : 'text-[#00629d]'}`}>{discountDisplay}</div>
         <div className="text-[10px] font-bold text-[#707882] uppercase tracking-tighter">
           {voucher.discount_type.replace('_', ' ')}
         </div>
@@ -54,10 +77,17 @@ export const VoucherCard: FC<VoucherCardProps> = ({ voucher, onClaim, isClaimed,
 
       {/* Right side (Details) */}
       <div className="flex-1 flex flex-col justify-between p-4 bg-white border border-[#e9f5ff] rounded-r-2xl relative">
-        <div className="absolute top-0 left-0 w-full h-1 bg-[#00629d]"></div>
+        <div className={`absolute top-0 left-0 w-full h-1 ${isInactive ? 'bg-slate-400' : 'bg-[#00629d]'}`}></div>
         
         <div>
-          <h4 className="font-bold text-[#0f1d25] text-sm line-clamp-1">{voucher.code}</h4>
+          <div className="flex items-start justify-between">
+            <h4 className="font-bold text-[#0f1d25] text-sm line-clamp-1">{voucher.code}</h4>
+            {statusBadge && (
+              <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase ${statusBadge.color}`}>
+                {statusBadge.label}
+              </span>
+            )}
+          </div>
           <p className="text-[11px] text-[#707882] mt-0.5">{minSpendDisplay}</p>
           <div className="flex items-center gap-1 mt-2">
             <span className="text-[9px] font-bold px-1.5 py-0.5 bg-[#e9f5ff] text-[#00629d] rounded uppercase">
@@ -81,17 +111,19 @@ export const VoucherCard: FC<VoucherCardProps> = ({ voucher, onClaim, isClaimed,
             >
               Đã dùng
             </button>
-          ) : isClaimed ? (
+          ) : isClaimed || isFullyClaimedByUser ? (
             <button 
-              onClick={() => onUse?.(voucher.code)}
-              className="px-4 py-1.5 bg-[#00629d] text-white text-[10px] font-black uppercase rounded-full hover:bg-[#004d7c] transition-colors"
+              onClick={() => !isInactive && onUse?.(voucher)}
+              disabled={isInactive}
+              className={`px-4 py-1.5 text-[10px] font-black uppercase rounded-full transition-all ${isInactive ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-[#00629d] text-white hover:bg-[#004d7c]'}`}
             >
               Dùng ngay
             </button>
           ) : (
             <button 
-              onClick={() => onClaim?.(voucher.id)}
-              className="px-4 py-1.5 border-2 border-[#00629d] text-[#00629d] text-[10px] font-black uppercase rounded-full hover:bg-[#00629d] hover:text-white transition-all"
+              onClick={() => !isInactive && onClaim?.(voucher.id)}
+              disabled={isInactive}
+              className={`px-4 py-1.5 border-2 text-[10px] font-black uppercase rounded-full transition-all ${isInactive ? 'border-slate-200 text-slate-400 cursor-not-allowed' : 'border-[#00629d] text-[#00629d] hover:bg-[#00629d] hover:text-white'}`}
             >
               Lưu
             </button>
@@ -103,7 +135,9 @@ export const VoucherCard: FC<VoucherCardProps> = ({ voucher, onClaim, isClaimed,
       </div>
 
       {/* Hover elevation */}
-      <div className="absolute inset-0 rounded-2xl bg-[#00629d]/5 scale-x-[1.02] scale-y-[1.05] opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none -z-10"></div>
+      {!isInactive && (
+        <div className="absolute inset-0 rounded-2xl bg-[#00629d]/5 scale-x-[1.02] scale-y-[1.05] opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none -z-10"></div>
+      )}
     </div>
   );
 };

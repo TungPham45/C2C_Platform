@@ -37,6 +37,7 @@ import ShopSalesAnalytics from '../pages/admin/ShopSalesAnalytics';
 import CategoryManagement from '../pages/admin/CategoryManagement';
 import { BannersAdminPage } from '../pages/admin/BannersAdminPage';
 import { VoucherList } from '../pages/admin/VoucherManagement/VoucherList';
+import { ReportModeration } from '../pages/admin/ReportModeration';
 import { SellerProtectedRoute } from '../components/auth/SellerProtectedRoute';
 import { BuyerProtectedRoute } from '../components/auth/BuyerProtectedRoute';
 import { AdminProtectedRoute } from '../components/auth/AdminProtectedRoute';
@@ -104,6 +105,7 @@ export function App() {
         <Route path="/admin/analytics/users" element={<UserAnalytics />} />
         <Route path="/admin/analytics/shop-sales" element={<ShopSalesAnalytics />} />
         <Route path="/admin/categories" element={<CategoryManagement />} />
+        <Route path="/admin/reports" element={<ReportModeration />} />
       </Route>
 
     </Routes>

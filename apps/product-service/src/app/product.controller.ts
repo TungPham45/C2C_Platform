@@ -239,6 +239,28 @@ export class ProductController {
     return this.productService.getShopsByIds(idArray);
   }
 
+  @Get('internal/admin/products-by-ids')
+  getProductsByIds(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query('ids') ids: string,
+  ) {
+    this.requireInternalAccess(headers);
+    if (!ids) return [];
+    const idArray = ids.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
+    return this.productService.getProductsByIds(idArray);
+  }
+
+  @Put('internal/admin/products/:id/status')
+  updateProductStatus(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Param('id') id: string,
+    @Body('status') status: string,
+    @Body('moderation_note') moderationNote?: string,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.productService.updateProductStatus(+id, status, moderationNote);
+  }
+
   // --- CATEGORY MANAGEMENT ---
 
   @Get('internal/admin/categories')

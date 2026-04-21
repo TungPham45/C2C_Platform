@@ -25,6 +25,8 @@ export class VoucherService {
     private productPrisma: ProductPrismaService,
   ) {}
 
+  private readonly allowedTargetTypes = ['all_buyers', 'new_buyer', 'followers'] as const;
+
   private async sendNotification(data: { user_id: number; title: string; message: string; type: string; link?: string }) {
     try {
       const authUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:3002/api/auth';
@@ -36,8 +38,6 @@ export class VoucherService {
       });
     } catch (e) {}
   }
-
-  private readonly allowedTargetTypes = ['all_buyers', 'new_buyer', 'followers'] as const;
 
   async getUserVoucherContext(userId: number) {
     const [user, follows, ownedShops] = await Promise.all([
@@ -199,7 +199,7 @@ export class VoucherService {
       for (const follower of followers) {
         await this.sendNotification({
           user_id: follower.user_id,
-          title: `Ư u đãi mới từ ${shop.name}!`,
+          title: `Ưu đãi mới từ ${shop.name}!`,
           message: `Shop "${shop.name}" vừa phát hành mã giảm giá "${voucher.code}" ${discountText}. Đổi ngay trước khi hết!`,
           type: 'SYSTEM',
           link: '/vouchers',
@@ -225,15 +225,20 @@ export class VoucherService {
     });
   }
 
-  async getAvailableVouchers(userId: number) {
+  async getAvailableVouchers(userId: number, onlyActive = false) {
     const userContext = await this.getUserVoucherContext(userId);
 
+    const where: any = {
+      status: 'active',
+    };
+
+    if (onlyActive) {
+      where.start_date = { lte: new Date() };
+      where.end_date = { gte: new Date() };
+    }
+
     const vouchers = await this.prisma.voucher.findMany({
-      where: {
-        status: 'active',
-        start_date: { lte: new Date() },
-        end_date: { gte: new Date() },
-      },
+      where,
       include: {
         claims: {
           where: { user_id: userId },
@@ -247,18 +252,23 @@ export class VoucherService {
     });
 
     return vouchers.filter(v => {
+      // We still filter by target eligibility (e.g. new buyers only)
       if (!this.isVoucherTargetEligible(v, userContext)) {
         return false;
       }
 
-      const totalClaimCount = v._count.claims;
-      const totalQuantity = v.total_quantity || 0;
-      const userClaimCount = v.claims.length;
+      if (onlyActive) {
+        const totalClaimCount = v._count.claims;
+        const totalQuantity = v.total_quantity || 0;
+        const userClaimCount = v.claims.length;
 
-      return (
-        (totalQuantity === 0 || totalClaimCount < totalQuantity) &&
-        userClaimCount < (v.max_per_user || 1)
-      );
+        return (
+          (totalQuantity === 0 || totalClaimCount < totalQuantity) &&
+          userClaimCount < (v.max_per_user || 1)
+        );
+      }
+
+      return true;
     });
   }
 

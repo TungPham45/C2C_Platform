@@ -1,7 +1,8 @@
-import { Injectable, Inject, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Inject, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { EmailService } from './email.service';
+import { NotificationsService } from './notifications.service';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -9,7 +10,8 @@ export class AuthService {
   constructor(
     @Inject(PrismaService) private prisma: PrismaService,
     @Inject(JwtService) private jwtService: JwtService,
-    @Inject(EmailService) private emailService: EmailService
+    @Inject(EmailService) private emailService: EmailService,
+    @Inject(NotificationsService) private notificationsService: NotificationsService
   ) {}
 
   async validateUser(email: string, pass: string): Promise<any> {
@@ -38,8 +40,6 @@ export class AuthService {
         email: user.email,
         full_name: user.full_name,
         role: user.role,
-        phone: user.phone,
-        avatar_url: user.avatar_url,
         shop: null
       }
     };
@@ -48,7 +48,12 @@ export class AuthService {
   async register(data: any) {
     const { password, ...rest } = data;
     const existingUser = await this.prisma.user.findUnique({ where: { email: data.email } });
-    if (existingUser) throw new BadRequestException('Email already registered');
+    if (existingUser) throw new BadRequestException('Email đã được đăng ký');
+
+    if (data.phone) {
+      const existingPhone = await this.prisma.user.findUnique({ where: { phone: data.phone } });
+      if (existingPhone) throw new BadRequestException('Số điện thoại đã được sử dụng');
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await this.prisma.user.create({
@@ -56,15 +61,25 @@ export class AuthService {
         ...rest,
         password: hashedPassword,
         role: 'user', 
-        status: 'active' // Tiện cho việc test: Bỏ qua bước chờ OTP
+        status: 'pending' // Đã khôi phục bước chờ OTP
       },
     });
+
+    await this.generateAndSendOtp(user.id, user.email, 'REGISTER');
 
     const { password: _, ...result } = user;
     return result;
   }
 
   // --- OTP & FORGOT PASSWORD LOGIC ---
+
+  async resendOtp(email: string, purpose: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) throw new NotFoundException('Không tìm thấy tài khoản');
+
+    await this.generateAndSendOtp(user.id, email, purpose);
+    return { message: 'Mã OTP mới đã được gửi' };
+  }
 
   async requestForgotPassword(email: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
@@ -117,9 +132,6 @@ export class AuthService {
     await this.verifyOtp(email, code, 'RESET_PASSWORD');
 
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) throw new NotFoundException('User not found');
-    if (!newPassword || newPassword.length < 6) throw new BadRequestException('Mật khẩu mới phải có ít nhất 6 ký tự');
-
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     await this.prisma.user.update({
@@ -151,14 +163,11 @@ export class AuthService {
   }
 
   async getAdminStats() {
-    const [totalUsers, activeUsers, pendingVerification, suspended] = await Promise.all([
-      this.prisma.user.count(),
-      this.prisma.user.count({ where: { status: 'active' } }),
-      this.prisma.user.count({ where: { status: 'pending_verification' } }),
-      this.prisma.user.count({ where: { status: { in: ['suspended', 'banned'] } } }),
-    ]);
+    const activeUsers = await this.prisma.user.count({
+      where: { status: 'active' },
+    });
 
-    return { totalUsers, activeUsers, pendingVerification, suspended };
+    return { activeUsers };
   }
 
   async getAllUsers() {
@@ -187,36 +196,29 @@ export class AuthService {
       throw new NotFoundException('User not found');
     }
 
-    return this.prisma.user.update({
+    await this.prisma.user.update({
       where: { id },
       data: { status },
       select: { id: true, status: true },
     });
-  }
 
-  async updateProfile(userId: number, data: { full_name?: string; phone?: string; avatar_url?: string }) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundException('User not found');
-
-    const updateData: any = {};
-    if (data.full_name !== undefined) updateData.full_name = data.full_name;
-    if (data.phone !== undefined) {
-      const phoneVal = data.phone?.trim() || null;
-      // Check if phone is already used by another user
-      if (phoneVal) {
-        const existing = await this.prisma.user.findFirst({ where: { phone: phoneVal, id: { not: userId } } });
-        if (existing) throw new BadRequestException('Số điện thoại này đã được sử dụng bởi tài khoản khác');
-      }
-      updateData.phone = phoneVal;
+    if (status === 'suspended') {
+      await this.notificationsService.createNotification({
+        user_id: id,
+        title: 'Tài khoản đã bị đình chỉ',
+        message: 'Tài khoản của bạn đã bị quản trị viên đình chỉ hoạt động do vi phạm quy tắc cộng đồng hoặc có hành vi gian lận.',
+        type: 'SYSTEM'
+      });
+    } else if (status === 'active') {
+      await this.notificationsService.createNotification({
+        user_id: id,
+        title: 'Tài khoản đã được khôi phục',
+        message: 'Chào mừng trở lại! Tài khoản của bạn đã được kích hoạt lại.',
+        type: 'SYSTEM'
+      });
     }
-    if (data.avatar_url !== undefined) updateData.avatar_url = data.avatar_url;
 
-    const updated = await this.prisma.user.update({
-      where: { id: userId },
-      data: updateData,
-      select: { id: true, email: true, full_name: true, phone: true, avatar_url: true, role: true },
-    });
-    return updated;
+    return { id, status };
   }
 
   async getUserGrowthAnalytics(timeframe?: string) {
@@ -258,7 +260,7 @@ export class AuthService {
     if (!ids.length) return [];
     return this.prisma.user.findMany({
       where: { id: { in: ids } },
-      select: { id: true, full_name: true, avatar_url: true },
+      select: { id: true, full_name: true, avatar_url: true, status: true },
     });
   }
 }

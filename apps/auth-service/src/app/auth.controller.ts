@@ -24,6 +24,9 @@ export class AuthController {
     if (user.status === 'suspended' || user.status === 'banned') {
       throw new ForbiddenException('Tài khoản của bạn đã bị đình chỉ hoặc khoá. Vui lòng liên hệ bộ phận hỗ trợ.');
     }
+    if (user.status === 'pending') {
+      throw new ForbiddenException('Tài khoản chưa được xác thực. Vui lòng xác thực mã OTP gửi qua Email trước khi đăng nhập.');
+    }
     return this.authService.login(user);
   }
 
@@ -42,6 +45,11 @@ export class AuthController {
     return this.authService.verifyOtp(body.email, body.code, body.purpose);
   }
 
+  @Post('resend-otp')
+  async resendOtp(@Body() body: { email: string; purpose: string }) {
+    return this.authService.resendOtp(body.email, body.purpose);
+  }
+
   @Post('reset-password')
   async resetPassword(@Body() body: any) {
     return this.authService.resetPassword(body);
@@ -51,13 +59,6 @@ export class AuthController {
   getAdminStats(@Headers() headers: Record<string, string | string[] | undefined>) {
     this.requireInternalAccess(headers);
     return this.authService.getAdminStats();
-  }
-
-  @Put('profile')
-  updateProfile(@Headers() headers: any, @Body() data: any) {
-    const userId = headers['x-user-id'];
-    if (!userId) throw new UnauthorizedException('Missing x-user-id');
-    return this.authService.updateProfile(parseInt(userId, 10), data);
   }
 
   @Get('internal/admin/users')
@@ -85,7 +86,7 @@ export class AuthController {
     return this.authService.getUserGrowthAnalytics(timeframe);
   }
 
-  @Get('internal/users-by-ids')
+  @Get('internal/admin/users-by-ids')
   getUsersByIds(
     @Headers() headers: Record<string, string | string[] | undefined>,
     @Query('ids') ids: string,

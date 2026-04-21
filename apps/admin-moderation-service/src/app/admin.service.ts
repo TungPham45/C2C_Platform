@@ -333,4 +333,69 @@ export class AdminService {
       method: 'DELETE',
     });
   }
+
+  // --- REPORT HELPERS ---
+
+  async getShopsByIds(ids: number[]) {
+    if (!ids.length) return [];
+    return this.requestJson<Array<{ id: number; name: string | null; owner_id: number | null; slug: string | null; logo_url: string | null }>>(
+      `${this.productBaseUrl}/internal/admin/shops-by-ids?ids=${ids.join(',')}`
+    ).catch(() => [] as any[]);
+  }
+
+  async getProductsByIds(ids: number[]) {
+    if (!ids.length) return [];
+    return this.requestJson<Array<{ id: number; name: string | null; shop_id: number | null }>>(
+      `${this.productBaseUrl}/internal/admin/products-by-ids?ids=${ids.join(',')}`
+    ).catch(() => [] as any[]);
+  }
+
+  async adminUpdateProductStatus(id: number, status: string, note?: string) {
+    return this.requestJson<any>(
+      `${this.productBaseUrl}/internal/admin/products/${id}/status`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, moderation_note: note }),
+      }
+    );
+  }
+
+  async hydrateReports(reports: any[]) {
+    if (!reports.length) return reports;
+
+    const shopIds = [...new Set(reports.map(r => r.shop_id).filter(Boolean))] as number[];
+    const productIds = [...new Set(reports.map(r => r.product_id).filter(Boolean))] as number[];
+    const reporterIds = [...new Set(reports.map(r => r.reporter_id).filter(Boolean))] as number[];
+
+    const [shops, products, users] = await Promise.all([
+      shopIds.length ? this.getShopsByIds(shopIds) : Promise.resolve([]),
+      productIds.length ? this.getProductsByIds(productIds) : Promise.resolve([]),
+      reporterIds.length
+        ? this.requestJson<any[]>(`${this.authBaseUrl}/internal/admin/users-by-ids?ids=${reporterIds.join(',')}`)
+            .catch(() => [] as any[])
+        : Promise.resolve([]),
+    ]);
+
+    const shopMap = Object.fromEntries((shops as any[]).map((s: any) => [s.id, s]));
+    const productMap = Object.fromEntries((products as any[]).map((p: any) => [p.id, p]));
+    const userMap = Object.fromEntries((users as any[]).map((u: any) => [u.id, u]));
+
+    return reports.map(report => {
+      const shop = report.shop_id ? (shopMap[report.shop_id] ?? null) : null;
+      const product = report.product_id ? (productMap[report.product_id] ?? null) : null;
+      const reporter = report.reporter_id ? (userMap[report.reporter_id] ?? null) : null;
+
+      return {
+        ...report,
+        shop_name: shop?.name || null,
+        product_name: product?.name || null,
+        reporter_name: reporter?.name || reporter?.full_name || null,
+        shop,
+        product,
+        reporter,
+      };
+    });
+  }
 }
+

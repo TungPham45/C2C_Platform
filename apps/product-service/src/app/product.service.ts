@@ -1054,14 +1054,28 @@ export class ProductService {
         this.sendNotification({
           user_id: shop.owner_id,
           title: 'Yêu cầu mở Shop bị từ chối',
-          message: `Rất tiếc, yêu cầu mở Shop "${shop.name}" của bạn đã bị từ chối. Vui lòng liên hệ hỗ trợ để biết thêm thông tin.`,
+          message: `Rất tiếc, yêu cầu mở Shop "${shop.name}" của bạn đã bị từ chối. Vui lòng liên hệ bộ phận hỗ trợ để biết thêm thông tin.`,
+          type: 'SYSTEM'
+        });
+      } else if (status === 'suspended') {
+        this.sendNotification({
+          user_id: shop.owner_id,
+          title: 'Cửa hàng đã bị đình chỉ',
+          message: `Cửa hàng "${shop.name}" của bạn đã bị quản trị viên đình chỉ hoạt động do vi phạm chính sách hoặc có báo cáo tiêu cực.`,
           type: 'SYSTEM'
         });
       } else if (status === 'banned') {
         this.sendNotification({
           user_id: shop.owner_id,
-          title: 'Shop đã bị đình chỉ',
-          message: `Cửa hàng "${shop.name}" của bạn đã bị quản trị viên đình chỉ hoạt động.`,
+          title: 'Shop đã bị khoá vĩnh viễn',
+          message: `Cửa hàng "${shop.name}" của bạn đã bị khoá vĩnh viễn. Mọi lệnh rút tiền và giao dịch sẽ bị phong toả để đối soát.`,
+          type: 'SYSTEM'
+        });
+      } else if (status === 'active' && shop.status !== 'active') {
+        this.sendNotification({
+          user_id: shop.owner_id,
+          title: 'Cửa hàng đã được kích hoạt',
+          message: `Chúc mừng! Cửa hàng "${shop.name}" của bạn đã được kích hoạt trở lại.`,
           type: 'SYSTEM'
         });
       }
@@ -1073,7 +1087,27 @@ export class ProductService {
   async getShopsByIds(ids: number[]) {
     return this.prisma.shop.findMany({
       where: { id: { in: ids } },
-      select: { id: true, name: true, logo_url: true }
+      select: { id: true, name: true, logo_url: true, slug: true, owner_id: true }
+    });
+  }
+
+  async getProductsByIds(ids: number[]) {
+    return this.prisma.product.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true, shop_id: true, status: true }
+    });
+  }
+
+  async updateProductStatus(id: number, status: string, moderationNote?: string) {
+    const product = await this.prisma.product.findUnique({ where: { id }, select: { id: true, shop_id: true } });
+    if (!product) throw new Error('Product not found');
+    return this.prisma.product.update({
+      where: { id },
+      data: {
+        status,
+        ...(moderationNote ? { moderation_note: moderationNote } : {}),
+      },
+      select: { id: true, status: true, shop_id: true }
     });
   }
 
