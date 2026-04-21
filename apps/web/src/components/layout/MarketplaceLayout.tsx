@@ -1,12 +1,22 @@
 import { FC, ReactNode, useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '../../hooks/useCart';
+import { NotificationBell } from './NotificationBell';
+import { SearchBar } from './SearchBar';
 import { FaFacebookF, FaInstagram, FaTwitter, FaYoutube } from "react-icons/fa6";
 interface MarketplaceLayoutProps {
   children: ReactNode;
+  /** Replaces the default marketplace search field (e.g. “Search in this shop…”). */
+  searchSlot?: ReactNode;
+  /** Compact Serene header: cart, notifications, profile — hides seller shortcut. */
+  storefrontHeader?: boolean;
 }
 
-export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
+export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({
+  children,
+  searchSlot,
+  storefrontHeader,
+}) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -46,62 +56,95 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const navShell = storefrontHeader
+    ? 'max-w-[1280px] mx-auto h-[60px] rounded-full flex items-center justify-between px-6 lg:px-8 bg-white shadow-[0_4px_24px_rgba(43,120,197,0.08)] border border-[#e8f0fb]'
+    : `max-w-7xl mx-auto h-16 rounded-3xl flex items-center justify-between px-8 transition-all duration-500 ${isScrolled ? 'bg-white/80 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,98,157,0.06)] border border-white/40' : 'bg-white/40 backdrop-blur-md border border-white/20'}`;
+
   return (
-    <div className="min-h-screen bg-[#f5faff] font-['Inter'] text-[#0f1d25]">
+    <div className={`min-h-screen font-['Inter'] text-[#0f1d25] ${storefrontHeader ? 'bg-[#f0f7ff]' : 'bg-[#f5faff]'}`}>
       {/* Floating Header */}
-      <header className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 px-6 py-4 ${isScrolled ? 'mt-0' : 'mt-4'}`}>
-        <nav className={`max-w-7xl mx-auto h-16 rounded-3xl flex items-center justify-between px-8 transition-all duration-500 ${isScrolled ? 'bg-white/80 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,98,157,0.06)] border border-white/40' : 'bg-white/40 backdrop-blur-md border border-white/20'}`}>
+      <header className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 px-6 py-4 ${storefrontHeader ? 'mt-2' : isScrolled ? 'mt-0' : 'mt-4'}`}>
+        <nav className={navShell}>
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 bg-gradient-to-br from-[#00629d] to-[#42a5f5] rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 group-hover:rotate-12 transition-transform">
-              <span className="material-symbols-outlined text-white text-2xl font-bold italic">eco</span>
-            </div>
-            <span className="text-xl font-black font-['Plus_Jakarta_Sans'] tracking-tight bg-gradient-to-r from-[#00629d] to-[#42a5f5] bg-clip-text text-transparent">Serene</span>
+          <Link
+            to="/"
+            className={`flex items-center shrink-0 group ${storefrontHeader ? 'gap-0' : 'gap-3'}`}
+          >
+            {!storefrontHeader && (
+              <div className="w-10 h-10 bg-gradient-to-br from-[#00629d] to-[#42a5f5] rounded-xl flex items-center justify-center shadow-lg shadow-blue-200 group-hover:rotate-12 transition-transform">
+                <span className="material-symbols-outlined text-white text-2xl font-bold italic">eco</span>
+              </div>
+            )}
+            <span
+              className={`text-xl font-black font-['Plus_Jakarta_Sans'] tracking-tight ${storefrontHeader
+                  ? 'text-[#2b82c9]'
+                  : 'bg-gradient-to-r from-[#00629d] to-[#42a5f5] bg-clip-text text-transparent'
+                }`}
+            >
+              Serene
+            </span>
           </Link>
 
-          {/* Search Bar */}
-          <div className="hidden md:flex items-center flex-1 max-w-xl mx-12">
-            <div className="w-full relative group">
-              <input
-                type="text"
-                placeholder="Tìm kiếm sản phẩm, cửa hàng..."
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    const val = e.currentTarget.value.trim();
-                    if (val) navigate(`/products?q=${encodeURIComponent(val)}`);
-                  }
-                }}
-                className="w-full h-11 pl-12 pr-4 bg-[#f5faff]/50 border border-transparent focus:bg-white focus:border-[#00629d]/10 rounded-2xl text-sm outline-none transition-all placeholder:text-[#707882]/50"
-              />
-              <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#707882] group-focus-within:text-[#00629d] transition-colors">search</span>
-            </div>
+          <div
+            className={`hidden md:flex items-center flex-1 justify-center ${storefrontHeader ? 'mx-4 lg:mx-10' : 'max-w-xl mx-12'}`}
+          >
+            {searchSlot ?? <SearchBar />}
           </div>
 
-          {/* User Actions */}
-          <div className="flex items-center gap-6 text-sm font-bold">
-            {currentUser?.role === 'admin' ? (
-              <Link to="/admin" className="hidden lg:flex items-center gap-2 text-[#00629d] hover:opacity-70 transition-opacity">
-                <span className="material-symbols-outlined text-xl">admin_panel_settings</span>
-                Quản Trị Viên
-              </Link>
-            ) : (
-              <Link to="/seller/center" className="hidden lg:flex items-center gap-2 text-[#00629d] hover:opacity-70 transition-opacity">
-                <span className="material-symbols-outlined text-xl">store</span>
-                Kênh Người Bán
-              </Link>
-            )}
-            <div className="w-px h-6 bg-[#00629d]/10 hidden lg:block"></div>
+          {/* Mobile search icon when storefront uses custom slot */}
+          {storefrontHeader && searchSlot && (
+            <div className="md:hidden flex-1 flex justify-center px-2 min-w-0">{searchSlot}</div>
+          )}
 
-            <div className="flex items-center gap-4">
+          {/* User Actions */}
+          <div className="flex items-center gap-4 lg:gap-5 text-sm font-bold shrink-0">
+            {!storefrontHeader && (
+              <>
+                {currentUser?.role === 'admin' ? (
+                  <Link
+                    to="/admin"
+                    className="hidden lg:flex items-center gap-2 text-[#00629d] hover:opacity-70 transition-opacity"
+                  >
+                    <span className="material-symbols-outlined text-xl">admin_panel_settings</span>
+                    Quản Trị Viên
+                  </Link>
+                ) : (
+                  <Link
+                    to="/seller/center"
+                    className="hidden lg:flex items-center gap-2 text-[#00629d] hover:opacity-70 transition-opacity"
+                  >
+                    <span className="material-symbols-outlined text-xl">store</span>
+                    Kênh Người Bán
+                  </Link>
+                )}
+                <div className="w-px h-6 bg-[#00629d]/10 hidden lg:block" />
+              </>
+            )}
+            <div className="flex items-center gap-2 sm:gap-3">
               {currentUser?.role !== 'admin' && (
                 <>
-                  <Link to="/messages" className="relative w-10 h-10 flex items-center justify-center text-[#0f1d25] hover:bg-white/50 rounded-xl transition-colors" title="Tin nhắn">
-                    <span className="material-symbols-outlined">chat</span>
-                  </Link>
-                  <Link to="/cart" className="relative w-10 h-10 flex items-center justify-center text-[#0f1d25] hover:bg-white/50 rounded-xl transition-colors">
-                    <span className="material-symbols-outlined">shopping_bag</span>
+                  {currentUser && !storefrontHeader && <NotificationBell />}
+                  {!storefrontHeader && (
+                    <Link
+                      to="/messages"
+                      className="relative w-10 h-10 flex items-center justify-center text-[#0f1d25] hover:bg-white/50 rounded-xl transition-colors"
+                      title="Tin nhắn"
+                    >
+                      <span className="material-symbols-outlined">chat</span>
+                    </Link>
+                  )}
+                  <Link
+                    to="/cart"
+                    className={`relative w-10 h-10 flex items-center justify-center transition-colors ${storefrontHeader
+                        ? 'text-[#1a2b3c] hover:bg-[#EBF4FF] rounded-full'
+                        : 'text-[#0f1d25] hover:bg-white/50 rounded-xl'
+                      }`}
+                  >
+                    <span className={`material-symbols-outlined ${storefrontHeader ? 'text-[22px]' : ''}`}>
+                      {storefrontHeader ? 'shopping_cart' : 'shopping_bag'}
+                    </span>
                     {totalCartItems > 0 && (
-                      <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-[#ba1a1a] text-white text-[10px] flex items-center justify-center rounded-full font-bold">
+                      <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-[#ba1a1a] text-white text-[10px] flex items-center justify-center rounded-full font-bold">
                         {totalCartItems}
                       </span>
                     )}
@@ -109,56 +152,145 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({ children }) => {
                 </>
               )}
 
+              {storefrontHeader && currentUser && (
+                <NotificationBell />
+              )}
+
               {currentUser ? (
-                <div className="relative group">
-                  <button className="px-6 py-2.5 bg-[#00629d] text-white rounded-full hover:bg-[#004e7c] transition-all shadow-md shadow-blue-500/20 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-sm">person</span>
-                    {currentUser.role === 'admin' ? 'Quản Trị Viên' : (currentUser.full_name || currentUser.email.split('@')[0])}
-                  </button>
-                  {/* Dropdown Menu */}
-                  <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-[#dbeaf5] rounded-2xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right group-hover:translate-y-0 translate-y-2 z-50 overflow-hidden">
-                    <div className="py-2">
-                      {currentUser.role === 'admin' ? (
-                        <>
-                          <Link to="/admin" className="flex items-center gap-3 px-5 py-3 hover:bg-purple-50 transition-colors text-sm font-bold text-[#0f1d25]">
-                            <span className="material-symbols-outlined text-purple-600 text-lg">admin_panel_settings</span>
-                            Bảng quản trị
-                          </Link>
-                          <Link to="/admin/products" className="flex items-center gap-3 px-5 py-3 hover:bg-purple-50 transition-colors text-sm font-bold text-[#0f1d25]">
-                            <span className="material-symbols-outlined text-purple-600 text-lg">inventory_2</span>
-                            Duyệt sản phẩm
-                          </Link>
-                          <Link to="/admin/users" className="flex items-center gap-3 px-5 py-3 hover:bg-purple-50 transition-colors text-sm font-bold text-[#0f1d25]">
-                            <span className="material-symbols-outlined text-purple-600 text-lg">group</span>
-                            Quản lý người dùng
-                          </Link>
-                        </>
-                      ) : (
-                        <>
-                          <Link to="/profile" className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]">
-                            <span className="material-symbols-outlined text-[#00629d] text-lg">manage_accounts</span>
-                            Hồ sơ của tôi
-                          </Link>
-                          <Link to="/orders" className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]">
-                            <span className="material-symbols-outlined text-[#00629d] text-lg">receipt_long</span>
-                            Đơn mua
-                          </Link>
-                          <Link to="/vouchers" className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]">
-                            <span className="material-symbols-outlined text-[#00629d] text-lg">confirmation_number</span>
-                            Mã giảm giá
-                          </Link>
-                        </>
-                      )}
-                      <div className="border-t border-[#e9f5ff] my-1"></div>
-                      <button onClick={handleLogout} className="w-full flex items-center gap-3 px-5 py-3 hover:bg-red-50 hover:text-red-600 transition-colors text-sm font-bold text-[#707882] text-left">
-                        <span className="material-symbols-outlined text-lg">logout</span>
-                        Đăng xuất
-                      </button>
+                storefrontHeader ? (
+                  <div className="relative group">
+                    <button
+                      type="button"
+                      className="w-10 h-10 rounded-full bg-gradient-to-br from-[#2b82c9] to-[#5aa3e8] flex items-center justify-center text-white text-sm font-black ring-2 ring-white shadow-md"
+                      aria-label="Tài khoản"
+                    >
+                      {(currentUser.full_name || currentUser.email || '?').charAt(0).toUpperCase()}
+                    </button>
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-[#dbeaf5] rounded-2xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 overflow-hidden">
+                      <div className="py-2">
+                        {currentUser.role === 'admin' ? (
+                          <>
+                            <Link to="/admin" className="flex items-center gap-3 px-5 py-3 hover:bg-purple-50 transition-colors text-sm font-bold text-[#0f1d25]">
+                              <span className="material-symbols-outlined text-purple-600 text-lg">admin_panel_settings</span>
+                              Bảng quản trị
+                            </Link>
+                            <Link to="/admin/products" className="flex items-center gap-3 px-5 py-3 hover:bg-purple-50 transition-colors text-sm font-bold text-[#0f1d25]">
+                              <span className="material-symbols-outlined text-purple-600 text-lg">inventory_2</span>
+                              Duyệt sản phẩm
+                            </Link>
+                            <Link to="/admin/users" className="flex items-center gap-3 px-5 py-3 hover:bg-purple-50 transition-colors text-sm font-bold text-[#0f1d25]">
+                              <span className="material-symbols-outlined text-purple-600 text-lg">group</span>
+                              Quản lý người dùng
+                            </Link>
+                          </>
+                        ) : (
+                          <>
+                            <Link
+                              to="/profile"
+                              className="flex items-center gap-3 px-5 py-3 hover:bg-[#EBF4FF] transition-colors text-sm font-bold text-[#0f1d25]"
+                            >
+                              <span className="material-symbols-outlined text-[#2b82c9] text-lg">manage_accounts</span>
+                              Hồ sơ của tôi
+                            </Link>
+                            <Link
+                              to="/orders"
+                              className="flex items-center gap-3 px-5 py-3 hover:bg-[#EBF4FF] transition-colors text-sm font-bold text-[#0f1d25]"
+                            >
+                              <span className="material-symbols-outlined text-[#2b82c9] text-lg">receipt_long</span>
+                              Đơn mua
+                            </Link>
+                            <Link to="/vouchers" className="flex items-center gap-3 px-5 py-3 hover:bg-[#EBF4FF] transition-colors text-sm font-bold text-[#0f1d25]">
+                              <span className="material-symbols-outlined text-[#2b82c9] text-lg">confirmation_number</span>
+                              Mã giảm giá
+                            </Link>
+                          </>
+                        )}
+                        <div className="border-t border-[#e9f5ff] my-1" />
+                        <button
+                          onClick={handleLogout}
+                          className="w-full flex items-center gap-3 px-5 py-3 hover:bg-red-50 hover:text-red-600 transition-colors text-sm font-bold text-[#707882] text-left"
+                        >
+                          <span className="material-symbols-outlined text-lg">logout</span>
+                          Đăng xuất
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="relative group">
+                    <button className="px-6 py-2.5 bg-[#00629d] text-white rounded-full hover:bg-[#004e7c] transition-all shadow-md shadow-blue-500/20 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-sm">person</span>
+                      {currentUser.role === 'admin'
+                        ? 'Quản Trị Viên'
+                        : currentUser.full_name || currentUser.email?.split('@')[0]}
+                    </button>
+                    {/* Dropdown Menu */}
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-[#dbeaf5] rounded-2xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right group-hover:translate-y-0 translate-y-2 z-50 overflow-hidden">
+                      <div className="py-2">
+                        {currentUser.role === 'admin' ? (
+                          <>
+                            <Link to="/admin" className="flex items-center gap-3 px-5 py-3 hover:bg-purple-50 transition-colors text-sm font-bold text-[#0f1d25]">
+                              <span className="material-symbols-outlined text-purple-600 text-lg">admin_panel_settings</span>
+                              Bảng quản trị
+                            </Link>
+                            <Link to="/admin/products" className="flex items-center gap-3 px-5 py-3 hover:bg-purple-50 transition-colors text-sm font-bold text-[#0f1d25]">
+                              <span className="material-symbols-outlined text-purple-600 text-lg">inventory_2</span>
+                              Duyệt sản phẩm
+                            </Link>
+                            <Link to="/admin/users" className="flex items-center gap-3 px-5 py-3 hover:bg-purple-50 transition-colors text-sm font-bold text-[#0f1d25]">
+                              <span className="material-symbols-outlined text-purple-600 text-lg">group</span>
+                              Quản lý người dùng
+                            </Link>
+                          </>
+                        ) : (
+                          <>
+                            <Link
+                              to="/profile"
+                              className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]"
+                            >
+                              <span className="material-symbols-outlined text-[#00629d] text-lg">manage_accounts</span>
+                              Hồ sơ của tôi
+                            </Link>
+                            <Link
+                              to="/orders"
+                              className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]"
+                            >
+                              <span className="material-symbols-outlined text-[#00629d] text-lg">receipt_long</span>
+                              Đơn mua
+                            </Link>
+                            <Link to="/vouchers" className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]">
+                              <span className="material-symbols-outlined text-[#00629d] text-lg">confirmation_number</span>
+                              Mã giảm giá
+                            </Link>
+                          </>
+                        )}
+                        <div className="border-t border-[#e9f5ff] my-1"></div>
+                        <button
+                          onClick={handleLogout}
+                          className="w-full flex items-center gap-3 px-5 py-3 hover:bg-red-50 hover:text-red-600 transition-colors text-sm font-bold text-[#707882] text-left"
+                        >
+                          <span className="material-symbols-outlined text-lg">logout</span>
+                          Đăng xuất
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              ) : storefrontHeader ? (
+                <Link
+                  to="/login"
+                  state={{ from: location.pathname }}
+                  className="w-10 h-10 rounded-full bg-[#e8f1fa] border border-[#d0e4f7] flex items-center justify-center text-[#2b82c9] hover:bg-white transition-colors"
+                  aria-label="Đăng nhập"
+                >
+                  <span className="material-symbols-outlined text-[22px]">person</span>
+                </Link>
               ) : (
-                <Link to="/login" state={{ from: location.pathname }} className="px-6 py-2.5 bg-[#0f1d25] text-white rounded-full hover:scale-105 active:scale-95 transition-all shadow-lg shadow-slate-200">
+                <Link
+                  to="/login"
+                  state={{ from: location.pathname }}
+                  className="px-6 py-2.5 bg-[#0f1d25] text-white rounded-full hover:scale-105 active:scale-95 transition-all shadow-lg shadow-slate-200"
+                >
                   Đăng nhập
                 </Link>
               )}

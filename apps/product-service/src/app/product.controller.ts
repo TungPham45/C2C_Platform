@@ -69,6 +69,12 @@ export class ProductController {
     return this.productService.getShopProducts(userId);
   }
 
+  @Put('seller/shop')
+  updateShop(@Headers() headers: any, @Body() data: any) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.updateShop(userId, data);
+  }
+
   @Get('seller/context')
   getSellerContext(@Headers() headers: any) {
     const userId = this.getProviderUserId(headers);
@@ -131,22 +137,56 @@ export class ProductController {
     return this.productService.syncCategoryProducts(userId, +id, body.productIds);
   }
 
+
+  @Get('seller/analytics')
+  getSellerAnalytics(@Headers() headers: any, @Query('days') days?: string) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.getSellerAnalytics(userId, days ? +days : 10);
+  }
+
+  // --- SELLER REVIEW ROUTES ---
+
+  @Get('seller/reviews')
+  getShopReviews(
+    @Headers() headers: any,
+    @Query('rating') rating?: string,
+    @Query('status') status?: string,
+  ) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.getShopReviews(userId, {
+      rating: rating ? parseInt(rating) : undefined,
+      status
+    });
+  }
+
+  @Post('seller/reviews/:id/reply')
+  replyToReview(@Headers() headers: any, @Param('id') id: string, @Body('reply') reply: string) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.replyToReview(userId, +id, reply);
+  }
+
   @Get('seller/:id')
   getSellerProductDetail(@Headers() headers: any, @Param('id') id: string) {
     const userId = this.getProviderUserId(headers);
-    return this.productService.getSellerProductById(userId, +id);
+    const productId = parseInt(id, 10);
+    if (isNaN(productId)) throw new BadRequestException('Invalid product ID');
+    return this.productService.getSellerProductById(userId, productId);
   }
 
   @Put('seller/:id')
   updateProduct(@Headers() headers: any, @Param('id') id: string, @Body() data: any) {
     const userId = this.getProviderUserId(headers);
-    return this.productService.updateProduct(userId, +id, data);
+    const productId = parseInt(id, 10);
+    if (isNaN(productId)) throw new BadRequestException('Invalid product ID');
+    return this.productService.updateProduct(userId, productId, data);
   }
 
   @Delete('seller/:id')
   deleteProduct(@Headers() headers: any, @Param('id') id: string) {
     const userId = this.getProviderUserId(headers);
-    return this.productService.deleteProduct(userId, +id);
+    const productId = parseInt(id, 10);
+    if (isNaN(productId)) throw new BadRequestException('Invalid product ID');
+    return this.productService.deleteProduct(userId, productId);
   }
 
   // --- INTERNAL ADMIN ROUTES ---
@@ -197,6 +237,28 @@ export class ProductController {
     if (!ids) return [];
     const idArray = ids.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
     return this.productService.getShopsByIds(idArray);
+  }
+
+  @Get('internal/admin/products-by-ids')
+  getProductsByIds(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query('ids') ids: string,
+  ) {
+    this.requireInternalAccess(headers);
+    if (!ids) return [];
+    const idArray = ids.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
+    return this.productService.getProductsByIds(idArray);
+  }
+
+  @Put('internal/admin/products/:id/status')
+  updateProductStatus(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Param('id') id: string,
+    @Body('status') status: string,
+    @Body('moderation_note') moderationNote?: string,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.productService.updateProductStatus(+id, status, moderationNote);
   }
 
   // --- CATEGORY MANAGEMENT ---
@@ -322,7 +384,6 @@ export class ProductController {
     this.requireInternalAccess(headers);
     return this.productService.deleteAttributeOption(+id);
   }
-
   @Get('internal/admin/pending-products')
   getPendingProducts(@Headers() headers: Record<string, string | string[] | undefined>) {
     this.requireInternalAccess(headers);
@@ -350,6 +411,18 @@ export class ProductController {
 
   // --- PUBLIC ROUTES (TAXONOMY MUST BE BEFORE :id) ---
 
+  // --- PUBLIC SHOP STOREFRONT ---
+
+  @Get('shops/:id')
+  getPublicShop(@Param('id') id: string) {
+    return this.productService.getPublicShopById(+id);
+  }
+
+  @Get('shops/:id/products')
+  getPublicShopProducts(@Param('id') id: string) {
+    return this.productService.getPublicShopProducts(+id);
+  }
+
   @Get('shop/:shopId')
   getShopDetail(@Headers() headers: any, @Param('shopId') shopId: string) {
     return this.productService.getPublicShopDetail(+shopId, this.getOptionalProviderUserId(headers));
@@ -373,8 +446,48 @@ export class ProductController {
     return this.productService.getActiveProducts(query, categorySlug);
   }
 
+  // --- PUBLIC REVIEW ROUTES (must be before :id catch-all) ---
+
+  @Get('reviews/me')
+  getMyReviews(@Headers() headers: any) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.getMyReviews(userId);
+  }
+
+  @Get(':id/reviews')
+  getProductReviews(@Param('id') id: string, @Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.productService.getProductReviews(+id, page ? +page : 1, limit ? +limit : 10);
+  }
+
+  @Post(':id/reviews')
+  createReview(@Headers() headers: any, @Param('id') id: string, @Body() data: any) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.createReview(userId, +id, data);
+  }
+
+  @Put(':id/reviews/:reviewId')
+  updateReview(
+    @Headers() headers: any,
+    @Param('reviewId') reviewId: string,
+    @Body() data: { rating?: number; comment?: string; media_urls?: string[] }
+  ) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.updateReview(userId, +reviewId, data);
+  }
+
+  @Delete(':id/reviews/:reviewId')
+  deleteReview(
+    @Headers() headers: any,
+    @Param('reviewId') reviewId: string
+  ) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.deleteReview(userId, +reviewId);
+  }
+
   @Get(':id')
   getProductDetail(@Param('id') id: string) {
-    return this.productService.getProductById(+id);
+    const productId = parseInt(id, 10);
+    if (isNaN(productId)) throw new BadRequestException('Invalid product ID');
+    return this.productService.getProductById(productId);
   }
 }

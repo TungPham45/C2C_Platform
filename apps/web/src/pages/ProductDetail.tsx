@@ -4,6 +4,7 @@ import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useProducts } from '../hooks/useProducts';
 import { useCart } from '../hooks/useCart';
 import { formatVnd, formatPriceRange } from '../utils/currency';
+import ReportModal from '../components/shared/ReportModal';
 
 export const ProductDetailPage: FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +20,7 @@ export const ProductDetailPage: FC = () => {
   const [isStartingChat, setIsStartingChat] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const { addToCart } = useCart();
 
@@ -438,6 +440,15 @@ export const ProductDetailPage: FC = () => {
                            <span className="material-symbols-outlined">shopping_bag</span>
                            Mua ngay
                         </button>
+                        {currentUser && (
+                          <button
+                            onClick={() => setShowReportModal(true)}
+                            className="h-14 w-14 bg-white border-2 border-red-300 text-red-400 rounded-full font-bold flex items-center justify-center transition-all hover:bg-red-50 hover:border-red-500 hover:text-red-600 active:scale-[0.98]"
+                            title="Tố cáo sản phẩm"
+                          >
+                            <span className="material-symbols-outlined text-[20px]">flag</span>
+                          </button>
+                        )}
                      </>
                   )}
               </div>
@@ -611,6 +622,15 @@ export const ProductDetailPage: FC = () => {
           Xem Giỏ
         </Link>
       </div>
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        targetType="product"
+        targetId={product?.id}
+        reporterId={currentUser?.id}
+      />
 
     </MarketplaceLayout>
   );

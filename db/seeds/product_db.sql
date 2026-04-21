@@ -426,6 +426,34 @@ LEFT JOIN product_attribute_values existing
  AND existing.attribute_id = ad.id
 WHERE existing.id IS NULL;
 
+-- Ensure review table has seller_reply columns and unique constraint
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'reviews' AND column_name = 'seller_reply'
+  ) THEN
+    ALTER TABLE reviews ADD COLUMN seller_reply TEXT;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'reviews' AND column_name = 'replied_at'
+  ) THEN
+    ALTER TABLE reviews ADD COLUMN replied_at TIMESTAMP(6);
+  END IF;
+END
+$$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'reviews_user_id_product_id_shop_order_id_key'
+  ) THEN
+    ALTER TABLE reviews ADD CONSTRAINT reviews_user_id_product_id_shop_order_id_key UNIQUE (user_id, product_id, shop_order_id);
+  END IF;
+END
+$$;
+
 WITH review_rows(user_id, product_slug, shop_order_id, rating, comment, media_urls) AS (
   VALUES
     (1, 'classic-t-shirt', 9001, 5, 'Chất vải mềm và form mặc dễ chịu.', '[]'::jsonb),
@@ -446,3 +474,4 @@ LEFT JOIN reviews existing
  AND existing.product_id = p.id
  AND existing.comment = r.comment
 WHERE existing.id IS NULL;
+

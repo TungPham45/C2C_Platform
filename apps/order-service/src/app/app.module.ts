@@ -8,10 +8,11 @@ import { ProductPrismaService } from './product-prisma.service';
 import { VoucherController } from './voucher.controller';
 import { VoucherService } from './voucher.service';
 import { AuthPrismaService } from './auth-prisma.service';
+import { NotificationClientService } from './notification-client.service';
 
 @Module({
   imports: [],
   controllers: [OrderController, CartController, VoucherController],
-  providers: [OrderService, CartService, PrismaService, ProductPrismaService, VoucherService, AuthPrismaService],
+  providers: [OrderService, CartService, PrismaService, ProductPrismaService, VoucherService, AuthPrismaService, NotificationClientService],
 })
-export class AppModule {}
+export class AppModule { }

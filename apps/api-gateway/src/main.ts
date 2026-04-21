@@ -3,9 +3,12 @@ import { AppModule } from './app/app.module';
 import { Logger } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 import { createReverseProxy } from './app/reverse-proxy';
+import { json, urlencoded } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.use(json({ limit: '10mb' }));
+  app.use(urlencoded({ limit: '10mb', extended: true }));
   app.enableCors();
   const authServiceUrl = process.env.AUTH_SERVICE_URL ?? 'http://localhost:3002/api/auth';
   const productServiceUrl = process.env.PRODUCT_SERVICE_URL ?? 'http://localhost:3001/api/products';
@@ -42,6 +45,10 @@ async function bootstrap() {
 
   // Proxy Admin Service
   app.use('/api/admin', createReverseProxy(adminServiceUrl));
+
+  // Proxy Report API (part of Admin/Moderation Service)
+  const adminBaseUrl = adminServiceUrl.replace(/\/api\/admin\/?$/, '');
+  app.use('/api/reports', createReverseProxy(`${adminBaseUrl}/api/reports`));
 
   // Proxy Order Service
   app.use('/api/orders', createReverseProxy(orderServiceUrl));

@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Body, Param, Put, Query, Req, UnauthorizedException, Headers, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Query, Req, UnauthorizedException, Headers, ForbiddenException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { OrderService } from './order.service';
 
 @Controller('orders')
 export class OrderController {
-  constructor(private readonly orderService: OrderService) {}
+  constructor(private readonly orderService: OrderService) { }
 
   private requireInternalAccess(headers: Record<string, string | string[] | undefined>) {
     const expectedToken = process.env.INTERNAL_SERVICE_TOKEN ?? 'internal-dev-token';
@@ -29,15 +29,41 @@ export class OrderController {
   }
 
   @Get('buyer')
-  async getBuyerOrders(@Query('userId') userId: string) {
+  async getBuyerOrders(@Req() req: any) {
+    const userId = req.headers['x-user-id'];
+    if (!userId) throw new UnauthorizedException('User not authenticated');
     return this.orderService.getBuyerOrders(parseInt(userId));
   }
 
   @Get('seller')
-  async getSellerOrders(@Query('shopId') shopId: string) {
-    return this.orderService.getSellerOrders(parseInt(shopId));
+  async getSellerOrders(@Req() req: any) {
+    const userId = req.headers['x-user-id'];
+    if (!userId) throw new UnauthorizedException('User not authenticated');
+    return this.orderService.getSellerOrders(parseInt(userId));
   }
 
+  // Internal routes — MUST be before :id to avoid being caught by the wildcard
+  @Get('internal/admin/analytics/shop-sales')
+  getShopSalesAnalytics(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query('timeframe') timeframe: string,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.orderService.getShopSalesAnalytics(timeframe);
+  }
+
+  @Get('internal/seller-analytics')
+  getSingleShopAnalytics(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query('shopId') shopId: string,
+    @Query('days') days?: string,
+  ) {
+    this.requireInternalAccess(headers);
+    if (!shopId) throw new BadRequestException('shopId is required');
+    return this.orderService.getSingleShopAnalytics(+shopId, days ? +days : 10);
+  }
+
+  // Wildcard :id routes — MUST be last to avoid catching named routes above
   @Get(':id')
   async getOrderDetail(@Param('id') id: string) {
     return this.orderService.getOrderDetail(parseInt(id));
@@ -45,9 +71,12 @@ export class OrderController {
 
   @Put(':id/status')
   async updateStatus(
+    @Req() req: any,
     @Param('id') id: string,
     @Body() body: { status: string; tracking_number?: string; carrier_name?: string }
   ) {
+    const userId = req.headers['x-user-id'];
+    if (!userId) throw new UnauthorizedException('User not authenticated');
     const { status, tracking_number, carrier_name } = body;
     return this.orderService.updateOrderStatus(parseInt(id), status, {
       tracking_number,
@@ -59,14 +88,5 @@ export class OrderController {
   getAdminStats(@Headers() headers: Record<string, string | string[] | undefined>) {
     this.requireInternalAccess(headers);
     return this.orderService.getAdminStats();
-  }
-
-  @Get('internal/admin/analytics/shop-sales')
-  getShopSalesAnalytics(
-    @Headers() headers: Record<string, string | string[] | undefined>,
-    @Query('timeframe') timeframe: string,
-  ) {
-    this.requireInternalAccess(headers);
-    return this.orderService.getShopSalesAnalytics(timeframe);
   }
 }

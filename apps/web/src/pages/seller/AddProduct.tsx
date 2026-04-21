@@ -1,4 +1,4 @@
-import { FC, useState, useRef, useEffect } from 'react';
+import { FC, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SellerLayout } from '../../components/layout/SellerLayout';
 import { VariantBuilder, GeneratedVariant } from '../../components/products/VariantBuilder';
@@ -9,6 +9,7 @@ import { PRODUCT_API_URL, resolveAssetUrl } from '../../config/api';
 export const AddProductPage: FC = () => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeSection, setActiveSection] = useState<'basic' | 'desc' | 'sales' | 'ship'>('basic');
   
   // Category specific state
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -32,6 +33,33 @@ export const AddProductPage: FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingCount, setUploadingCount] = useState(0);
+
+  useEffect(() => {
+    const sectionIds: Array<'basic' | 'desc' | 'sales' | 'ship'> = ['basic', 'desc', 'sales', 'ship'];
+    const onScroll = () => {
+      let closest: { id: 'basic' | 'desc' | 'sales' | 'ship'; top: number } | null = null;
+      for (const id of sectionIds) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        const topDistance = Math.abs(rect.top - 130);
+        if (!closest || topDistance < closest.top) closest = { id, top: topDistance };
+      }
+      if (closest) setActiveSection(closest.id);
+    };
+
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const scrollToSection = (id: 'basic' | 'desc' | 'sales' | 'ship') => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const y = el.getBoundingClientRect().top + window.scrollY - 110;
+    window.scrollTo({ top: y, behavior: 'smooth' });
+    setActiveSection(id);
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -120,22 +148,7 @@ export const AddProductPage: FC = () => {
     }
   };
 
-  const [activeSection, setActiveSection] = useState('basic');
-
   useEffect(() => {
-    const observer = new IntersectionObserver((entries) => {
-      // Find the most intersecting element
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          setActiveSection(entry.target.id);
-        }
-      });
-    }, { rootMargin: '-20% 0px -70% 0px' });
-
-    const observerIds = ['basic', 'desc', 'sales', 'ship'];
-    const elements = observerIds.map(id => document.getElementById(id)).filter(Boolean) as Element[];
-    elements.forEach(el => observer.observe(el));
-
     const fetchShopCategories = async () => {
       setIsShopCategoryLoading(true);
       try {
@@ -154,18 +167,7 @@ export const AddProductPage: FC = () => {
       }
     };
     fetchShopCategories();
-
-    return () => elements.forEach(el => observer.unobserve(el));
   }, []);
-
-  const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
-    e.preventDefault();
-    const element = document.getElementById(id);
-    if (element) {
-      const y = element.getBoundingClientRect().top + window.scrollY - 160;
-      window.scrollTo({ top: y, behavior: 'smooth' });
-    }
-  };
 
   const hasGoodImages = formData.images.length >= 3;
   const hasGoodName = formData.name.length >= 25 && formData.name.length <= 100;
@@ -249,11 +251,51 @@ export const AddProductPage: FC = () => {
         {/* Middle Main Form (60%) */}
         <section className="col-span-6 space-y-8">
           {/* Sticky Anchor Menu */}
-          <nav className="sticky top-[4.5rem] z-30 flex gap-8 bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-sm border border-[#dbeaf5] mx-auto w-fit transition-all duration-300">
-            <a href="#basic" onClick={e => scrollToSection(e, 'basic')} className={`px-4 py-2 rounded-full text-sm transition-all duration-300 ${activeSection === 'basic' ? 'font-semibold bg-[#00629d] text-white shadow-md' : 'font-medium text-[#707882] hover:text-[#00629d]'}`}>Thông tin cơ bản</a>
-            <a href="#desc" onClick={e => scrollToSection(e, 'desc')} className={`px-4 py-2 rounded-full text-sm transition-all duration-300 ${activeSection === 'desc' ? 'font-semibold bg-[#00629d] text-white shadow-md' : 'font-medium text-[#707882] hover:text-[#00629d]'}`}>Mô tả</a>
-            <a href="#sales" onClick={e => scrollToSection(e, 'sales')} className={`px-4 py-2 rounded-full text-sm transition-all duration-300 ${activeSection === 'sales' ? 'font-semibold bg-[#00629d] text-white shadow-md' : 'font-medium text-[#707882] hover:text-[#00629d]'}`}>Bán hàng</a>
-            <a href="#ship" onClick={e => scrollToSection(e, 'ship')} className={`px-4 py-2 rounded-full text-sm transition-all duration-300 ${activeSection === 'ship' ? 'font-semibold bg-[#00629d] text-white shadow-md' : 'font-medium text-[#707882] hover:text-[#00629d]'}`}>Vận chuyển</a>
+          <nav className="sticky top-[4.5rem] z-30 flex gap-8 bg-white/90 backdrop-blur-sm p-2 rounded-full shadow-sm border border-[#dbeaf5] mx-auto w-fit">
+            <button
+              type="button"
+              onClick={() => scrollToSection('basic')}
+              className={`px-4 py-2 rounded-full text-sm transition-colors ${
+                activeSection === 'basic'
+                  ? 'font-semibold bg-[#00629d] text-white shadow-md'
+                  : 'font-medium text-[#707882] hover:text-[#00629d]'
+              }`}
+            >
+              Thông tin cơ bản
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSection('desc')}
+              className={`px-4 py-2 rounded-full text-sm transition-colors ${
+                activeSection === 'desc'
+                  ? 'font-semibold bg-[#00629d] text-white shadow-md'
+                  : 'font-medium text-[#707882] hover:text-[#00629d]'
+              }`}
+            >
+              Mô tả bài đăng
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSection('sales')}
+              className={`px-4 py-2 rounded-full text-sm transition-colors ${
+                activeSection === 'sales'
+                  ? 'font-semibold bg-[#00629d] text-white shadow-md'
+                  : 'font-medium text-[#707882] hover:text-[#00629d]'
+              }`}
+            >
+              Bán hàng
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSection('ship')}
+              className={`px-4 py-2 rounded-full text-sm transition-colors ${
+                activeSection === 'ship'
+                  ? 'font-semibold bg-[#00629d] text-white shadow-md'
+                  : 'font-medium text-[#707882] hover:text-[#00629d]'
+              }`}
+            >
+              Vận chuyển
+            </button>
           </nav>
 
           {/* Card 1: Basic Info */}
@@ -440,10 +482,88 @@ export const AddProductPage: FC = () => {
               <span className="w-2 h-8 bg-[#ffb952] rounded-full"></span>
               <h2 className="text-xl font-bold font-['Plus_Jakarta_Sans']">Vận chuyển</h2>
             </div>
-            <div className="h-32 border-2 border-dashed border-[#bfc7d3]/30 rounded-xl bg-[#e9f5ff] flex items-center justify-center">
-              <div className="text-center">
-                <span className="material-symbols-outlined text-[#707882] text-4xl mb-2">local_shipping</span>
-                <p className="text-sm text-[#707882] font-medium">Thiết lập cân nặng & đơn vị vận chuyển...</p>
+
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-[#404751] mb-2">Cân nặng (gram)</label>
+                  <input
+                    type="number"
+                    defaultValue={500}
+                    min={1}
+                    className="w-full bg-[#e9f5ff] border-none rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#00629d]/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[#404751] mb-2">Thời gian chuẩn bị hàng</label>
+                  <select className="w-full bg-[#e9f5ff] border-none rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#00629d]/20">
+                    <option>Chuẩn bị trong ngày</option>
+                    <option>1 ngày</option>
+                    <option>2 ngày</option>
+                    <option>3 ngày</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-[#404751] mb-2">Kích thước gói hàng (cm)</label>
+                <div className="grid grid-cols-3 gap-3">
+                  <input
+                    type="number"
+                    defaultValue={20}
+                    min={1}
+                    placeholder="Dài"
+                    className="w-full bg-[#e9f5ff] border-none rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#00629d]/20"
+                  />
+                  <input
+                    type="number"
+                    defaultValue={12}
+                    min={1}
+                    placeholder="Rộng"
+                    className="w-full bg-[#e9f5ff] border-none rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#00629d]/20"
+                  />
+                  <input
+                    type="number"
+                    defaultValue={6}
+                    min={1}
+                    placeholder="Cao"
+                    className="w-full bg-[#e9f5ff] border-none rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#00629d]/20"
+                  />
+                </div>
+              </div>
+
+              <div className="bg-[#e9f5ff] border border-[#dbeaf5] rounded-xl p-4 space-y-3">
+                <p className="text-sm font-bold text-[#0f1d25] flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#00629d]">local_shipping</span>
+                  Đơn vị vận chuyển áp dụng
+                </p>
+                <div className="grid grid-cols-2 gap-3 text-sm text-[#404751]">
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" defaultChecked className="rounded text-[#00629d] focus:ring-[#00629d]" />
+                    Giao hàng tiết kiệm
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" defaultChecked className="rounded text-[#00629d] focus:ring-[#00629d]" />
+                    Giao hàng nhanh
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" className="rounded text-[#00629d] focus:ring-[#00629d]" />
+                    J&T Express
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" className="rounded text-[#00629d] focus:ring-[#00629d]" />
+                    Viettel Post
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-[#404751] mb-2">Ghi chú vận chuyển</label>
+                <textarea
+                  rows={4}
+                  placeholder="Ví dụ: Sản phẩm dễ vỡ, cần dán cảnh báo khi đóng gói..."
+                  className="w-full bg-[#e9f5ff] border-none rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#00629d]/20 placeholder:text-[#707882]/60"
+                />
               </div>
             </div>
           </div>

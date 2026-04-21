@@ -16,7 +16,7 @@ export const VoucherSection: FC = () => {
                 }
                 const user = JSON.parse(userStr);
                 
-                const response = await fetch('/api/vouchers/available', {
+                const response = await fetch('/api/vouchers/available?only_active=true', {
                     headers: {
                         'x-user-id': user.id.toString()
                     }
@@ -24,7 +24,7 @@ export const VoucherSection: FC = () => {
                 
                 if (response.ok) {
                     const data = await response.json();
-                    setVouchers(data);
+                    setVouchers(data.slice(0, 6));
                 }
             } catch (err) {
                 console.error('Failed to fetch vouchers', err);

@@ -40,11 +40,19 @@ model Report {
   admin_id         Int?
   admin_note       String?   @db.Text
   resolution       String?   @db.VarChar(100)
+  resolution_action String?  @db.VarChar(50) // 'lock_product', 'suspend_shop', 'restore_product', etc.
   created_at       DateTime? @default(now()) @db.Timestamp(6)
   updated_at       DateTime? @default(now()) @db.Timestamp(6)
   resolved_at      DateTime? @db.Timestamp(6)
 
+
   report_reason    ReportReason  @relation(fields: [report_reason_id], references: [id])
+
+  @@index([reporter_id])
+  @@index([status])
+  @@index([product_id])
+  @@index([shop_id])
+  @@index([target_type])
 
   @@map("reports")
 }

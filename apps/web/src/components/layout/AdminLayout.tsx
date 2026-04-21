@@ -71,6 +71,11 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children, pageTitle = 'Seren
             <span className="material-symbols-outlined">inventory_2</span> Kiểm duyệt sản phẩm
           </NavLink>
 
+
+          <NavLink to="/admin/reports" className={getNavLinkClass}>
+            <span className="material-symbols-outlined">flag</span> Quản lý Tố Cáo
+          </NavLink>
+
           <div className="pt-4 pb-2 px-4 text-[10px] font-bold text-[#707882] uppercase tracking-widest opacity-50">Hệ thống</div>
 
           <NavLink to="/admin/users" className={getNavLinkClass}>

@@ -2,6 +2,7 @@ import { Injectable, Inject, BadRequestException, NotFoundException } from '@nes
 import { PrismaService } from './prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { EmailService } from './email.service';
+import { NotificationsService } from './notifications.service';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -9,7 +10,8 @@ export class AuthService {
   constructor(
     @Inject(PrismaService) private prisma: PrismaService,
     @Inject(JwtService) private jwtService: JwtService,
-    @Inject(EmailService) private emailService: EmailService
+    @Inject(EmailService) private emailService: EmailService,
+    @Inject(NotificationsService) private notificationsService: NotificationsService
   ) {}
 
   async validateUser(email: string, pass: string): Promise<any> {
@@ -46,7 +48,12 @@ export class AuthService {
   async register(data: any) {
     const { password, ...rest } = data;
     const existingUser = await this.prisma.user.findUnique({ where: { email: data.email } });
-    if (existingUser) throw new BadRequestException('Email already registered');
+    if (existingUser) throw new BadRequestException('Email đã được đăng ký');
+
+    if (data.phone) {
+      const existingPhone = await this.prisma.user.findUnique({ where: { phone: data.phone } });
+      if (existingPhone) throw new BadRequestException('Số điện thoại đã được sử dụng');
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await this.prisma.user.create({
@@ -54,15 +61,25 @@ export class AuthService {
         ...rest,
         password: hashedPassword,
         role: 'user', 
-        status: 'active' // Tiện cho việc test: Bỏ qua bước chờ OTP
+        status: 'pending' // Đã khôi phục bước chờ OTP
       },
     });
+
+    await this.generateAndSendOtp(user.id, user.email, 'REGISTER');
 
     const { password: _, ...result } = user;
     return result;
   }
 
   // --- OTP & FORGOT PASSWORD LOGIC ---
+
+  async resendOtp(email: string, purpose: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) throw new NotFoundException('Không tìm thấy tài khoản');
+
+    await this.generateAndSendOtp(user.id, email, purpose);
+    return { message: 'Mã OTP mới đã được gửi' };
+  }
 
   async requestForgotPassword(email: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
@@ -185,11 +202,29 @@ export class AuthService {
       throw new NotFoundException('User not found');
     }
 
-    return this.prisma.user.update({
+    await this.prisma.user.update({
       where: { id },
       data: { status },
       select: { id: true, status: true },
     });
+
+    if (status === 'suspended') {
+      await this.notificationsService.createNotification({
+        user_id: id,
+        title: 'Tài khoản đã bị đình chỉ',
+        message: 'Tài khoản của bạn đã bị quản trị viên đình chỉ hoạt động do vi phạm quy tắc cộng đồng hoặc có hành vi gian lận.',
+        type: 'SYSTEM'
+      });
+    } else if (status === 'active') {
+      await this.notificationsService.createNotification({
+        user_id: id,
+        title: 'Tài khoản đã được khôi phục',
+        message: 'Chào mừng trở lại! Tài khoản của bạn đã được kích hoạt lại.',
+        type: 'SYSTEM'
+      });
+    }
+
+    return { id, status };
   }
 
   async getUserGrowthAnalytics(timeframe?: string) {
@@ -231,7 +266,7 @@ export class AuthService {
     if (!ids.length) return [];
     return this.prisma.user.findMany({
       where: { id: { in: ids } },
-      select: { id: true, full_name: true, avatar_url: true },
+      select: { id: true, full_name: true, avatar_url: true, status: true },
     });
   }
 }

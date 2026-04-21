@@ -6,20 +6,30 @@ interface BuyerProtectedRouteProps {
 }
 
 export const BuyerProtectedRoute: FC<BuyerProtectedRouteProps> = ({ children }) => {
+  const token = localStorage.getItem('c2c_token');
   const userStr = localStorage.getItem('c2c_user');
-  
-  if (userStr) {
-    try {
-      const user = JSON.parse(userStr);
-      // Nếu là admin thì không được phép truy cập luồng mua hàng
-      if (user.role === 'admin') {
-        return <Navigate to="/admin" replace />;
-      }
-    } catch (e) {
-      // Bỏ qua lỗi parse
-    }
+
+  // Must be logged in
+  if (!token || !userStr) {
+    return <Navigate to="/login" replace />;
   }
 
-  // Cho phép người dùng chưa đăng nhập hoặc không phải admin (yêu cầu đăng nhập cụ thể sẽ xử lý trong component nếu cần)
+  try {
+    const user = JSON.parse(userStr);
+
+    // Admin không dùng luồng mua hàng
+    if (user.role === 'admin') {
+      return <Navigate to="/admin" replace />;
+    }
+
+    // Tài khoản bị khoá không được thanh toán/xem đơn
+    if (user.status === 'suspended' || user.status === 'banned') {
+      return <Navigate to="/" replace />;
+    }
+  } catch {
+    return <Navigate to="/login" replace />;
+  }
+
   return children ? <>{children}</> : <Outlet />;
 };
+

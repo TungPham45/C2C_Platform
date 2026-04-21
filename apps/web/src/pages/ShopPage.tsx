@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { VoucherCard } from '../components/vouchers/VoucherCard';
 import { formatPriceRange } from '../utils/currency';
+import ReportModal from '../components/shared/ReportModal';
 
 interface ShopDetail {
   id: number;
@@ -59,6 +60,7 @@ export const ShopPage: FC = () => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFollowLoading, setIsFollowLoading] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const loadShopVouchers = async (shopId = id) => {
     setVoucherLoading(true);
@@ -71,7 +73,7 @@ export const ShopPage: FC = () => {
       }
 
       const user = JSON.parse(userStr);
-      const response = await fetch('/api/vouchers/available', {
+      const response = await fetch('/api/vouchers/available?only_active=true', {
         headers: {
           'x-user-id': user.id.toString(),
         },
@@ -125,7 +127,7 @@ export const ShopPage: FC = () => {
         }
 
         const user = JSON.parse(userStr);
-        const response = await fetch('/api/vouchers/available', {
+        const response = await fetch('/api/vouchers/available?only_active=true', {
           headers: {
             'x-user-id': user.id.toString(),
           },
@@ -371,6 +373,15 @@ export const ShopPage: FC = () => {
                     <button className="px-5 py-2.5 rounded-full font-bold text-sm border-2 border-[#dbeaf5] text-[#0f1d25] bg-white hover:bg-[#f5faff] transition-all">
                       Chat
                     </button>
+                    {!isOwnShop && currentUser && (
+                      <button
+                        onClick={() => setShowReportModal(true)}
+                        className="w-10 h-10 rounded-full font-bold flex items-center justify-center border-2 border-red-200 text-red-400 bg-white hover:bg-red-50 hover:border-red-400 hover:text-red-600 transition-all"
+                        title="Tố cáo cửa hàng"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">flag</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -653,6 +664,16 @@ export const ShopPage: FC = () => {
           )}
         </div>
       </div>
+
+      {/* Report Modal */}
+      <ReportModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        targetType="shop"
+        targetId={shopDetail?.id}
+        reporterId={currentUser?.id}
+      />
+
     </MarketplaceLayout>
   );
 };

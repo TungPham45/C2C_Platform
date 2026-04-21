@@ -4,6 +4,7 @@ import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useOrders } from '../hooks/useOrders';
 import { formatVnd } from '../utils/currency';
 import { getOrderPricing } from '../utils/orderPricing';
+import { resolveAssetUrl } from '../config/api';
 
 const statusConfig: Record<string, { label: string; color: string; icon: string }> = {
   pending:    { label: 'CHờ Xử LÝ',     color: 'bg-[#fff8e5] text-[#e09110] border-[#ffb952]/30', icon: 'schedule' },
@@ -14,11 +15,9 @@ const statusConfig: Record<string, { label: string; color: string; icon: string 
 };
 
 const sidebarItems = [
-  { label: 'Lịch sử đơn hàng', icon: 'receipt_long', path: '/orders', active: true },
-  { label: 'Yêu thích',       icon: 'favorite',     path: '#', active: false },
-  { label: 'Thanh toán',       icon: 'credit_card', path: '#', active: false },
-  { label: 'Cài đặt',         icon: 'settings',     path: '#', active: false },
-  { label: 'Trung tâm hỗ trợ', icon: 'help',        path: '#', active: false },
+  { label: 'Hồ sơ của tôi',    icon: 'person',        path: '/profile',  active: false },
+  { label: 'Lịch sử đơn hàng', icon: 'receipt_long',  path: '/orders',   active: true },
+  { label: 'Tin nhắn',         icon: 'chat',          path: '/messages', active: false },
 ];
 
 export const MyPurchasesPage: FC = () => {
@@ -26,6 +25,60 @@ export const MyPurchasesPage: FC = () => {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<string>('all');
+  
+  // Review Modal State
+  const [reviewOrder, setReviewOrder] = useState<any>(null);
+  const [reviewItem, setReviewItem] = useState<any>(null);
+  const [reviewRating, setReviewRating] = useState<number>(5);
+  const [reviewComment, setReviewComment] = useState<string>('');
+  const [submittingReview, setSubmittingReview] = useState<boolean>(false);
+  const [reviewSuccess, setReviewSuccess] = useState<boolean>(false);
+  const [reviewedOrders, setReviewedOrders] = useState<Set<number>>(new Set());
+
+  const handleSubmitReview = async () => {
+    if (!reviewOrder || !reviewItem) return;
+    setSubmittingReview(true);
+    try {
+      const token = localStorage.getItem('c2c_token');
+      const res = await fetch(`http://localhost:3000/api/products/${reviewItem.product_id}/reviews`, { // using correct API gateway endpoint
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          rating: reviewRating,
+          comment: reviewComment,
+          product_id: reviewItem.product_id,
+          shop_order_id: reviewOrder.id
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Lỗi khi gửi đánh giá');
+      }
+
+      setReviewSuccess(true);
+      setReviewedOrders(prev => {
+        const next = new Set(prev);
+        next.add(reviewOrder.id);
+        return next;
+      });
+      setTimeout(() => {
+        setReviewOrder(null);
+        setReviewItem(null);
+        setReviewSuccess(false);
+        setReviewRating(5);
+        setReviewComment('');
+      }, 2000);
+
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   useEffect(() => {
     const userStr = localStorage.getItem('c2c_user');
@@ -38,6 +91,21 @@ export const MyPurchasesPage: FC = () => {
       return;
     }
     fetchBuyerOrders();
+    
+    // Fetch user's reviewed orders
+    const fetchReviews = async () => {
+      try {
+        const res = await fetch('http://localhost:3000/api/products/reviews/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setReviewedOrders(new Set(data.map((r: any) => r.shop_order_id)));
+        }
+      } catch (e) {}
+    };
+    fetchReviews();
+
   }, [fetchBuyerOrders, navigate]);
 
   const tabs = [
@@ -141,7 +209,7 @@ export const MyPurchasesPage: FC = () => {
                             <span className="material-symbols-outlined text-lg">storefront</span>
                           </div>
                           <div>
-                            <p className="text-sm font-black text-[#0f1d25]">Shop #{order.shop_id}</p>
+                            <p className="text-sm font-black text-[#0f1d25]">{order.shop_name || `Shop #${order.shop_id}`}</p>
                             <p className="text-[10px] text-[#707882] font-semibold">
                               Order #SR-{String(order.id).padStart(5, '0')} • {orderDate}
                             </p>
@@ -156,8 +224,16 @@ export const MyPurchasesPage: FC = () => {
                       <div className="px-8 py-5 divide-y divide-[#f0f3f8]">
                         {(order.items || []).map((item: any) => (
                           <div key={item.id} className="flex items-center gap-5 py-4 first:pt-0 last:pb-0">
-                            <div className="w-20 h-20 bg-[#f0f3f8] rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden">
-                              <span className="material-symbols-outlined text-3xl text-[#bfc7d3]">inventory_2</span>
+                            <div className="w-20 h-20 bg-[#f0f3f8] border border-[#e4e9f0] rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+                              {(item.product_image_url || item.product_thumbnail_url) ? (
+                                <img 
+                                  src={resolveAssetUrl(item.product_image_url || item.product_thumbnail_url)} 
+                                  alt={item.product_name} 
+                                  className="w-full h-full object-cover" 
+                                />
+                              ) : (
+                                <span className="material-symbols-outlined text-3xl text-[#bfc7d3]">inventory_2</span>
+                              )}
                             </div>
                             <div className="flex-1 min-w-0">
                               <h4 className="font-bold text-sm text-[#0f1d25] line-clamp-1">{item.product_name}</h4>
@@ -195,10 +271,25 @@ export const MyPurchasesPage: FC = () => {
                               Theo dõi
                             </button>
                           )}
-                          {order.status?.toLowerCase() === 'delivered' && (
-                            <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-[#e4e9f0] text-[#0f1d25] rounded-full text-xs font-bold hover:bg-[#f5faff] transition-all">
-                              <span className="material-symbols-outlined text-base">star</span>
+                          {order.status?.toLowerCase() === 'delivered' && !reviewedOrders.has(order.id) && (
+                            <button 
+                              onClick={() => {
+                                setReviewOrder(order);
+                                setReviewItem(order.items?.[0] || null);
+                                setReviewRating(5);
+                                setReviewComment('');
+                                setReviewSuccess(false);
+                              }}
+                              className="flex items-center gap-2 px-5 py-2.5 bg-white border border-[#00629d] text-[#00629d] rounded-full text-xs font-bold hover:bg-[#f5faff] transition-all"
+                            >
+                              <span className="material-symbols-outlined text-base fill-current">star</span>
                               Đánh giá
+                            </button>
+                          )}
+                          {order.status?.toLowerCase() === 'delivered' && reviewedOrders.has(order.id) && (
+                            <button disabled className="flex items-center gap-2 px-5 py-2.5 bg-[#f5faff] border border-[#e1f0fb] text-[#a0aab5] rounded-full text-xs font-bold cursor-not-allowed">
+                              <span className="material-symbols-outlined text-base fill-current">star</span>
+                              Đã đánh giá
                             </button>
                           )}
                           <Link
@@ -217,6 +308,97 @@ export const MyPurchasesPage: FC = () => {
           </main>
         </div>
       </div>
+      {/* Review Modal */}
+      {reviewOrder && reviewItem && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#0f1d25]/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white max-w-[480px] w-full rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="px-8 py-5 border-b border-[#e4e9f0] flex items-center justify-between bg-[#f9fafc]">
+              <h3 className="font-black text-[#0f1d25] text-lg font-['Plus_Jakarta_Sans']">Đánh giá Sản phẩm</h3>
+              <button onClick={() => { setReviewOrder(null); setReviewItem(null); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#f0f3f8] text-[#707882] hover:bg-[#e4e9f0] hover:text-[#0f1d25] transition-colors">
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            
+            <div className="p-8 space-y-6">
+              {reviewSuccess ? (
+                <div className="flex flex-col items-center justify-center py-6 text-center animate-in fade-in zoom-in-95">
+                  <div className="w-16 h-16 bg-[#e1f9f1] text-[#00a67e] rounded-full flex items-center justify-center mb-4 shadow-sm">
+                    <span className="material-symbols-outlined text-3xl font-bold">check</span>
+                  </div>
+                  <h4 className="font-bold text-[#0f1d25] text-lg">Cảm ơn bạn!</h4>
+                  <p className="text-[#707882] text-sm mt-1">Đánh giá của bạn đã được hệ thống ghi nhận.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Product Mini Preview */}
+                  <div className="flex gap-4 p-4 rounded-2xl bg-[#f5faff] border border-[#e1f0fb]">
+                    <div className="w-14 h-14 bg-white rounded-xl flex-shrink-0 flex items-center justify-center overflow-hidden border border-[#e4e9f0]">
+                      {reviewItem.product_thumbnail_url ? (
+                        <img src={`http://localhost:3000${reviewItem.product_thumbnail_url}`} className="w-full h-full object-cover" alt="thumbnail" />
+                      ) : (
+                        <span className="material-symbols-outlined text-[#bfc7d3]">inventory_2</span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-bold text-[#0f1d25] text-sm line-clamp-1">{reviewItem.product_name}</p>
+                      <p className="text-xs text-[#707882] mt-0.5 tracking-wider uppercase font-bold">SL: {reviewItem.quantity}</p>
+                    </div>
+                  </div>
+
+                  {/* Rating Stars */}
+                  <div className="flex flex-col items-center space-y-2">
+                    <p className="text-sm font-bold text-[#404751]">Chất lượng sản phẩm</p>
+                    <div className="flex gap-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          onClick={() => setReviewRating(star)}
+                          className={`material-symbols-outlined text-4xl transition-all ${
+                            star <= reviewRating 
+                              ? 'text-[#ffb952] fill-current scale-110 drop-shadow-sm' 
+                              : 'text-[#e4e9f0] hover:text-[#ffb952]/40'
+                          }`}
+                        >
+                          star
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-[#ffb952] font-bold mt-1">
+                      {['Tệ', 'Không hài lòng', 'Bình thường', 'Hài lòng', 'Tuyệt vời'][reviewRating - 1]}
+                    </p>
+                  </div>
+
+                  {/* Comment */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase tracking-widest text-[#707882] ml-1">Nhận xét (Tùy chọn)</label>
+                    <textarea
+                      value={reviewComment}
+                      onChange={(e) => setReviewComment(e.target.value)}
+                      placeholder="Chia sẻ trải nghiệm sử dụng của bạn để giúp những người mua khác..."
+                      className="w-full h-32 p-4 bg-[#f9fafc] border border-[#e4e9f0] focus:bg-white focus:border-[#00629d]/50 rounded-2xl outline-none transition-all placeholder-[#a0aab5] resize-none text-sm"
+                    ></textarea>
+                  </div>
+
+                  {/* Action */}
+                  <button
+                    onClick={handleSubmitReview}
+                    disabled={submittingReview}
+                    className="w-full h-12 bg-[#00629d] text-white rounded-xl font-bold hover:bg-[#004e7c] transition-all flex items-center justify-center gap-2 disabled:bg-[#a0aab5] disabled:cursor-not-allowed shadow-md shadow-blue-400/20"
+                  >
+                    {submittingReview ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    ) : (
+                      'Gửi đánh giá ngay'
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </MarketplaceLayout>
   );
 };

@@ -17,7 +17,7 @@ export const useOrders = () => {
       const userId = localStorage.getItem('c2c_user_id') || user?.id;
       if (!token) throw new Error('Unauthorized Session');
 
-      const res = await fetch(`${API_BASE}/buyer?userId=${userId}`, {
+      const res = await fetch(`${API_BASE}/buyer`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Failed to fetch buyer orders');
