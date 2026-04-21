@@ -189,7 +189,7 @@ export const ProductDetailPage: FC = () => {
   };
 
   const getPrice = () => {
-    let rawPrice = selectedVariant?.price;
+    let rawPrice = selectedVariant?.price_override ?? selectedVariant?.price;
     if (rawPrice === undefined || rawPrice === null) {
        rawPrice = product?.base_price;
     }

@@ -209,7 +209,7 @@ export const MyPurchasesPage: FC = () => {
                             <span className="material-symbols-outlined text-lg">storefront</span>
                           </div>
                           <div>
-                            <p className="text-sm font-black text-[#0f1d25]">Shop #{order.shop_id}</p>
+                            <p className="text-sm font-black text-[#0f1d25]">{order.shop_name || `Shop #${order.shop_id}`}</p>
                             <p className="text-[10px] text-[#707882] font-semibold">
                               Order #SR-{String(order.id).padStart(5, '0')} • {orderDate}
                             </p>

@@ -418,7 +418,13 @@ export class ProductService {
     const shop = await this.requireActiveSellerShop(userId);
     return this.prisma.product.findMany({
       where: { shop_id: shop.id },
-      include: { category: true, images: true, variants: true, shop_categories: true },
+      include: { 
+        category: true, 
+        images: true, 
+        variants: true, 
+        shop_categories: true,
+        _count: { select: { reviews: true } }
+      },
       orderBy: { created_at: 'desc' }
     });
   }
@@ -904,14 +910,14 @@ export class ProductService {
   async approveProduct(id: number) {
     const product = await this.prisma.product.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, name: true, shop: { select: { owner_id: true } } },
     });
 
     if (!product) {
       throw new NotFoundException('Product not found');
     }
 
-    return this.prisma.product.update({
+    const updated = await this.prisma.product.update({
       where: { id },
       data: {
         status: 'active',
@@ -922,19 +928,31 @@ export class ProductService {
         status: true,
       },
     });
+
+    if (product.shop?.owner_id) {
+      this.sendNotification({
+        user_id: product.shop.owner_id,
+        title: 'Sản phẩm đã được duyệt',
+        message: `Sản phẩm "${product.name}" của bạn đã được kiểm duyệt và hiện đang ở trạng thái hoạt động.`,
+        type: 'SYSTEM',
+        link: '/seller/products'
+      });
+    }
+
+    return updated;
   }
 
   async rejectProduct(id: number, reason: string) {
     const product = await this.prisma.product.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, name: true, shop: { select: { owner_id: true } } },
     });
 
     if (!product) {
       throw new NotFoundException('Product not found');
     }
 
-    return this.prisma.product.update({
+    const updated = await this.prisma.product.update({
       where: { id },
       data: {
         status: 'rejected',
@@ -945,6 +963,18 @@ export class ProductService {
         status: true,
       },
     });
+
+    if (product.shop?.owner_id) {
+      this.sendNotification({
+        user_id: product.shop.owner_id,
+        title: 'Sản phẩm bị từ chối',
+        message: `Sản phẩm "${product.name}" của bạn đã bị từ chối duyệt với lý do: ${reason}. Vui lòng cập nhật lại.`,
+        type: 'SYSTEM',
+        link: '/seller/products'
+      });
+    }
+
+    return updated;
   }
 
   async getPendingShops() {
@@ -965,14 +995,14 @@ export class ProductService {
   async approveShop(id: number) {
     const shop = await this.prisma.shop.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, name: true, owner_id: true },
     });
 
     if (!shop) {
       throw new NotFoundException('Shop not found');
     }
 
-    return this.prisma.shop.update({
+    const updated = await this.prisma.shop.update({
       where: { id },
       data: { status: 'active' },
       select: {
@@ -980,6 +1010,18 @@ export class ProductService {
         status: true,
       },
     });
+
+    if (shop.owner_id) {
+      this.sendNotification({
+        user_id: shop.owner_id,
+        title: 'Yêu cầu mở Shop đã được duyệt',
+        message: `Chúc mừng! Cửa hàng "${shop.name}" của bạn đã được phê duyệt. Bạn có thể bắt đầu đăng bán các sản phẩm.`,
+        type: 'SYSTEM',
+        link: '/seller/center'
+      });
+    }
+
+    return updated;
   }
 
   async getAllShops() {
@@ -1000,11 +1042,32 @@ export class ProductService {
   async updateShopStatus(id: number, status: string) {
     const shop = await this.prisma.shop.findUnique({ where: { id } });
     if (!shop) throw new NotFoundException('Shop not found');
-    return this.prisma.shop.update({
+    
+    const updated = await this.prisma.shop.update({
       where: { id },
       data: { status },
       select: { id: true, status: true }
     });
+
+    if (shop.owner_id) {
+      if (status === 'rejected') {
+        this.sendNotification({
+          user_id: shop.owner_id,
+          title: 'Yêu cầu mở Shop bị từ chối',
+          message: `Rất tiếc, yêu cầu mở Shop "${shop.name}" của bạn đã bị từ chối. Vui lòng liên hệ hỗ trợ để biết thêm thông tin.`,
+          type: 'SYSTEM'
+        });
+      } else if (status === 'banned') {
+        this.sendNotification({
+          user_id: shop.owner_id,
+          title: 'Shop đã bị đình chỉ',
+          message: `Cửa hàng "${shop.name}" của bạn đã bị quản trị viên đình chỉ hoạt động.`,
+          type: 'SYSTEM'
+        });
+      }
+    }
+
+    return updated;
   }
 
   async getShopsByIds(ids: number[]) {

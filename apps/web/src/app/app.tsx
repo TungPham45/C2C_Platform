@@ -60,6 +60,7 @@ export function App() {
       </Route>
       <Route element={<SellerProtectedRoute />}>
         <Route path="/seller" element={<Navigate to="/seller/center" replace />} />
+        <Route path="/seller/product" element={<Navigate to="/seller/products" replace />} />
         <Route path="/seller/center" element={<SellerCenterPage />} />
         <Route path="/seller/products" element={<ProductManagementPage />} />
         <Route path="/seller/vouchers" element={<SellerVoucherManagementPage />} />
@@ -79,6 +80,7 @@ export function App() {
       
       {/* Order Flow */}
       <Route element={<BuyerProtectedRoute />}>
+        <Route path="/my-purchases" element={<Navigate to="/orders" replace />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/order-success" element={<OrderSuccess />} />

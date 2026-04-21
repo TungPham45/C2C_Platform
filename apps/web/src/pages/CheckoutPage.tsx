@@ -205,6 +205,11 @@ export const CheckoutPage = () => {
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!shippingAddress.fullName.trim() || !shippingAddress.address.trim() || !shippingAddress.city.trim() || !shippingAddress.phone.trim()) {
+      alert('Vui lòng điền đầy đủ thông tin giao hàng (Họ tên, Địa chỉ, Thành phố, Số điện thoại) trước khi đặt hàng!');
+      return;
+    }
+
     const orderData: any = {
       total_payment: totalPayment,
       payment_method: paymentMethod,

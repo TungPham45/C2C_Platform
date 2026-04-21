@@ -36,13 +36,15 @@ export const AnalyticsPage: FC = () => {
     trendData: []
   });
   const [loading, setLoading] = useState(true);
+  const [selectedDays, setSelectedDays] = useState(30);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchStats = async () => {
+      setLoading(true);
       try {
         const token = localStorage.getItem('c2c_token');
-        const res = await fetch(`${PRODUCT_API_URL}/seller/analytics?days=10`, {
+        const res = await fetch(`${PRODUCT_API_URL}/seller/analytics?days=${selectedDays}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.ok) {
@@ -56,7 +58,13 @@ export const AnalyticsPage: FC = () => {
       }
     };
     fetchStats();
-  }, []);
+  }, [selectedDays]);
+
+  const dayOptions = [
+    { label: '10 Ngày', value: 10 },
+    { label: '30 Ngày', value: 30 },
+    { label: '90 Ngày', value: 90 },
+  ];
 
   return (
     <SellerLayout pageTitle="Phân tích bán hàng">
@@ -69,7 +77,15 @@ export const AnalyticsPage: FC = () => {
             <p className="text-[#404751] mt-1 text-sm">Hiệu suất và tăng trưởng dựa trên dữ liệu thời gian thực</p>
           </div>
           <div className="flex bg-white rounded-full p-1 shadow-sm border border-[#bfc7d3]/20">
-            <button className="px-4 py-2 text-sm font-bold text-white bg-[#00629d] rounded-full shadow-md">10 Ngày</button>
+            {dayOptions.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setSelectedDays(opt.value)}
+                className={`px-4 py-2 text-sm font-bold rounded-full transition-all ${selectedDays === opt.value ? 'text-white bg-[#00629d] shadow-md' : 'text-[#707882] hover:text-[#00629d]'}`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
         </div>
 

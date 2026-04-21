@@ -5,6 +5,7 @@ import { useOrders } from '../hooks/useOrders';
 import { useReviews } from '../hooks/useReviews';
 import { formatVnd } from '../utils/currency';
 import { getOrderPricing } from '../utils/orderPricing';
+import { resolveAssetUrl } from '../config/api';
 
 const ORDER_STEPS = [
   { key: 'pending',   label: 'Đã đặt hàng',  icon: 'receipt_long' },
@@ -289,7 +290,15 @@ export const BuyerOrderDetail: FC = () => {
                 {(order.items || []).map((item: any) => (
                   <div key={item.id} className="flex items-center gap-6 py-5 first:pt-0 last:pb-0">
                     <div className="w-[88px] h-[88px] bg-[#f0f3f8] rounded-2xl flex items-center justify-center flex-shrink-0 overflow-hidden">
-                      <span className="material-symbols-outlined text-4xl text-[#bfc7d3]">inventory_2</span>
+                      {(item.product_image_url || item.product_thumbnail_url) ? (
+                        <img 
+                          src={resolveAssetUrl(item.product_image_url || item.product_thumbnail_url)} 
+                          alt={item.product_name} 
+                          className="w-full h-full object-cover" 
+                        />
+                      ) : (
+                        <span className="material-symbols-outlined text-4xl text-[#bfc7d3]">inventory_2</span>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="font-bold text-[#0f1d25] text-sm line-clamp-1">{item.product_name}</h4>

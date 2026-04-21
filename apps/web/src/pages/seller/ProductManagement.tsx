@@ -390,9 +390,9 @@ export const ProductManagementPage: FC = () => {
                     <>
                       <div className="flex items-center justify-center gap-0.5 text-[#d99000]">
                         <span className="material-symbols-outlined text-sm">star</span>
-                        <span className="text-sm font-bold text-[#0f1d25]">{p.rating || '4.8'}</span>
+                        <span className="text-sm font-bold text-[#0f1d25]">{Number(p.rating) > 0 ? Number(p.rating).toFixed(1) : '0.0'}</span>
                       </div>
-                      <p className="text-[10px] text-[#707882]">(128 đánh giá)</p>
+                      <p className="text-[10px] text-[#707882]">({p._count?.reviews || 0} đánh giá)</p>
                     </>
                   ) : (
                     <span className="text-[#707882]">—</span>

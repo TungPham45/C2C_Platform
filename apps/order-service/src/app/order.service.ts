@@ -3,6 +3,7 @@ import { PrismaService } from './prisma.service';
 import { ProductPrismaService } from './product-prisma.service';
 import { AuthPrismaService } from './auth-prisma.service';
 import { VoucherService } from './voucher.service';
+import { NotificationClientService } from './notification-client.service';
 
 @Injectable()
 export class OrderService {
@@ -10,7 +11,8 @@ export class OrderService {
     private prisma: PrismaService,
     private productPrisma: ProductPrismaService,
     private authPrisma: AuthPrismaService,
-    private voucherService: VoucherService
+    private voucherService: VoucherService,
+    private notificationClient: NotificationClientService,
   ) {}
 
   async getCheckoutVouchers(userId: number, data: any) {
@@ -41,6 +43,9 @@ export class OrderService {
   }
 
   async createOrder(userId: number, data: any) {
+    if (!data.shipping_address || data.shipping_address.trim() === '' || data.shipping_address.replace(/[\s,]/g, '') === '') {
+      throw new BadRequestException('Vui lòng cung cấp đầy đủ thông tin giao hàng');
+    }
     const draft = await this.buildOrderDraft(data, userId);
     const voucherSelection = await this.validateSelectedVoucherClaims(userId, draft, data);
     const now = new Date();
@@ -189,6 +194,37 @@ export class OrderService {
       console.error(`[ORDER] Failed to update user first_order_at:`, authError.message || authError);
     }
 
+    // --- Send notifications (non-blocking) ---
+    try {
+      // Notify buyer
+      await this.notificationClient.sendNotification({
+        user_id: userId,
+        title: 'Đặt hàng thành công',
+        message: `Đơn hàng #${orderResult.checkoutSession.id} của bạn đã được đặt thành công và đang chờ người bán xác nhận.`,
+        type: 'order',
+        link: '/orders',
+      });
+
+      // Notify each seller
+      for (const createdOrder of orderResult.createdOrders) {
+        const shop = await this.productPrisma.shop.findUnique({
+          where: { id: createdOrder.shop_id },
+          select: { owner_id: true },
+        });
+        if (shop?.owner_id) {
+          await this.notificationClient.sendNotification({
+            user_id: shop.owner_id,
+            title: 'Bạn có đơn hàng mới',
+            message: `Đơn hàng mới #${createdOrder.id} vừa được đặt. Hãy xác nhận đơn hàng sớm nhất có thể.`,
+            type: 'order',
+            link: `/seller/orders/${createdOrder.id}`,
+          });
+        }
+      }
+    } catch (notifError: any) {
+      console.error(`[NOTIFICATION] Failed to send order notifications:`, notifError.message || notifError);
+    }
+
     return {
       id: orderResult.checkoutSession.id,
       total_payment: orderResult.checkoutSession.total_payment,
@@ -201,8 +237,33 @@ export class OrderService {
     };
   }
 
+  private async enrichOrderWithProductDetails(order: any, knownShopName?: string) {
+    let shopName = knownShopName;
+    if (!shopName) {
+      const shop = await this.productPrisma.shop.findUnique({ where: { id: order.shop_id }, select: { name: true }});
+      shopName = shop?.name || `Shop #${order.shop_id}`;
+    }
+
+    const enrichedItems = await Promise.all(order.items.map(async (item: any) => {
+      const variant = await this.productPrisma.productVariant.findUnique({
+        where: { id: item.product_variant_id },
+        include: { product: { select: { thumbnail_url: true } } }
+      });
+      return {
+        ...item,
+        product_thumbnail_url: variant?.product?.thumbnail_url || null,
+      };
+    }));
+
+    return {
+      ...order,
+      shop_name: shopName,
+      items: enrichedItems,
+    };
+  }
+
   async getBuyerOrders(userId: number) {
-    return this.prisma.shopOrder.findMany({
+    const orders = await this.prisma.shopOrder.findMany({
       where: {
         checkout_session: {
           user_id: userId,
@@ -215,20 +276,21 @@ export class OrderService {
         created_at: 'desc',
       },
     });
+    return Promise.all(orders.map(o => this.enrichOrderWithProductDetails(o)));
   }
 
   async getSellerOrders(userId: number) {
     // Look up the shop owned by this user (from product DB)
     const shop = await this.productPrisma.shop.findFirst({
       where: { owner_id: userId },
-      select: { id: true },
+      select: { id: true, name: true },
     });
 
     if (!shop) {
       return [];
     }
 
-    return this.prisma.shopOrder.findMany({
+    const orders = await this.prisma.shopOrder.findMany({
       where: {
         shop_id: shop.id,
       },
@@ -239,6 +301,7 @@ export class OrderService {
         created_at: 'desc',
       },
     });
+    return Promise.all(orders.map(o => this.enrichOrderWithProductDetails(o, shop.name)));
   }
 
   async getOrderDetail(orderId: number) {
@@ -254,13 +317,13 @@ export class OrderService {
       throw new NotFoundException(`Order with ID ${orderId} not found`);
     }
 
-    return order;
+    return this.enrichOrderWithProductDetails(order);
   }
 
   async updateOrderStatus(orderId: number, status: string, trackingInfo?: { tracking_number?: string; carrier_name?: string }) {
     const order = await this.prisma.shopOrder.findUnique({
       where: { id: orderId },
-      include: { items: true }
+      include: { items: true, checkout_session: true },
     });
 
     if (!order) {
@@ -305,6 +368,43 @@ export class OrderService {
       }
     } catch (stockError: any) {
       console.error(`[STOCKS] Failed to adjust stock for order #${orderId}:`, stockError.message || stockError);
+    }
+
+    // --- Notify buyer of status change ---
+    try {
+      const buyerId = (order as any).checkout_session?.user_id;
+      if (buyerId) {
+        const statusMessages: Record<string, { title: string; message: string }> = {
+          confirmed: {
+            title: 'Đơn hàng đã được xác nhận',
+            message: `Đơn hàng #${orderId} của bạn đã được người bán xác nhận và đang được chuẩn bị.`,
+          },
+          shipped: {
+            title: 'Đơn hàng đang được giao',
+            message: `Đơn hàng #${orderId} của bạn đã được giao cho đơn vị vận chuyển.`,
+          },
+          delivered: {
+            title: 'Đơn hàng đã giao thành công',
+            message: `Đơn hàng #${orderId} đã được giao thành công. Cảm ơn bạn đã mua sắm!`,
+          },
+          cancelled: {
+            title: 'Đơn hàng đã bị hủy',
+            message: `Đơn hàng #${orderId} của bạn đã bị hủy.`,
+          },
+        };
+        const notifContent = statusMessages[nextStatus];
+        if (notifContent) {
+          await this.notificationClient.sendNotification({
+            user_id: buyerId,
+            title: notifContent.title,
+            message: notifContent.message,
+            type: 'order',
+            link: '/orders',
+          });
+        }
+      }
+    } catch (notifError: any) {
+      console.error(`[NOTIFICATION] Failed to send status-change notification:`, notifError.message || notifError);
     }
 
     return updatedOrder;
@@ -772,20 +872,26 @@ export class OrderService {
   }
 
 
-  async getSingleShopAnalytics(shopId: number, days: number = 10) {
-    const dt = new Date();
-    dt.setDate(dt.getDate() - days);
+  async getSingleShopAnalytics(shopId: number, days: number = 30) {
+    // trendMap shows `days` entries: today-(days-1) ... today
+    // Query must exactly match that window
+    const today = new Date();
+    const startOfWindow = new Date(today);
+    startOfWindow.setDate(startOfWindow.getDate() - (days - 1));
+    startOfWindow.setHours(0, 0, 0, 0); // start of that day
 
-    // Get all orders not cancelled in the last `days`
+    // Only count orders that are confirmed, shipped, or delivered (real revenue)
     const orders = await this.prisma.shopOrder.findMany({
       where: {
         shop_id: shopId,
-        status: { not: 'cancelled' },
-        created_at: { gte: dt }
+        status: { in: ['confirmed', 'shipped', 'delivered'] },
+        created_at: { gte: startOfWindow }
       },
       select: {
         id: true,
         subtotal: true,
+        shipping_fee: true,
+        platform_discount_amount: true,
         created_at: true
       }
     });
@@ -793,9 +899,8 @@ export class OrderService {
     let totalOrders = orders.length;
     let totalRevenue = 0;
 
-    // Initialize trend data mapping (last N days)
+    // Initialize trend data mapping (last N days) - aligned with query window
     const trendMap = new Map<string, { orders: number; revenue: number }>();
-    const today = new Date();
     for (let i = days - 1; i >= 0; i--) {
       const iterDate = new Date(today);
       iterDate.setDate(iterDate.getDate() - i);
@@ -804,7 +909,8 @@ export class OrderService {
     }
 
     for (const o of orders) {
-      const revenue = Number(o.subtotal) || 0;
+      // Revenue = subtotal + shipping_fee - platform_discount (matches frontend getOrderPricing finalTotal)
+      const revenue = Math.max(0, (Number(o.subtotal) || 0) + (Number(o.shipping_fee) || 0) - (Number(o.platform_discount_amount) || 0));
       totalRevenue += revenue;
 
       const oDate = new Date(o.created_at || new Date());
