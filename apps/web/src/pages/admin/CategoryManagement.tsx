@@ -46,6 +46,14 @@ interface AttributeOptionDraft {
   sort_order?: number;
 }
 
+interface CategoryDeleteImpact {
+  productCount: number;
+  childrenCount: number;
+  fallbackCategory: { id: number; name: string } | null;
+  canDelete: boolean;
+  canReassignToFallback: boolean;
+}
+
 const createDefaultCategoryForm = (selectedCategory: Category | null): CategoryFormState => ({
   name: '',
   slug: '',
@@ -106,13 +114,19 @@ const CategoryManagement: FC = () => {
   const [expandedIds, setExpandedIds] = useState<number[]>([]);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isAttributeModalOpen, setIsAttributeModalOpen] = useState(false);
+  const [isDeleteCategoryModalOpen, setIsDeleteCategoryModalOpen] = useState(false);
   const [submittingCategory, setSubmittingCategory] = useState(false);
   const [submittingAttribute, setSubmittingAttribute] = useState(false);
+  const [deletingCategory, setDeletingCategory] = useState(false);
+  const [loadingDeleteImpact, setLoadingDeleteImpact] = useState(false);
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(createDefaultCategoryForm(null));
   const [attributeForm, setAttributeForm] = useState<AttributeFormState>(createDefaultAttributeForm());
   const [attributeOptions, setAttributeOptions] = useState<AttributeOptionDraft[]>(createAttributeOptionDrafts('radio'));
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingAttribute, setEditingAttribute] = useState<Attribute | null>(null);
+  const [deleteTargetCategory, setDeleteTargetCategory] = useState<Category | null>(null);
+  const [deleteImpact, setDeleteImpact] = useState<CategoryDeleteImpact | null>(null);
+  const [deleteCategoryError, setDeleteCategoryError] = useState<string | null>(null);
   const [parentSelectionPath, setParentSelectionPath] = useState<number[]>([]);
 
   useEffect(() => {
@@ -152,7 +166,7 @@ const CategoryManagement: FC = () => {
       if (!statsRes.ok) throw new Error(await getResponseError(statsRes, 'Failed to fetch admin dashboard'));
       const catData = await catRes.json();
       const statsData = await statsRes.json();
-      
+
       setCategories(buildTree(catData));
       setStats(statsData);
     } catch (error) {
@@ -166,11 +180,11 @@ const CategoryManagement: FC = () => {
   const buildTree = (flat: Category[]) => {
     const tree: Category[] = [];
     const map = new Map<number, Category>();
-    
+
     flat.forEach(cat => {
       map.set(cat.id, { ...cat, children: [] });
     });
-    
+
     flat.forEach(cat => {
       const node = map.get(cat.id)!;
       if (cat.parent_id && map.has(cat.parent_id)) {
@@ -179,7 +193,7 @@ const CategoryManagement: FC = () => {
         tree.push(node);
       }
     });
-    
+
     return tree;
   };
 
@@ -198,7 +212,7 @@ const CategoryManagement: FC = () => {
   };
 
   const toggleExpand = (id: number) => {
-    setExpandedIds(prev => 
+    setExpandedIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
@@ -288,6 +302,43 @@ const CategoryManagement: FC = () => {
     setEditingCategory(null);
     setCategoryForm(createDefaultCategoryForm(selectedCategory));
     setParentSelectionPath(buildParentSelectionPath(selectedCategory?.id ?? null));
+  };
+
+  const openDeleteCategoryModal = async (category: Category) => {
+    setError(null);
+    setSuccessMessage(null);
+    setDeleteTargetCategory(category);
+    setDeleteImpact(null);
+    setDeleteCategoryError(null);
+    setIsDeleteCategoryModalOpen(true);
+    setLoadingDeleteImpact(true);
+
+    try {
+      const response = await fetch(`${ADMIN_API_BASE_URL}/categories/${category.id}/delete-impact`);
+
+      if (!response.ok) {
+        throw new Error(await getResponseError(response, 'Failed to check category delete impact'));
+      }
+
+      setDeleteImpact(await response.json());
+    } catch (deleteImpactError) {
+      console.error('Error checking category delete impact:', deleteImpactError);
+      setDeleteCategoryError(
+        deleteImpactError instanceof Error
+          ? deleteImpactError.message
+          : 'Failed to check category delete impact',
+      );
+    } finally {
+      setLoadingDeleteImpact(false);
+    }
+  };
+
+  const closeDeleteCategoryModal = () => {
+    if (deletingCategory) return;
+    setIsDeleteCategoryModalOpen(false);
+    setDeleteTargetCategory(null);
+    setDeleteImpact(null);
+    setDeleteCategoryError(null);
   };
 
   const openAttributeModal = () => {
@@ -424,6 +475,48 @@ const CategoryManagement: FC = () => {
     }
   };
 
+  const handleDeleteCategory = async (reassignProductsToOther = false) => {
+    if (!deleteTargetCategory) return;
+
+    try {
+      setDeletingCategory(true);
+      setDeleteCategoryError(null);
+      setError(null);
+      setSuccessMessage(null);
+
+      const response = await fetch(`${ADMIN_API_BASE_URL}/categories/${deleteTargetCategory.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reassignProductsToOther }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await getResponseError(response, 'Failed to delete category'));
+      }
+
+      await fetchData();
+
+      if (selectedCategory?.id === deleteTargetCategory.id) {
+        setSelectedCategory(null);
+        setAttributes([]);
+      }
+
+      setSuccessMessage(
+        reassignProductsToOther
+          ? `Đã chuyển sản phẩm sang "Khác" và xóa danh mục "${deleteTargetCategory.name}".`
+          : `Đã xóa danh mục "${deleteTargetCategory.name}".`,
+      );
+      setIsDeleteCategoryModalOpen(false);
+      setDeleteTargetCategory(null);
+      setDeleteImpact(null);
+    } catch (deleteError) {
+      console.error('Error deleting category:', deleteError);
+      setDeleteCategoryError(deleteError instanceof Error ? deleteError.message : 'Failed to delete category');
+    } finally {
+      setDeletingCategory(false);
+    }
+  };
+
   const handleAttributeSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -441,12 +534,12 @@ const CategoryManagement: FC = () => {
     const normalizedInputType = normalizeAttributeInputType(attributeForm.input_type);
     const normalizedOptions = supportsAttributeOptions(normalizedInputType, attributeOptions)
       ? attributeOptions
-          .map((option, index) => ({
-            id: option.id,
-            value_name: option.value_name.trim(),
-            sort_order: index,
-          }))
-          .filter((option) => option.value_name.length > 0)
+        .map((option, index) => ({
+          id: option.id,
+          value_name: option.value_name.trim(),
+          sort_order: index,
+        }))
+        .filter((option) => option.value_name.length > 0)
       : [];
 
     if (supportsAttributeOptions(normalizedInputType, attributeOptions) && normalizedOptions.length === 0) {
@@ -590,17 +683,21 @@ const CategoryManagement: FC = () => {
     const isExpanded = expandedIds.includes(node.id);
     const hasChildren = node.children && node.children.length > 0;
     const isSelected = selectedCategory?.id === node.id;
+    const isActive = Boolean(node.is_active);
 
     return (
       <div key={node.id} className="ml-4">
-        <div 
-          className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
-            isSelected ? 'bg-[#00629d] text-white' : 'hover:bg-[#e9f5ff]'
-          }`}
+        <div
+          className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${isSelected
+            ? 'bg-[#00629d] text-white'
+            : isActive
+              ? 'hover:bg-[#e9f5ff]'
+              : 'bg-[#fff8f7] text-[#7d2924] opacity-80 hover:bg-[#fff0ef]'
+            }`}
           onClick={() => handleSelectCategory(node)}
         >
           {hasChildren ? (
-            <span 
+            <span
               className="material-symbols-outlined text-sm select-none"
               onClick={(e) => {
                 e.stopPropagation();
@@ -615,7 +712,21 @@ const CategoryManagement: FC = () => {
           <span className="material-symbols-outlined text-sm">
             {isSelected ? 'folder_open' : 'folder'}
           </span>
-          <span className="text-sm font-medium">{node.name}</span>
+          <span className={`min-w-0 flex-1 truncate text-sm font-medium ${!isActive && !isSelected ? 'line-through decoration-[#ba1a1a]/50' : ''}`}>
+            {node.name}
+          </span>
+          <span
+            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${isSelected
+              ? isActive
+                ? 'bg-white/20 text-white'
+                : 'bg-[#ffe5e1] text-[#7d2924]'
+              : isActive
+                ? 'bg-[#e6f6ec] text-[#23713a]'
+                : 'bg-[#ffdad6] text-[#ba1a1a]'
+              }`}
+          >
+            {isActive ? 'Hoạt động' : 'Không hoạt động'}
+          </span>
         </div>
         {isExpanded && hasChildren && (
           <div className="border-l border-[#e1f0fb] ml-2">
@@ -672,9 +783,9 @@ const CategoryManagement: FC = () => {
           {/* Left Panel: Tree View */}
           <div className="w-[400px] bg-white rounded-[32px] border border-[#e1f0fb] shadow-sm flex flex-col overflow-hidden">
             <div className="p-6 border-b border-[#e1f0fb] flex items-center justify-between">
-              <h4 className="font-bold text-[#0f1d25]">Cau truc cay</h4>
+              <h4 className="font-bold text-[#0f1d25]">Cấu trúc cây</h4>
               <button type="button" className="text-[#00629d] text-xs font-bold hover:underline" onClick={() => setExpandedIds([])}>
-                Thu gon tat ca
+                Thu gọn tất cả
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
@@ -720,17 +831,27 @@ const CategoryManagement: FC = () => {
                 <div className="space-y-6">
                   <div className="flex items-center justify-between rounded-2xl border border-[#e1f0fb] bg-[#f8fbff] px-4 py-3">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-[#707882]">Selected category</p>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-[#707882]">Danh mục được chọn</p>
                       <p className="mt-1 text-sm font-bold text-[#0f1d25]">{selectedCategory.name}</p>
                     </div>
-                    <button
-                      type="button"
-                      className="flex items-center gap-2 rounded-xl border border-[#d6e7f6] bg-white px-4 py-2 text-sm font-semibold text-[#00629d] transition-all hover:bg-[#f5faff]"
-                      onClick={() => openEditCategoryModal(selectedCategory)}
-                    >
-                      <span className="material-symbols-outlined text-sm">edit</span>
-                      Edit category
-                    </button>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 rounded-xl border border-[#d6e7f6] bg-white px-4 py-2 text-sm font-semibold text-[#00629d] transition-all hover:bg-[#f5faff]"
+                        onClick={() => openEditCategoryModal(selectedCategory)}
+                      >
+                        <span className="material-symbols-outlined text-sm">edit</span>
+                        Chỉnh sửa danh mục
+                      </button>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 rounded-xl border border-[#ffd9d6] bg-white px-4 py-2 text-sm font-semibold text-[#ba1a1a] transition-all hover:bg-[#fff0ef]"
+                        onClick={() => openDeleteCategoryModal(selectedCategory)}
+                      >
+                        <span className="material-symbols-outlined text-sm">delete</span>
+                        Xóa danh mục
+                      </button>
+                    </div>
                   </div>
 
                   {/* Table Header */}
@@ -744,36 +865,36 @@ const CategoryManagement: FC = () => {
                   {attributes.map(attr => (
                     <div key={attr.id} className="rounded-2xl border border-[#edf5fb] px-4 py-4 transition-colors hover:bg-[#fcfdfe]">
                       <div className="grid grid-cols-4 gap-4 items-start">
-                      <div>
-                        <p className="font-bold text-[#0f1d25]">{attr.name}</p>
-                        {attr.options && attr.options.length > 0 && (
-                          <p className="text-[10px] text-[#707882] mt-1">{attr.options.length} tùy chọn khả dụng</p>
-                        )}
-                      </div>
-                      <div>
-                        <span className="px-3 py-1 bg-[#e9f5ff] text-[#00629d] text-[10px] font-black rounded-lg uppercase">
-                          {attr.input_type}
-                        </span>
-                      </div>
-                      <div>
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${attr.is_required ? 'bg-[#00629d] text-white' : 'border-2 border-[#e1f0fb] text-[#707882]'}`}>
-                          <span className="material-symbols-outlined text-[10px] font-bold">
-                            {attr.is_required ? 'check' : ''}
+                        <div>
+                          <p className="font-bold text-[#0f1d25]">{attr.name}</p>
+                          {attr.options && attr.options.length > 0 && (
+                            <p className="text-[10px] text-[#707882] mt-1">{attr.options.length} tùy chọn khả dụng</p>
+                          )}
+                        </div>
+                        <div>
+                          <span className="px-3 py-1 bg-[#e9f5ff] text-[#00629d] text-[10px] font-black rounded-lg uppercase">
+                            {attr.input_type}
                           </span>
                         </div>
-                      </div>
-                      <div className="flex flex-wrap items-center justify-end gap-2">
-                        <button type="button" className="rounded-lg bg-[#f5faff] px-3 py-2 text-xs font-semibold text-[#00629d] transition-all hover:bg-[#00629d] hover:text-white" onClick={() => openEditAttributeModal(attr)}>
-                          Edit
-                        </button>
-                        <button type="button" className="rounded-lg bg-[#fff5f5] px-3 py-2 text-xs font-semibold text-[#ba1a1a] transition-all hover:bg-[#ba1a1a] hover:text-white" onClick={() => handleDeleteAttribute(attr)}>
-                          Remove
-                        </button>
-                      </div>
+                        <div>
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center ${attr.is_required ? 'bg-[#00629d] text-white' : 'border-2 border-[#e1f0fb] text-[#707882]'}`}>
+                            <span className="material-symbols-outlined text-[10px] font-bold">
+                              {attr.is_required ? 'check' : ''}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <button type="button" className="rounded-lg bg-[#f5faff] px-3 py-2 text-xs font-semibold text-[#00629d] transition-all hover:bg-[#00629d] hover:text-white" onClick={() => openEditAttributeModal(attr)}>
+                            Chỉnh sửa
+                          </button>
+                          <button type="button" className="rounded-lg bg-[#fff5f5] px-3 py-2 text-xs font-semibold text-[#ba1a1a] transition-all hover:bg-[#ba1a1a] hover:text-white" onClick={() => handleDeleteAttribute(attr)}>
+                            Xóa
+                          </button>
+                        </div>
                       </div>
 
                       <div className="mt-4 border-t border-[#edf5fb] pt-4">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-[#707882]">Attribute options</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-[#707882]">Tùy chọn thuộc tính</p>
                         {attr.options && attr.options.length > 0 ? (
                           <div className="mt-3 flex flex-wrap gap-2">
                             {attr.options.map((option) => (
@@ -803,12 +924,12 @@ const CategoryManagement: FC = () => {
                     onClick={openAttributeModal}
                   >
                     <span className="material-symbols-outlined text-3xl mb-2 group-hover:scale-110 transition-transform">post_add</span>
-                    <p className="text-sm font-semibold">Tao them thuoc tinh moi cho {selectedCategory.name}</p>
+                    <p className="text-sm font-semibold">Thêm thuộc tính mới cho {selectedCategory.name}</p>
                   </button>
                 </div>
               )}
             </div>
-            
+
             <div className="p-6 bg-[#f5faff] border-t border-[#e1f0fb]">
               <div className="bg-[#00629d] bg-opacity-5 rounded-2xl p-4 flex gap-4 items-center border border-[#00629d] border-opacity-10">
                 <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-[#00629d] shadow-sm">
@@ -823,6 +944,101 @@ const CategoryManagement: FC = () => {
           </div>
         </div>
       </div>
+
+      {isDeleteCategoryModalOpen && deleteTargetCategory && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0f1d25]/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-[28px] bg-white p-6 shadow-2xl shadow-[#0f1d25]/20">
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-bold text-[#0f1d25]">Xóa danh mục</h3>
+                <p className="mt-1 text-sm text-[#707882]">
+                  Kiểm tra sản phẩm và danh mục con trước khi xóa "{deleteTargetCategory.name}".
+                </p>
+              </div>
+              <button
+                type="button"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f5faff] text-[#707882]"
+                onClick={closeDeleteCategoryModal}
+                disabled={deletingCategory}
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {loadingDeleteImpact ? (
+              <div className="rounded-2xl border border-[#e1f0fb] bg-[#f8fbff] p-5 text-sm text-[#707882]">
+                Đang kiểm tra danh mục...
+              </div>
+            ) : deleteCategoryError ? (
+              <div className="rounded-2xl border border-[#ffdad6] bg-[#fff8f7] p-5 text-sm text-[#ba1a1a]">
+                {deleteCategoryError}
+              </div>
+            ) : deleteImpact ? (
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-[#e1f0fb] bg-[#f8fbff] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#707882]">Sản phẩm</p>
+                    <p className="mt-2 text-2xl font-bold text-[#0f1d25]">{deleteImpact.productCount}</p>
+                  </div>
+                  <div className="rounded-2xl border border-[#e1f0fb] bg-[#f8fbff] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#707882]">Danh mục con</p>
+                    <p className="mt-2 text-2xl font-bold text-[#0f1d25]">{deleteImpact.childrenCount}</p>
+                  </div>
+                </div>
+
+                {deleteImpact.childrenCount > 0 ? (
+                  <div className="rounded-2xl border border-[#ffdad6] bg-[#fff8f7] p-4 text-sm text-[#7d2924]">
+                    Không thể xóa danh mục này vì vẫn còn danh mục con. Hãy xóa hoặc chuyển các danh mục con trước.
+                  </div>
+                ) : deleteImpact.productCount > 0 && deleteImpact.canReassignToFallback ? (
+                  <div className="rounded-2xl border border-[#ffe3a3] bg-[#fffaf0] p-4 text-sm text-[#6d4b00]">
+                    Không thể xóa trực tiếp vì danh mục này đang có sản phẩm. Bạn có thể chuyển tất cả sản phẩm sang danh mục "{deleteImpact.fallbackCategory?.name ?? 'Khác'}" rồi xóa danh mục này.
+                  </div>
+                ) : deleteImpact.productCount > 0 ? (
+                  <div className="rounded-2xl border border-[#ffdad6] bg-[#fff8f7] p-4 text-sm text-[#7d2924]">
+                    Không thể xóa danh mục này vì đang có sản phẩm và không có danh mục thay thế phù hợp.
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-[#ffdad6] bg-[#fff8f7] p-4 text-sm text-[#7d2924]">
+                    Danh mục này không có sản phẩm. Thao tác xóa sẽ không thể hoàn tác.
+                  </div>
+                )}
+              </div>
+            ) : null}
+
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                className="rounded-2xl border border-[#d6e7f6] px-5 py-3 font-semibold text-[#4b6472]"
+                onClick={closeDeleteCategoryModal}
+                disabled={deletingCategory}
+              >
+                Hủy
+              </button>
+              {deleteImpact?.canDelete && (
+                <button
+                  type="button"
+                  className="rounded-2xl bg-[#ba1a1a] px-5 py-3 font-semibold text-white transition hover:bg-[#931313] disabled:cursor-not-allowed disabled:opacity-70"
+                  onClick={() => handleDeleteCategory(false)}
+                  disabled={deletingCategory}
+                >
+                  {deletingCategory ? 'Đang xóa...' : 'Xóa danh mục'}
+                </button>
+              )}
+              {deleteImpact?.canReassignToFallback && (
+                <button
+                  type="button"
+                  className="rounded-2xl bg-[#ba1a1a] px-5 py-3 font-semibold text-white transition hover:bg-[#931313] disabled:cursor-not-allowed disabled:opacity-70"
+                  onClick={() => handleDeleteCategory(true)}
+                  disabled={deletingCategory}
+                >
+                  {deletingCategory ? 'Đang xử lý...' : 'Chuyển sang Khác và xóa'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {isCategoryModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0f1d25]/50 p-4 backdrop-blur-sm">
@@ -848,7 +1064,7 @@ const CategoryManagement: FC = () => {
             <form className="space-y-5" onSubmit={handleCategorySubmit}>
               <div className="grid gap-5 md:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-sm font-semibold text-[#0f1d25]">Name</span>
+                  <span className="text-sm font-semibold text-[#0f1d25]">Tên</span>
                   <input
                     className="w-full rounded-2xl border border-[#d6e7f6] px-4 py-3 outline-none transition focus:border-[#00629d]"
                     value={categoryForm.name}
@@ -858,7 +1074,7 @@ const CategoryManagement: FC = () => {
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-sm font-semibold text-[#0f1d25]">Slug (optional)</span>
+                  <span className="text-sm font-semibold text-[#0f1d25]">Slug (tùy chọn)</span>
                   <input
                     className="w-full rounded-2xl border border-[#d6e7f6] px-4 py-3 outline-none transition focus:border-[#00629d]"
                     value={categoryForm.slug}
@@ -869,18 +1085,18 @@ const CategoryManagement: FC = () => {
 
                 {editingCategory ? (
                   <div className="rounded-2xl border border-[#d6e7f6] bg-[#f8fbff] px-4 py-3 text-sm text-[#4b6472] md:col-span-2">
-                    Parent category remains{' '}
+                    Danh mục cha vẫn là{' '}
                     <span className="font-semibold text-[#0f1d25]">
                       {selectedParentCategories.length > 0
                         ? selectedParentCategories.map((category) => category.name).join(' / ')
                         : 'Root level'}
                     </span>{' '}
-                    while editing this category.
+                    khi chỉnh sửa danh mục này.
                   </div>
                 ) : (
                   <div className="space-y-3 md:col-span-2">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm font-semibold text-[#0f1d25]">Parent category</span>
+                      <span className="text-sm font-semibold text-[#0f1d25]">Danh mục cha</span>
                       <button
                         type="button"
                         className="text-xs font-semibold text-[#00629d] hover:underline"
@@ -889,17 +1105,17 @@ const CategoryManagement: FC = () => {
                           setCategoryForm((prev) => ({ ...prev, parent_id: '' }));
                         }}
                       >
-                        Set as root
+                        Đặt là rễ
                       </button>
                     </div>
 
                     <div className="rounded-2xl border border-[#d6e7f6] bg-[#f8fbff] p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-[#707882]">Choose level by level</p>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-[#707882]">Chọn từng cấp</p>
                       <div className="mt-3 grid gap-3 md:grid-cols-2">
                         {parentSelectionLevels.map((levelCategories, levelIndex) => (
                           <label key={`parent-level-${levelIndex}`} className="space-y-2">
                             <span className="text-xs font-semibold text-[#4b6472]">
-                              Level {levelIndex + 1}
+                              Cấp {levelIndex + 1}
                             </span>
                             <select
                               className="w-full rounded-2xl border border-[#d6e7f6] bg-white px-4 py-3 outline-none transition focus:border-[#00629d]"
@@ -920,7 +1136,7 @@ const CategoryManagement: FC = () => {
                       </div>
 
                       <div className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm text-[#4b6472]">
-                        <span className="font-semibold text-[#0f1d25]">Selected parent:</span>{' '}
+                        <span className="font-semibold text-[#0f1d25]">Danh mục cha:</span>{' '}
                         {selectedParentCategories.length > 0
                           ? selectedParentCategories.map((category) => category.name).join(' / ')
                           : 'Root level'}
@@ -930,7 +1146,7 @@ const CategoryManagement: FC = () => {
                 )}
 
                 <label className="space-y-2">
-                  <span className="text-sm font-semibold text-[#0f1d25]">Sort order</span>
+                  <span className="text-sm font-semibold text-[#0f1d25]">Thứ tự hiển thị</span>
                   <input
                     type="number"
                     className="w-full rounded-2xl border border-[#d6e7f6] px-4 py-3 outline-none transition focus:border-[#00629d]"
@@ -941,7 +1157,7 @@ const CategoryManagement: FC = () => {
                 </label>
 
                 <label className="space-y-2 md:col-span-2">
-                  <span className="text-sm font-semibold text-[#0f1d25]">Icon URL (optional)</span>
+                  <span className="text-sm font-semibold text-[#0f1d25]">Icon URL (tùy chọn)</span>
                   <input
                     className="w-full rounded-2xl border border-[#d6e7f6] px-4 py-3 outline-none transition focus:border-[#00629d]"
                     value={categoryForm.icon_url}
@@ -957,7 +1173,7 @@ const CategoryManagement: FC = () => {
                   checked={categoryForm.is_active}
                   onChange={(event) => setCategoryForm((prev) => ({ ...prev, is_active: event.target.checked }))}
                 />
-                Active category
+                Danh mục hoạt động
               </label>
 
               <div className="flex justify-end gap-3 pt-2">
@@ -966,7 +1182,7 @@ const CategoryManagement: FC = () => {
                   className="rounded-2xl border border-[#d6e7f6] px-5 py-3 font-semibold text-[#4b6472]"
                   onClick={closeCategoryModal}
                 >
-                  Cancel
+                  Hủy
                 </button>
                 <button
                   type="submit"
@@ -1005,7 +1221,7 @@ const CategoryManagement: FC = () => {
             <form className="space-y-5" onSubmit={handleAttributeSubmit}>
               <div className="grid gap-5 md:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-sm font-semibold text-[#0f1d25]">Name</span>
+                  <span className="text-sm font-semibold text-[#0f1d25]">Tên</span>
                   <input
                     className="w-full rounded-2xl border border-[#d6e7f6] px-4 py-3 outline-none transition focus:border-[#00629d]"
                     value={attributeForm.name}
@@ -1015,7 +1231,7 @@ const CategoryManagement: FC = () => {
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-sm font-semibold text-[#0f1d25]">Input type</span>
+                  <span className="text-sm font-semibold text-[#0f1d25]">Loại nhập</span>
                   <select
                     className="w-full rounded-2xl border border-[#d6e7f6] px-4 py-3 outline-none transition focus:border-[#00629d]"
                     value={attributeForm.input_type}
@@ -1032,7 +1248,7 @@ const CategoryManagement: FC = () => {
                 </label>
 
                 <label className="space-y-2">
-                  <span className="text-sm font-semibold text-[#0f1d25]">Sort order</span>
+                  <span className="text-sm font-semibold text-[#0f1d25]">Thứ tự hiển thị</span>
                   <input
                     type="number"
                     className="w-full rounded-2xl border border-[#d6e7f6] px-4 py-3 outline-none transition focus:border-[#00629d]"
@@ -1055,15 +1271,15 @@ const CategoryManagement: FC = () => {
                   <div className="space-y-3 rounded-2xl border border-[#d6e7f6] bg-[#f8fbff] p-4 md:col-span-2">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-[#0f1d25]">Value options</p>
-                        <p className="text-xs text-[#707882]">Add the values buyers can pick for this attribute.</p>
+                        <p className="text-sm font-semibold text-[#0f1d25]">Giá trị tùy chọn</p>
+                        <p className="text-xs text-[#707882]">Thêm các giá trị mà người mua có thể chọn cho thuộc tính này.</p>
                       </div>
                       <button
                         type="button"
                         className="rounded-xl bg-white px-3 py-2 text-xs font-semibold text-[#00629d] border border-[#d6e7f6] transition hover:bg-[#e9f5ff]"
                         onClick={handleAddAttributeOptionField}
                       >
-                        Add value
+                        Thêm giá trị
                       </button>
                     </div>
 
@@ -1086,7 +1302,7 @@ const CategoryManagement: FC = () => {
                             disabled={attributeOptions.length === 1}
                             title={attributeOptions.length === 1 ? 'At least one value is required' : 'Remove value'}
                           >
-                            <span className="material-symbols-outlined text-sm">delete</span>
+                            <span className="material-symbols-outlined text-sm">Xóa</span>
                           </button>
                         </div>
                       ))}
@@ -1101,7 +1317,7 @@ const CategoryManagement: FC = () => {
                   className="rounded-2xl border border-[#d6e7f6] px-5 py-3 font-semibold text-[#4b6472]"
                   onClick={closeAttributeModal}
                 >
-                  Cancel
+                  Hủy
                 </button>
                 <button
                   type="submit"

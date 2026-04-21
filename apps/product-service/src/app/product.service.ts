@@ -461,25 +461,44 @@ export class ProductService {
   // =====================
 
   async getAdminStats() {
-    const [activeShops, pendingApplications, pendingProducts, totalCategories, rootCategories] = await Promise.all([
+    const [
+      totalShops,
+      activeShops,
+      pendingApplications,
+      totalProducts,
+      activeProducts,
+      pendingProducts,
+      totalCategories,
+      activeCategories,
+      rootCategories,
+    ] = await Promise.all([
+      this.prisma.shop.count(),
       this.prisma.shop.count({ where: { status: 'active' } }),
       this.prisma.shop.count({ where: { status: 'pending' } }),
+      this.prisma.product.count(),
+      this.prisma.product.count({ where: { status: 'active' } }),
       this.prisma.product.count({ where: { status: 'pending_approval' } }),
-      this.prisma.category.count(),
-      this.prisma.category.count({ where: { level: 1 } }),
+      this.prisma.category.count({ where: { shop_id: null } }),
+      this.prisma.category.count({ where: { shop_id: null, is_active: true } }),
+      this.prisma.category.count({ where: { shop_id: null, level: 1 } }),
     ]);
 
     // Get max attributes in a single category
     const categoriesWithAtts = await this.prisma.category.findMany({
+      where: { shop_id: null },
       include: { _count: { select: { attribute_defs: true } } }
     });
     const maxAttributes = categoriesWithAtts.reduce((max, cat) => Math.max(max, cat._count.attribute_defs), 0);
 
     return {
+      totalShops,
       activeShops,
       pendingApplications,
+      totalProducts,
+      activeProducts,
       pendingProducts,
       totalCategories,
+      activeCategories,
       rootCategories,
       maxAttributes,
     };
@@ -536,19 +555,107 @@ export class ProductService {
     });
   }
 
-  async deleteCategory(id: number) {
+  private async getFallbackCategoryForReassignment(excludedCategoryId: number) {
+    const existingFallback = await this.prisma.category.findFirst({
+      where: {
+        shop_id: null,
+        OR: [{ slug: 'khac' }, { name: 'Khác' }],
+      },
+    });
+
+    if (existingFallback) {
+      if (existingFallback.id === excludedCategoryId) {
+        throw new BadRequestException('Cannot reassign products because this category is already "Khác"');
+      }
+
+      return existingFallback;
+    }
+
+    const existingKhacSlug = await this.prisma.category.findFirst({
+      where: { slug: 'khac' },
+      select: { id: true },
+    });
+
+    return this.prisma.category.create({
+      data: {
+        name: 'Khác',
+        slug: existingKhacSlug ? this.generateSlug('Khác') : 'khac',
+        parent_id: null,
+        level: 1,
+        sort_order: 9999,
+        is_active: true,
+      },
+    });
+  }
+
+  async getAdminCategoryDeleteImpact(id: number) {
+    const category = await this.prisma.category.findUnique({
+      where: { id },
+      select: { id: true, name: true, slug: true, shop_id: true },
+    });
+
+    if (!category || category.shop_id !== null) {
+      throw new NotFoundException('Category not found');
+    }
+
+    const childrenCount = await this.prisma.category.count({ where: { parent_id: id } });
+    const productCount = await this.prisma.product.count({ where: { category_id: id } });
+    const fallbackCategory = await this.prisma.category.findFirst({
+      where: {
+        shop_id: null,
+        OR: [{ slug: 'khac' }, { name: 'Khác' }],
+      },
+      select: { id: true, name: true },
+    });
+    const isFallbackCategory = category.slug === 'khac' || category.name === 'Khác' || fallbackCategory?.id === id;
+
+    return {
+      productCount,
+      childrenCount,
+      fallbackCategory: fallbackCategory?.id === id ? null : fallbackCategory,
+      canDelete: productCount === 0 && childrenCount === 0,
+      canReassignToFallback: productCount > 0 && childrenCount === 0 && !isFallbackCategory,
+    };
+  }
+
+  async deleteCategory(id: number, options?: { reassignProductsToOther?: boolean }) {
+    const category = await this.prisma.category.findUnique({
+      where: { id },
+      select: { id: true, shop_id: true },
+    });
+
+    if (!category || category.shop_id !== null) {
+      throw new NotFoundException('Category not found');
+    }
+
     // Check if category has children
     const childrenCount = await this.prisma.category.count({ where: { parent_id: id } });
     if (childrenCount > 0) {
       throw new BadRequestException('Cannot delete category with sub-categories');
     }
+
     // Check if category has products
     const productCount = await this.prisma.product.count({ where: { category_id: id } });
+    let fallbackCategoryId: number | null = null;
     if (productCount > 0) {
-      throw new BadRequestException('Cannot delete category with assigned products');
+      if (!options?.reassignProductsToOther) {
+        throw new BadRequestException('Cannot delete category with assigned products');
+      }
+
+      const fallbackCategory = await this.getFallbackCategoryForReassignment(id);
+      fallbackCategoryId = fallbackCategory.id;
     }
 
-    return this.prisma.category.delete({ where: { id } });
+    return this.prisma.$transaction(async (tx) => {
+      if (fallbackCategoryId) {
+        await tx.product.updateMany({
+          where: { category_id: id },
+          data: { category_id: fallbackCategoryId },
+        });
+      }
+
+      return tx.category.delete({ where: { id } });
+    });
   }
 
   // =====================

@@ -43,35 +43,97 @@ export class AdminService {
     }
 
     if (!response.ok) {
-      throw new BadGatewayException(`Upstream request failed: ${url} (${response.status})`);
+      let upstreamMessage = '';
+
+      try {
+        const data = await response.json();
+        if (typeof data?.message === 'string') {
+          upstreamMessage = data.message;
+        } else if (Array.isArray(data?.message)) {
+          upstreamMessage = data.message.join(', ');
+        }
+      } catch {
+        try {
+          upstreamMessage = await response.text();
+        } catch {
+          upstreamMessage = '';
+        }
+      }
+
+      throw new BadGatewayException(
+        upstreamMessage || `Upstream request failed: ${url} (${response.status})`,
+      );
     }
 
     return response.json() as Promise<T>;
   }
 
   async getStats() {
-    const [authStats, productStats] = await Promise.all([
-      this.requestJson<{ activeUsers: number }>(`${this.authBaseUrl}/internal/admin/stats`),
+    const emptyOrderStats = {
+      totalOrders: 0,
+      pendingOrders: 0,
+      confirmedOrders: 0,
+      shippedOrders: 0,
+      deliveredOrders: 0,
+      cancelledOrders: 0,
+      todayOrders: 0,
+      totalRevenue: 0,
+    };
+    const emptyVoucherStats = {
+      totalVouchers: 0,
+      activeVouchers: 0,
+      scheduledVouchers: 0,
+      expiredVouchers: 0,
+      platformVouchers: 0,
+      shopVouchers: 0,
+      totalClaims: 0,
+      usedClaims: 0,
+    };
+
+    const [authStats, productStats, orderStats, voucherStats, bannerStats] = await Promise.all([
+      this.requestJson<{
+        totalUsers: number;
+        activeUsers: number;
+        suspendedUsers: number;
+      }>(`${this.authBaseUrl}/internal/admin/stats`),
       this.requestJson<{ 
+        totalShops: number;
         activeShops: number; 
         pendingApplications: number; 
+        totalProducts: number;
+        activeProducts: number;
         pendingProducts: number;
         totalCategories: number;
+        activeCategories: number;
         rootCategories: number;
         maxAttributes: number;
       }>(
         `${this.productBaseUrl}/internal/admin/stats`,
       ),
+      this.requestJson<typeof emptyOrderStats>(`${this.orderBaseUrl}/internal/admin/stats`).catch(() => emptyOrderStats),
+      this.requestJson<typeof emptyVoucherStats>(`${this.orderServiceRootUrl}/api/vouchers/internal/admin/stats`).catch(
+        () => emptyVoucherStats,
+      ),
+      this.getBannerStats(),
     ]);
 
     return {
+      totalUsers: authStats.totalUsers,
       activeUsers: authStats.activeUsers,
+      suspendedUsers: authStats.suspendedUsers,
+      totalShops: productStats.totalShops,
       activeShops: productStats.activeShops,
       pendingApplications: productStats.pendingApplications,
+      totalProducts: productStats.totalProducts,
+      activeProducts: productStats.activeProducts,
       pendingProducts: productStats.pendingProducts,
       totalCategories: productStats.totalCategories,
+      activeCategories: productStats.activeCategories,
       rootCategories: productStats.rootCategories,
       maxAttributes: productStats.maxAttributes,
+      ...orderStats,
+      ...voucherStats,
+      ...bannerStats,
     };
   }
 
@@ -227,9 +289,15 @@ export class AdminService {
     });
   }
 
-  async deleteCategory(id: number) {
+  async getCategoryDeleteImpact(id: number) {
+    return this.requestJson<any>(`${this.productBaseUrl}/internal/admin/categories/${id}/delete-impact`);
+  }
+
+  async deleteCategory(id: number, data?: any) {
     return this.requestJson<any>(`${this.productBaseUrl}/internal/admin/categories/${id}`, {
       method: 'DELETE',
+      headers: data ? { 'Content-Type': 'application/json' } : undefined,
+      body: data ? JSON.stringify(data) : undefined,
     });
   }
 
@@ -298,6 +366,20 @@ export class AdminService {
     });
     console.log(`[AdminService] Found ${banners.length} active banners`);
     return banners;
+  }
+
+  async getBannerStats() {
+    const [totalBanners, activeBanners, inactiveBanners] = await Promise.all([
+      this.prisma.banner.count(),
+      this.prisma.banner.count({ where: { is_active: true } }),
+      this.prisma.banner.count({ where: { is_active: false } }),
+    ]);
+
+    return {
+      totalBanners,
+      activeBanners,
+      inactiveBanners,
+    };
   }
 
   async createBanner(data: { title: string; image_url: string; target_url?: string; is_active?: boolean; sort_order?: number }) {

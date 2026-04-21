@@ -55,6 +55,12 @@ export class OrderController {
     });
   }
 
+  @Get('internal/admin/stats')
+  getAdminStats(@Headers() headers: Record<string, string | string[] | undefined>) {
+    this.requireInternalAccess(headers);
+    return this.orderService.getAdminStats();
+  }
+
   @Get('internal/admin/analytics/shop-sales')
   getShopSalesAnalytics(
     @Headers() headers: Record<string, string | string[] | undefined>,

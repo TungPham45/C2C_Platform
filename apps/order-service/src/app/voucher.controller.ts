@@ -30,6 +30,12 @@ export class VoucherController {
     return this.voucherService.getAllVouchers();
   }
 
+  @Get('internal/admin/stats')
+  async getAdminStats(@Headers() headers: any) {
+    this.requireInternalAccess(headers);
+    return this.voucherService.getAdminStats();
+  }
+
   @Get('internal/admin/:id')
   async getVoucherById(@Param('id') id: string, @Headers() headers: any) {
     this.requireInternalAccess(headers);

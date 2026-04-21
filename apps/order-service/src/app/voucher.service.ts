@@ -134,6 +134,54 @@ export class VoucherService {
     });
   }
 
+  async getAdminStats() {
+    const now = new Date();
+    const [
+      totalVouchers,
+      activeVouchers,
+      scheduledVouchers,
+      expiredVouchers,
+      platformVouchers,
+      shopVouchers,
+      totalClaims,
+      usedClaims,
+    ] = await Promise.all([
+      this.prisma.voucher.count(),
+      this.prisma.voucher.count({
+        where: {
+          status: 'active',
+          start_date: { lte: now },
+          end_date: { gte: now },
+        },
+      }),
+      this.prisma.voucher.count({
+        where: {
+          OR: [{ status: 'scheduled' }, { start_date: { gt: now } }],
+        },
+      }),
+      this.prisma.voucher.count({
+        where: {
+          OR: [{ status: 'expired' }, { end_date: { lt: now } }],
+        },
+      }),
+      this.prisma.voucher.count({ where: { shop_id: null } }),
+      this.prisma.voucher.count({ where: { shop_id: { not: null } } }),
+      this.prisma.userVoucherClaim.count(),
+      this.prisma.userVoucherClaim.count({ where: { is_used: true } }),
+    ]);
+
+    return {
+      totalVouchers,
+      activeVouchers,
+      scheduledVouchers,
+      expiredVouchers,
+      platformVouchers,
+      shopVouchers,
+      totalClaims,
+      usedClaims,
+    };
+  }
+
   async getVoucherById(id: number) {
     const voucher = await this.prisma.voucher.findUnique({
       where: { id },

@@ -235,13 +235,23 @@ export class ProductController {
     return this.productService.updateCategory(+id, data);
   }
 
-  @Delete('internal/admin/categories/:id')
-  deleteCategory(
+  @Get('internal/admin/categories/:id/delete-impact')
+  getAdminCategoryDeleteImpact(
     @Headers() headers: Record<string, string | string[] | undefined>,
     @Param('id') id: string,
   ) {
     this.requireInternalAccess(headers);
-    return this.productService.deleteCategory(+id);
+    return this.productService.getAdminCategoryDeleteImpact(+id);
+  }
+
+  @Delete('internal/admin/categories/:id')
+  deleteCategory(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Param('id') id: string,
+    @Body() data: any,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.productService.deleteCategory(+id, data);
   }
 
   // --- ATTRIBUTE MANAGEMENT ---

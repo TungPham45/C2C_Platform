@@ -4,19 +4,21 @@ import { NavLink, useLocation, Link } from 'react-router-dom';
 interface AdminLayoutProps {
   children: ReactNode;
   pageTitle?: string;
+  pageSubtitle?: string;
 }
 
-export const AdminLayout: FC<AdminLayoutProps> = ({ children, pageTitle = 'Serene Admin' }) => {
+export const AdminLayout: FC<AdminLayoutProps> = ({ children, pageTitle = 'Serene Admin', pageSubtitle }) => {
   const location = useLocation();
 
-  const getNavLinkClass = ({ isActive }: { isActive: boolean }) => 
-    `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
-      isActive 
-        ? 'bg-white text-[#00629d] shadow-[0_4px_20px_rgba(0,98,157,0.1)] font-semibold' 
-        : 'text-[#707882] hover:bg-[#e9f5ff] hover:text-[#00629d]'
+  const getNavLinkClass = ({ isActive }: { isActive: boolean }) =>
+    `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${isActive
+      ? 'bg-white text-[#00629d] shadow-[0_4px_20px_rgba(0,98,157,0.1)] font-semibold'
+      : 'text-[#707882] hover:bg-[#e9f5ff] hover:text-[#00629d]'
     }`;
 
   const isAdminProductsActive = location.pathname.startsWith('/admin/products');
+  const displayTitle = pageTitle === 'Serene Admin' ? 'Quản Trị Serene' : pageTitle;
+  const headerSubtitle = pageSubtitle ?? getAdminPageSubtitle(location.pathname);
 
   return (
     <div className="bg-[#f5faff] text-[#0f1d25] min-h-screen font-['Inter'] selection:bg-[#cfe5ff]">
@@ -28,21 +30,21 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children, pageTitle = 'Seren
               <span className="material-symbols-outlined text-white text-xl">shield_person</span>
             </div>
             <h1 className="text-xl font-bold text-[#0f1d25] font-['Plus_Jakarta_Sans'] tracking-tight">
-              {pageTitle === 'Serene Admin' ? 'Quản Trị Serene' : pageTitle}
+              {displayTitle}
             </h1>
           </div>
           <p className="text-[10px] text-[#707882] font-bold uppercase tracking-[0.2em] ml-10">Trung tâm điều khiển</p>
         </div>
-        
+
         <nav className="flex-1 space-y-2 text-sm">
           <NavLink to="/admin" end className={getNavLinkClass}>
             <span className="material-symbols-outlined">dashboard</span> Tổng quan
           </NavLink>
-          
+
           <NavLink to="/admin/applications" className={getNavLinkClass}>
             <span className="material-symbols-outlined">how_to_reg</span> Đăng ký mở shop
           </NavLink>
-          
+
           <NavLink to="/admin/shops" className={getNavLinkClass}>
             <span className="material-symbols-outlined">storefront</span> Quản lý Shop
           </NavLink>
@@ -50,45 +52,44 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children, pageTitle = 'Seren
           <NavLink to="/admin/categories" className={getNavLinkClass}>
             <span className="material-symbols-outlined">category</span> Quản lý Danh mục
           </NavLink>
-          
+
           <NavLink to="/admin/banners" className={getNavLinkClass}>
             <span className="material-symbols-outlined">view_carousel</span> Quản lý Banner
           </NavLink>
-          
+
           <NavLink to="/admin/vouchers" className={getNavLinkClass}>
             <span className="material-symbols-outlined">confirmation_number</span> Quản lý Voucher
           </NavLink>
-          
-          <NavLink 
-            to="/admin/products" 
-            className={() => `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
-              isAdminProductsActive 
-                ? 'bg-white text-[#00629d] shadow-[0_4px_20px_rgba(0,98,157,0.1)] font-semibold' 
-                : 'text-[#707882] hover:bg-[#e9f5ff] hover:text-[#00629d]'
-            }`}
+
+          <NavLink
+            to="/admin/products"
+            className={() => `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${isAdminProductsActive
+              ? 'bg-white text-[#00629d] shadow-[0_4px_20px_rgba(0,98,157,0.1)] font-semibold'
+              : 'text-[#707882] hover:bg-[#e9f5ff] hover:text-[#00629d]'
+              }`}
           >
             <span className="material-symbols-outlined">inventory_2</span> Kiểm duyệt sản phẩm
           </NavLink>
-          
+
           <div className="pt-4 pb-2 px-4 text-[10px] font-bold text-[#707882] uppercase tracking-widest opacity-50">Hệ thống</div>
-          
+
           <NavLink to="/admin/users" className={getNavLinkClass}>
             <span className="material-symbols-outlined">switch_account</span> Quản lý Người Dùng
           </NavLink>
-          
+
           <NavLink to="/admin/analytics/users" className={getNavLinkClass}>
             <span className="material-symbols-outlined">insights</span> Phân tích tăng trưởng
           </NavLink>
-          
+
           <NavLink to="/admin/analytics/shop-sales" className={getNavLinkClass}>
             <span className="material-symbols-outlined">query_stats</span> Báo cáo hiệu suất
           </NavLink>
-          
+
           <a href="#" className="flex items-center gap-3 px-4 py-3 text-[#707882] opacity-50 cursor-not-allowed">
             <span className="material-symbols-outlined">settings</span> Cài đặt hệ thống
           </a>
         </nav>
-        
+
         <div className="mt-auto bg-white/40 backdrop-blur-sm rounded-2xl p-4 border border-white/60">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-full bg-[#cfe5ff] flex items-center justify-center text-[#00629d] font-bold">
@@ -111,16 +112,16 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children, pageTitle = 'Seren
       {/* Header */}
       <header className="fixed top-0 right-0 w-[calc(100%-18rem)] h-20 bg-[#f5faff]/80 backdrop-blur-xl z-40 flex items-center justify-between px-10">
         <div>
-          <h2 className="text-sm font-bold text-[#0f1d25]">Product Moderation Queue</h2>
-          <p className="text-[10px] text-[#707882]">Review and approve submitted products</p>
+          <h2 className="text-sm font-bold text-[#0f1d25]">{displayTitle}</h2>
+          <p className="text-[10px] text-[#707882]">{headerSubtitle}</p>
         </div>
-        
+
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-sm border border-[#e1f0fb]">
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
             <span className="text-[10px] font-bold text-[#0f1d25]">Đang Hoạt Động</span>
           </div>
-          
+
           <button className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-[#707882] shadow-sm hover:text-[#00629d] transition-colors">
             <span className="material-symbols-outlined">notifications</span>
           </button>
@@ -133,4 +134,18 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children, pageTitle = 'Seren
       </main>
     </div>
   );
+};
+
+const getAdminPageSubtitle = (pathname: string) => {
+  if (pathname.startsWith('/admin/applications')) return 'Xem xét và duyệt đăng ký mở shop';
+  if (pathname.startsWith('/admin/shops')) return 'Theo dõi và quản lý trạng thái gian hàng';
+  if (pathname.startsWith('/admin/categories')) return 'Quản lý cây danh mục và bộ thuộc tính sản phẩm';
+  if (pathname.startsWith('/admin/banners')) return 'Quản lý banner hiển thị trên marketplace';
+  if (pathname.startsWith('/admin/vouchers')) return 'Quản lý voucher và chương trình khuyến mãi';
+  if (pathname.startsWith('/admin/products')) return 'Review and approve submitted products';
+  if (pathname.startsWith('/admin/users')) return 'Quản lý tài khoản và quyền truy cập người dùng';
+  if (pathname.startsWith('/admin/analytics/users')) return 'Theo dõi tăng trưởng và hành vi người dùng';
+  if (pathname.startsWith('/admin/analytics/shop-sales')) return 'Phân tích doanh thu và hiệu suất gian hàng';
+
+  return 'Trung tâm điều khiển hệ thống';
 };

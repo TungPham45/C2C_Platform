@@ -146,11 +146,17 @@ export class AuthService {
   }
 
   async getAdminStats() {
-    const activeUsers = await this.prisma.user.count({
-      where: { status: 'active' },
-    });
+    const [totalUsers, activeUsers, suspendedUsers] = await Promise.all([
+      this.prisma.user.count(),
+      this.prisma.user.count({
+        where: { status: 'active' },
+      }),
+      this.prisma.user.count({
+        where: { status: { not: 'active' } },
+      }),
+    ]);
 
-    return { activeUsers };
+    return { totalUsers, activeUsers, suspendedUsers };
   }
 
   async getAllUsers() {

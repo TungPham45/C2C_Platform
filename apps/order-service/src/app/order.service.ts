@@ -338,6 +338,62 @@ export class OrderService {
     }));
   }
 
+  async getAdminStats() {
+    const [
+      totalOrders,
+      pendingOrders,
+      confirmedOrders,
+      shippedOrders,
+      deliveredOrders,
+      cancelledOrders,
+      revenueTotals,
+      todayOrders,
+    ] = await Promise.all([
+      this.prisma.shopOrder.count(),
+      this.prisma.shopOrder.count({ where: { status: 'pending' } }),
+      this.prisma.shopOrder.count({ where: { status: 'confirmed' } }),
+      this.prisma.shopOrder.count({ where: { status: 'shipped' } }),
+      this.prisma.shopOrder.count({ where: { status: 'delivered' } }),
+      this.prisma.shopOrder.count({ where: { status: 'cancelled' } }),
+      this.prisma.shopOrder.aggregate({
+        where: { status: { not: 'cancelled' } },
+        _sum: {
+          subtotal: true,
+          shipping_fee: true,
+          platform_discount_amount: true,
+        },
+      }),
+      this.prisma.shopOrder.count({
+        where: {
+          created_at: {
+            gte: this.getStartOfToday(),
+          },
+        },
+      }),
+    ]);
+
+    const subtotal = revenueTotals._sum.subtotal?.toNumber() ?? 0;
+    const shippingFee = revenueTotals._sum.shipping_fee?.toNumber() ?? 0;
+    const platformDiscount = revenueTotals._sum.platform_discount_amount?.toNumber() ?? 0;
+
+    return {
+      totalOrders,
+      pendingOrders,
+      confirmedOrders,
+      shippedOrders,
+      deliveredOrders,
+      cancelledOrders,
+      todayOrders,
+      totalRevenue: this.roundCurrency(subtotal + shippingFee - platformDiscount),
+    };
+  }
+
+  private getStartOfToday() {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }
+
   private async buildOrderDraft(data: any, userId?: number) {
     const rawShopOrders = Array.isArray(data?.shop_orders) ? data.shop_orders : [];
     if (!rawShopOrders.length) {
