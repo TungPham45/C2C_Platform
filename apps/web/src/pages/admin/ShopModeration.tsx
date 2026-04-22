@@ -11,10 +11,11 @@ interface PendingShop {
 }
 
 const ShopModeration: FC = () => {
-  const [shops, setShops] = useState<PendingShop[]>([]);
+  const [shops, setShops] = useState<PendingShop[]>([]); // dsach các cửa hàng lấy về từ api
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // lấy danh sách các cửa hàng chờ duyệt
   const fetchShops = async () => {
     try {
       setLoading(true);
@@ -33,15 +34,16 @@ const ShopModeration: FC = () => {
     fetchShops();
   }, []);
 
+  // xử lý duyệt cửa hàng
   const handleApprove = async (id: number, shopName: string) => {
     if (!confirm(`Bạn có chắc chắn muốn duyệt Cửa hàng "${shopName}" không?`)) return;
-    
+
     try {
       const response = await fetch(`/api/admin/applications/${id}/approve`, {
         method: 'PUT',
       });
       if (!response.ok) throw new Error('Duyệt cửa hàng thất bại');
-      
+
       // Cập nhật giao diện: Loại bỏ shop đã duyệt
       setShops(shops.filter(s => s.id !== id));
       alert(`Cửa hàng "${shopName}" đã được duyệt thành công!`);
@@ -57,12 +59,12 @@ const ShopModeration: FC = () => {
           <div className="px-10 py-8 border-b border-[#f5faff] flex items-center justify-between">
             <h3 className="text-lg font-bold text-[#0f1d25] font-['Plus_Jakarta_Sans']">Danh sách hồ sơ chờ duyệt</h3>
             <div className="flex gap-2">
-               <span className="px-4 py-1.5 bg-[#fff8e5] text-[#ffb952] rounded-full text-[10px] font-bold uppercase tracking-wider">
-                 Tổng cộng {shops.length} hồ sơ
-               </span>
+              <span className="px-4 py-1.5 bg-[#fff8e5] text-[#ffb952] rounded-full text-[10px] font-bold uppercase tracking-wider">
+                Tổng cộng {shops.length} hồ sơ
+              </span>
             </div>
           </div>
-          
+
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
@@ -82,17 +84,17 @@ const ShopModeration: FC = () => {
                     </td>
                   </tr>
                 ) : error ? (
-                   <tr>
-                      <td colSpan={5} className="px-10 py-10 text-center text-[#ba1a1a] font-bold">
-                         {error}
-                      </td>
-                   </tr>
+                  <tr>
+                    <td colSpan={5} className="px-10 py-10 text-center text-[#ba1a1a] font-bold">
+                      {error}
+                    </td>
+                  </tr>
                 ) : shops.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-10 py-20 text-center">
-                       <span className="material-symbols-outlined text-4xl text-[#cfe5ff] mb-4">check_circle</span>
-                       <p className="text-[#0f1d25] font-bold">Đã xử lý hết!</p>
-                       <p className="text-[#707882] text-xs">Hiện không có đăng ký mở cửa hàng nào cần kiểm duyệt.</p>
+                      <span className="material-symbols-outlined text-4xl text-[#cfe5ff] mb-4">check_circle</span>
+                      <p className="text-[#0f1d25] font-bold">Đã xử lý hết!</p>
+                      <p className="text-[#707882] text-xs">Hiện không có đăng ký mở cửa hàng nào cần kiểm duyệt.</p>
                     </td>
                   </tr>
                 ) : (
@@ -111,15 +113,15 @@ const ShopModeration: FC = () => {
                       </td>
                       <td className="px-6 py-6 text-sm text-[#707882] font-medium">/{shop.slug}</td>
                       <td className="px-6 py-6 font-['Plus_Jakarta_Sans'] font-bold text-[#0f1d25]">
-                         {new Date(shop.created_at).toLocaleDateString('vi-VN')}
+                        {new Date(shop.created_at).toLocaleDateString('vi-VN')}
                       </td>
                       <td className="px-6 py-6">
-                         <span className="px-3 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-full uppercase tracking-wider">
-                           Đang chờ
-                         </span>
+                        <span className="px-3 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-full uppercase tracking-wider">
+                          Đang chờ
+                        </span>
                       </td>
                       <td className="px-10 py-6 text-right space-x-2">
-                        <button 
+                        <button
                           onClick={() => handleApprove(shop.id, shop.name)}
                           className="px-6 py-3 bg-[#dcfce7] text-[#166534] rounded-full text-xs font-bold uppercase tracking-wider hover:bg-[#bbf7d0] transition-all shadow-sm"
                         >

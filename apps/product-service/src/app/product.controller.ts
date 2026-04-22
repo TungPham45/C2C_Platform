@@ -32,7 +32,7 @@ export class ProductController {
   // --- FILE UPLOAD ---
 
   @Post('upload')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file')) // Interceptor này sử dụng thư viện Multer để xử lý luồng dữ liệu (stream) tệp tin. -> tên "file" trong ngoặc phải khớp với ở fe
   uploadImage(@UploadedFile() file: Express.Multer.File) {
     if (!file) {
       throw new BadRequestException('No file uploaded');

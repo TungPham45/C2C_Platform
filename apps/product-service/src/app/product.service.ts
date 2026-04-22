@@ -3,7 +3,7 @@ import { PrismaService } from './prisma.service';
 
 @Injectable()
 export class ProductService {
-  constructor(@Inject(PrismaService) private prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private prisma: PrismaService) { }
 
   private async sendNotification(data: { user_id: number; title: string; message: string; type: string; link?: string }) {
     try {
@@ -196,7 +196,7 @@ export class ProductService {
         },
       }),
     ]);
-    
+
     return {
       activeProducts: active,
       pendingProducts: pending,
@@ -322,7 +322,7 @@ export class ProductService {
           category_id: Number(data.category_id) || 1,
           base_price: Number(data.base_price),
           thumbnail_url: data.thumbnail_url || '',
-          shop_categories: data.shop_category_ids && Array.isArray(data.shop_category_ids) 
+          shop_categories: data.shop_category_ids && Array.isArray(data.shop_category_ids)
             ? { connect: data.shop_category_ids.map((id: number) => ({ id: Number(id) })) }
             : undefined
         }
@@ -344,19 +344,19 @@ export class ProductService {
       // Step 3: Create variants
       const variantData = data.has_variants && data.variants && data.variants.length > 0
         ? data.variants.map((v: any, idx: number) => ({
-            product_id: product.id,
-            sku: v.sku ? `${v.sku}-v${idx}` : `${slug}-v${idx}`,
-            stock_quantity: Number(v.stock) || 0,
-            price_override: Number(v.price) || Number(data.base_price),
-            attributes: v.attributes || {}
-          }))
+          product_id: product.id,
+          sku: v.sku ? `${v.sku}-v${idx}` : `${slug}-v${idx}`,
+          stock_quantity: Number(v.stock) || 0,
+          price_override: Number(v.price) || Number(data.base_price),
+          attributes: v.attributes || {}
+        }))
         : [{
-            product_id: product.id,
-            sku: defaultSku,
-            stock_quantity: Number(data.base_stock) || 0,
-            price_override: Number(data.base_price),
-            attributes: {}
-          }];
+          product_id: product.id,
+          sku: defaultSku,
+          stock_quantity: Number(data.base_stock) || 0,
+          price_override: Number(data.base_price),
+          attributes: {}
+        }];
       console.log('[CREATE] Step 3: Creating', variantData.length, 'variants...');
       await this.prisma.productVariant.createMany({ data: variantData });
 
@@ -457,7 +457,7 @@ export class ProductService {
           category_id: Number(data.category_id) || product.category_id,
           base_price: Number(data.base_price),
           thumbnail_url: data.thumbnail_url || '',
-          shop_categories: data.shop_category_ids !== undefined 
+          shop_categories: data.shop_category_ids !== undefined
             ? { set: Array.isArray(data.shop_category_ids) ? data.shop_category_ids.map((id: number) => ({ id: Number(id) })) : [] }
             : undefined
         }
@@ -478,19 +478,19 @@ export class ProductService {
       // Step 4: Create variants
       const variantData = data.has_variants && data.variants && data.variants.length > 0
         ? data.variants.map((v: any, idx: number) => ({
-            product_id: productId,
-            sku: v.sku ? `${v.sku}-v${idx}` : `${slug}-v${idx}`,
-            stock_quantity: Number(v.stock) || 0,
-            price_override: Number(v.price) || Number(data.base_price),
-            attributes: v.attributes || {}
-          }))
+          product_id: productId,
+          sku: v.sku ? `${v.sku}-v${idx}` : `${slug}-v${idx}`,
+          stock_quantity: Number(v.stock) || 0,
+          price_override: Number(v.price) || Number(data.base_price),
+          attributes: v.attributes || {}
+        }))
         : [{
-            product_id: productId,
-            sku: defaultSku,
-            stock_quantity: Number(data.base_stock) || 0,
-            price_override: Number(data.base_price),
-            attributes: {}
-          }];
+          product_id: productId,
+          sku: defaultSku,
+          stock_quantity: Number(data.base_stock) || 0,
+          price_override: Number(data.base_price),
+          attributes: {}
+        }];
       console.log('[UPDATE] Step 4: Creating', variantData.length, 'variants...');
       await this.prisma.productVariant.createMany({ data: variantData });
 
@@ -547,17 +547,25 @@ export class ProductService {
 
   // Get a single product for seller editing (no status filter, all relations)
   async getSellerContext(userId: number) {
+    // lấy ra shop đầu tiên mà user sở hữu
     const shop = await this.findSellerShopAnyStatus(userId);
     return {
       isSeller: !!shop,
       shop
     };
   }
+  /*
+  - !!shop: Dấu !! (double bang) là cách viết tắt trong JavaScript/TypeScript để ép một giá trị về kiểu Boolean.
+    Nó kiểm tra xem shop có tồn tại (không phải null hay undefined) hay không.
+  - shop.status === 'active': Kiểm tra xem trạng thái của cửa hàng có đang là active (đã được duyệt/đang hoạt động) hay không.
+  - Kết luận: isSeller chỉ trả về true khi và chỉ khi người dùng đã có cửa hàng VÀ cửa hàng đó đã được ban quản trị duyệt (active).
+    Nếu cửa hàng đang ở trạng thái pending (chờ duyệt) hoặc người dùng chưa có cửa hàng, isSeller sẽ là false.
+  */
 
-  async registerShop(userId: number, data: any) {
+  async registerShop(userId: number, data: any) { //data -> dlieu nhập từ form
     const existingShop = await this.findSellerShopAnyStatus(userId);
     if (existingShop) {
-      throw new BadRequestException('You have already registered a shop');
+      throw new BadRequestException('You have already registered a shop'); // http 400
     }
 
     const name = String(data?.name || '').trim();
@@ -565,7 +573,7 @@ export class ProductService {
       throw new BadRequestException('Shop name is required');
     }
 
-    const slug = this.generateSlug(name || 'shop');
+    const slug = this.generateSlug(name || 'shop'); // tạo đg dẫn url dễ nhìn từ tên cửa hàng
     return this.prisma.shop.create({
       data: {
         owner_id: userId,
@@ -834,7 +842,7 @@ export class ProductService {
 
   async createShopCategory(userId: number, data: any) {
     const shop = await this.requireActiveSellerShop(userId);
-    
+
     // Check limit (max 20 categories per shop)
     const count = await this.prisma.category.count({ where: { shop_id: shop.id } });
     if (count >= 20) {
@@ -889,7 +897,7 @@ export class ProductService {
       where: { id: categoryId },
       include: { shop_products: { select: { id: true } } }
     });
-    
+
     if (!category || (category.shop_id !== shop.id && category.shop_id !== null)) {
       throw new UnauthorizedException('Không có quyền truy cập danh mục này');
     }
@@ -918,7 +926,7 @@ export class ProductService {
   async syncCategoryProducts(userId: number, categoryId: number, productIds: number[]) {
     const shop = await this.requireActiveSellerShop(userId);
     const category = await this.prisma.category.findUnique({ where: { id: categoryId } });
-    
+
     if (!category || category.shop_id !== shop.id) {
       throw new UnauthorizedException('Không có quyền chỉnh sửa danh mục này');
     }
@@ -1084,6 +1092,7 @@ export class ProductService {
     return updated;
   }
 
+  // lấy danh sách các cửa hàng chờ duyệt
   async getPendingShops() {
     return this.prisma.shop.findMany({
       where: { status: 'pending' },
@@ -1099,7 +1108,9 @@ export class ProductService {
     });
   }
 
+  // duyệt cửa hàng
   async approveShop(id: number) {
+    // findUnique -> tìm 1 bản ghi duy nhất theo khóa chính id
     const shop = await this.prisma.shop.findUnique({
       where: { id },
       select: { id: true, name: true, owner_id: true },
@@ -1234,14 +1245,14 @@ export class ProductService {
       }),
       userId
         ? this.prisma.shopFollow.findUnique({
-            where: {
-              shop_id_user_id: {
-                shop_id: shop.id,
-                user_id: userId,
-              },
+          where: {
+            shop_id_user_id: {
+              shop_id: shop.id,
+              user_id: userId,
             },
-            select: { id: true },
-          })
+          },
+          select: { id: true },
+        })
         : Promise.resolve(null),
       this.prisma.product.findMany({
         where: { shop_id: shop.id, status: 'active' },
@@ -1370,26 +1381,26 @@ export class ProductService {
     const [productCounts, followerCounts] = await Promise.all([
       shopIds.length
         ? this.prisma.product.groupBy({
-            by: ['shop_id'],
-            where: {
-              shop_id: { in: shopIds },
-              status: 'active',
-            },
-            _count: {
-              _all: true,
-            },
-          })
+          by: ['shop_id'],
+          where: {
+            shop_id: { in: shopIds },
+            status: 'active',
+          },
+          _count: {
+            _all: true,
+          },
+        })
         : Promise.resolve([]),
       shopIds.length
         ? this.prisma.shopFollow.groupBy({
-            by: ['shop_id'],
-            where: {
-              shop_id: { in: shopIds },
-            },
-            _count: {
-              _all: true,
-            },
-          })
+          by: ['shop_id'],
+          where: {
+            shop_id: { in: shopIds },
+          },
+          _count: {
+            _all: true,
+          },
+        })
         : Promise.resolve([]),
     ]);
 
@@ -1413,7 +1424,7 @@ export class ProductService {
 
   // Homepage / Discovery: List all 'active' products
   async getActiveProducts(searchQuery?: string, categorySlug?: string) {
-    const where: any = { 
+    const where: any = {
       status: 'active',
       shop: { status: 'active' }
     };
@@ -1435,14 +1446,18 @@ export class ProductService {
       const categoryIds = await this.getCategoryDescendantIds(category.id);
       where.category_id = { in: categoryIds };
     }
+<<<<<<< HEAD
+=======
+
+>>>>>>> 649ec60 (ahihi)
     if (searchQuery && searchQuery.trim() !== '') {
       where.name = { contains: searchQuery.trim(), mode: 'insensitive' };
     }
 
     return this.prisma.product.findMany({
       where,
-      include: { 
-        shop: { select: { name: true, logo_url: true, rating: true, id: true } }, 
+      include: {
+        shop: { select: { name: true, logo_url: true, rating: true, id: true } },
         images: { where: { is_primary: true } },
         variants: true
       },
