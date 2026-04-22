@@ -1497,6 +1497,9 @@ export class ProductService {
   }
 
   async createReview(userId: number, productId: number, data: { rating: number; comment?: string; media_urls?: string[]; shop_order_id: number }) {
+    if (!productId || isNaN(productId)) {
+      throw new BadRequestException('Invalid product ID');
+    }
     const product = await this.prisma.product.findUnique({ where: { id: productId }, select: { id: true, shop_id: true } });
     if (!product) throw new NotFoundException('Product not found');
 

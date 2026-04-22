@@ -247,11 +247,29 @@ export class OrderService {
     const enrichedItems = await Promise.all(order.items.map(async (item: any) => {
       const variant = await this.productPrisma.productVariant.findUnique({
         where: { id: item.product_variant_id },
-        include: { product: { select: { thumbnail_url: true } } }
+        include: { product: { select: { thumbnail_url: true, id: true } } }
       });
+
+      // Some legacy orders may reference variant IDs that no longer exist after product edits.
+      // In that case, fall back to matching product by snapshot name + shop.
+      let fallbackProduct: { id: number; thumbnail_url: string | null } | null = null;
+      if (!variant?.product?.id && item.product_name) {
+        fallbackProduct = await this.productPrisma.product.findFirst({
+          where: {
+            shop_id: order.shop_id,
+            name: item.product_name,
+          },
+          select: {
+            id: true,
+            thumbnail_url: true,
+          },
+        });
+      }
+
       return {
         ...item,
-        product_thumbnail_url: variant?.product?.thumbnail_url || null,
+        product_id: variant?.product_id || variant?.product?.id || fallbackProduct?.id || null,
+        product_thumbnail_url: variant?.product?.thumbnail_url || fallbackProduct?.thumbnail_url || null,
       };
     }));
 
