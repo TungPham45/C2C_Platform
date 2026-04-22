@@ -3,7 +3,7 @@ import { PrismaService } from './prisma.service';
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   private readonly authBaseUrl =
     process.env.AUTH_SERVICE_BASE_URL ?? 'http://localhost:3002/api/auth';
@@ -145,6 +145,9 @@ export class AdminService {
       ).catch(() => []),
     ]);
 
+    // lấy ra dsach id của những ng có mở shop
+    // filter(s => s.owner_id !== null): Loại bỏ những shop bị lỗi dữ liệu (không có chủ sở hữu).
+    // map(s => s.owner_id): Chỉ lấy ra cái owner_id (ID của chủ shop) thay vì lấy toàn bộ object shop.
     const sellerIds = new Set(
       shops.filter(s => s.owner_id !== null).map(s => s.owner_id)
     );
