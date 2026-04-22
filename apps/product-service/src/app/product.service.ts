@@ -302,6 +302,103 @@ export class ProductService {
     return `${base}-${Date.now()}`;
   }
 
+  private normalizeCategoryName(name: string) {
+    return name.trim().replace(/\s+/g, ' ').normalize('NFC').toLowerCase();
+  }
+
+  private getValidCategoryName(name: unknown) {
+    const trimmedName = String(name ?? '').trim();
+    if (!trimmedName) {
+      throw new BadRequestException('Category name is required');
+    }
+
+    return trimmedName;
+  }
+
+  private async ensureCategoryNameIsUnique(name: string, shopId: number | null, excludedCategoryId?: number) {
+    const normalizedName = this.normalizeCategoryName(name);
+    const where: any = { shop_id: shopId };
+
+    if (excludedCategoryId !== undefined) {
+      where.id = { not: excludedCategoryId };
+    }
+
+    const categories = await this.prisma.category.findMany({
+      where,
+      select: { name: true },
+    });
+
+    const duplicate = categories.some(
+      (category) => this.normalizeCategoryName(category.name) === normalizedName,
+    );
+
+    if (duplicate) {
+      throw new BadRequestException('Category name already exists');
+    }
+  }
+
+  private getValidAttributeName(name: unknown) {
+    const trimmedName = String(name ?? '').trim();
+    if (!trimmedName) {
+      throw new BadRequestException('Attribute name is required');
+    }
+
+    return trimmedName;
+  }
+
+  private async ensureAttributeNameIsUnique(categoryId: number, name: string, excludedAttributeId?: number) {
+    const normalizedName = this.normalizeCategoryName(name);
+    const where: any = { category_id: categoryId };
+
+    if (excludedAttributeId !== undefined) {
+      where.id = { not: excludedAttributeId };
+    }
+
+    const attributes = await this.prisma.attributeDefinition.findMany({
+      where,
+      select: { name: true },
+    });
+
+    const duplicate = attributes.some(
+      (attribute) => this.normalizeCategoryName(attribute.name) === normalizedName,
+    );
+
+    if (duplicate) {
+      throw new BadRequestException('Attribute name already exists');
+    }
+  }
+
+  private getValidAttributeOptionName(name: unknown) {
+    const trimmedName = String(name ?? '').trim();
+    if (!trimmedName) {
+      throw new BadRequestException('Attribute option name is required');
+    }
+
+    return trimmedName;
+  }
+
+  private async ensureAttributeOptionNameIsUnique(attributeId: number, name: string, excludedOptionId?: number) {
+    const normalizedName = this.normalizeCategoryName(name);
+    const where: any = { attribute_id: attributeId };
+
+    if (excludedOptionId !== undefined) {
+      where.id = { not: excludedOptionId };
+    }
+
+    const options = await this.prisma.attributeOption.findMany({
+      where,
+      select: { value_name: true },
+    });
+
+    const duplicate = options.some(
+      (option) => this.normalizeCategoryName(option.value_name) === normalizedName,
+    );
+
+    if (duplicate) {
+      throw new BadRequestException('Attribute option name already exists');
+    }
+  }
+
   // Create a new product
 
   async createProduct(userId: number, data: any) {
@@ -688,10 +785,13 @@ export class ProductService {
   }
 
   async createCategory(data: any) {
-    const slug = data.slug || this.generateSlug(data.name);
+    const name = this.getValidCategoryName(data.name);
+    await this.ensureCategoryNameIsUnique(name, null);
+
+    const slug = data.slug || this.generateSlug(name);
     return this.prisma.category.create({
       data: {
-        name: data.name,
+        name,
         slug: slug,
         parent_id: data.parent_id ? Number(data.parent_id) : null,
         icon_url: data.icon_url || null,
@@ -703,10 +803,24 @@ export class ProductService {
   }
 
   async updateCategory(id: number, data: any) {
+    const existingCategory = await this.prisma.category.findUnique({
+      where: { id },
+      select: { id: true, shop_id: true },
+    });
+
+    if (!existingCategory || existingCategory.shop_id !== null) {
+      throw new NotFoundException('Category not found');
+    }
+
+    const name = data.name !== undefined ? this.getValidCategoryName(data.name) : undefined;
+    if (name !== undefined) {
+      await this.ensureCategoryNameIsUnique(name, null, id);
+    }
+
     return this.prisma.category.update({
       where: { id },
       data: {
-        name: data.name,
+        name,
         slug: data.slug,
         parent_id: data.parent_id !== undefined ? (data.parent_id ? Number(data.parent_id) : null) : undefined,
         icon_url: data.icon_url,
@@ -834,6 +948,7 @@ export class ProductService {
 
   async createShopCategory(userId: number, data: any) {
     const shop = await this.requireActiveSellerShop(userId);
+    const name = this.getValidCategoryName(data.name);
     
     // Check limit (max 20 categories per shop)
     const count = await this.prisma.category.count({ where: { shop_id: shop.id } });
@@ -841,10 +956,12 @@ export class ProductService {
       throw new BadRequestException('Mỗi cửa hàng chỉ được tạo tối đa 20 danh mục tùy chỉnh');
     }
 
-    const slug = this.generateSlug(data.name);
+    await this.ensureCategoryNameIsUnique(name, shop.id);
+
+    const slug = this.generateSlug(name);
     return this.prisma.category.create({
       data: {
-        name: data.name,
+        name,
         slug: slug,
         shop_id: shop.id,
         level: 1, // Flat structure
@@ -862,11 +979,16 @@ export class ProductService {
       throw new UnauthorizedException('Không có quyền chỉnh sửa danh mục này');
     }
 
+    const name = data.name !== undefined ? this.getValidCategoryName(data.name) : undefined;
+    if (name !== undefined) {
+      await this.ensureCategoryNameIsUnique(name, shop.id, categoryId);
+    }
+
     return this.prisma.category.update({
       where: { id: categoryId },
       data: {
-        name: data.name,
-        slug: data.name ? this.generateSlug(data.name) : undefined,
+        name,
+        slug: name ? this.generateSlug(name) : undefined,
         sort_order: data.sort_order !== undefined ? data.sort_order : undefined,
         is_active: data.is_active !== undefined ? data.is_active : undefined
       }
@@ -944,10 +1066,13 @@ export class ProductService {
   }
 
   async createAttributeDefinition(categoryId: number, data: any) {
+    const name = this.getValidAttributeName(data.name);
+    await this.ensureAttributeNameIsUnique(categoryId, name);
+
     return this.prisma.attributeDefinition.create({
       data: {
         category_id: categoryId,
-        name: data.name,
+        name,
         input_type: data.input_type || 'text',
         is_required: Boolean(data.is_required),
         sort_order: data.sort_order ? Number(data.sort_order) : 0,
@@ -956,10 +1081,24 @@ export class ProductService {
   }
 
   async updateAttributeDefinition(id: number, data: any) {
+    const existingAttribute = await this.prisma.attributeDefinition.findUnique({
+      where: { id },
+      select: { id: true, category_id: true },
+    });
+
+    if (!existingAttribute) {
+      throw new NotFoundException('Attribute not found');
+    }
+
+    const name = data.name !== undefined ? this.getValidAttributeName(data.name) : undefined;
+    if (name !== undefined) {
+      await this.ensureAttributeNameIsUnique(existingAttribute.category_id, name, id);
+    }
+
     return this.prisma.attributeDefinition.update({
       where: { id },
       data: {
-        name: data.name,
+        name,
         input_type: data.input_type,
         is_required: data.is_required !== undefined ? Boolean(data.is_required) : undefined,
         sort_order: data.sort_order !== undefined ? Number(data.sort_order) : undefined,
@@ -972,20 +1111,37 @@ export class ProductService {
   }
 
   async createAttributeOption(attributeId: number, data: any) {
+    const valueName = this.getValidAttributeOptionName(data.value_name);
+    await this.ensureAttributeOptionNameIsUnique(attributeId, valueName);
+
     return this.prisma.attributeOption.create({
       data: {
         attribute_id: attributeId,
-        value_name: data.value_name,
+        value_name: valueName,
         sort_order: data.sort_order ? Number(data.sort_order) : 0,
       },
     });
   }
 
   async updateAttributeOption(id: number, data: any) {
+    const existingOption = await this.prisma.attributeOption.findUnique({
+      where: { id },
+      select: { id: true, attribute_id: true },
+    });
+
+    if (!existingOption) {
+      throw new NotFoundException('Attribute option not found');
+    }
+
+    const valueName = data.value_name !== undefined ? this.getValidAttributeOptionName(data.value_name) : undefined;
+    if (valueName !== undefined) {
+      await this.ensureAttributeOptionNameIsUnique(existingOption.attribute_id, valueName, id);
+    }
+
     return this.prisma.attributeOption.update({
       where: { id },
       data: {
-        value_name: data.value_name,
+        value_name: valueName,
         sort_order: data.sort_order !== undefined ? Number(data.sort_order) : undefined,
       },
     });

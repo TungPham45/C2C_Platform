@@ -18,6 +18,7 @@ export const ShopCategoriesPage: React.FC = () => {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [formData, setFormData] = useState({ name: '', sort_order: 0, is_active: true });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [targetCategory, setTargetCategory] = useState<Category | null>(null);
 
@@ -44,6 +45,7 @@ export const ShopCategoriesPage: React.FC = () => {
   }, []);
 
   const handleOpenModal = (category: Category | null = null) => {
+    setModalError(null);
     if (category) {
       setEditingCategory(category);
       setFormData({ name: category.name, sort_order: category.sort_order, is_active: category.is_active });
@@ -56,9 +58,13 @@ export const ShopCategoriesPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name) return;
+    if (!formData.name.trim()) {
+      setModalError('Category name is required');
+      return;
+    }
 
     setIsSubmitting(true);
+    setModalError(null);
     try {
       const token = localStorage.getItem('c2c_token');
       const method = editingCategory ? 'PUT' : 'POST';
@@ -79,12 +85,11 @@ export const ShopCategoriesPage: React.FC = () => {
         setIsModalOpen(false);
         fetchCategories();
       } else {
-        const errData = await res.json();
-        alert(errData.message || 'Có lỗi xảy ra');
+        setModalError(await getResponseError(res, 'Có lỗi xảy ra'));
       }
     } catch (err) {
       console.error('Submit error:', err);
-      alert('Network error');
+      setModalError('Network error');
     } finally {
       setIsSubmitting(false);
     }
@@ -228,7 +233,10 @@ export const ShopCategoriesPage: React.FC = () => {
                 {editingCategory ? 'Chỉnh sửa danh mục' : 'Thêm danh mục mới'}
               </h2>
               <button 
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setModalError(null);
+                }}
                 className="w-10 h-10 flex items-center justify-center text-[#707882] hover:bg-white rounded-full transition-colors"
               >
                 <span className="material-symbols-outlined">close</span>
@@ -236,6 +244,12 @@ export const ShopCategoriesPage: React.FC = () => {
             </div>
             
             <form onSubmit={handleSubmit} className="p-8 space-y-6">
+              {modalError && (
+                <div className="rounded-2xl border border-[#ffdad6] bg-[#fff8f7] px-4 py-3 text-sm font-bold text-[#ba1a1a]">
+                  {modalError}
+                </div>
+              )}
+
               <div className="space-y-2">
                 <label className="text-sm font-bold text-[#404751] flex justify-between">
                   Tên danh mục <span className="text-[#ba1a1a]">*</span>
@@ -243,7 +257,10 @@ export const ShopCategoriesPage: React.FC = () => {
                 <input 
                   type="text" 
                   value={formData.name}
-                  onChange={e => setFormData({...formData, name: e.target.value})}
+                  onChange={e => {
+                    setFormData({...formData, name: e.target.value});
+                    setModalError(null);
+                  }}
                   className="w-full bg-[#f5faff] border-2 border-transparent focus:border-[#00629d]/20 focus:bg-white rounded-2xl px-4 py-3 outline-none transition-all text-sm font-medium"
                   placeholder="Ví dụ: Hàng mới về, Giảm giá cực sốc..."
                   required
@@ -280,7 +297,10 @@ export const ShopCategoriesPage: React.FC = () => {
               <div className="pt-4 flex gap-3">
                 <button 
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    setModalError(null);
+                  }}
                   className="flex-1 px-6 py-3 rounded-2xl text-sm font-bold text-[#707882] border-2 border-slate-100 hover:bg-slate-50 transition-colors"
                 >
                   Hủy
@@ -308,4 +328,31 @@ export const ShopCategoriesPage: React.FC = () => {
       )}
     </SellerLayout>
   );
+};
+
+const getResponseError = async (response: Response, fallbackMessage: string) => {
+  const clone = response.clone();
+
+  try {
+    const data = await response.json();
+    if (typeof data?.message === 'string') {
+      return data.message;
+    }
+    if (Array.isArray(data?.message)) {
+      return data.message.join(', ');
+    }
+  } catch {
+    // Fall back to plain text.
+  }
+
+  try {
+    const text = await clone.text();
+    if (text.trim()) {
+      return text.trim();
+    }
+  } catch {
+    // Use fallback below.
+  }
+
+  return fallbackMessage;
 };

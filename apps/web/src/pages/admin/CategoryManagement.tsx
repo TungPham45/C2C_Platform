@@ -102,6 +102,7 @@ const OPTION_INPUT_TYPES = new Set(['select', 'radio', 'checkbox', 'multiselect'
 
 //@CATT Chuan hoa input_type truoc khi tao attribute de tranh sai khac chu hoa/space.
 const normalizeAttributeInputType = (inputType: string) => inputType.trim().toLowerCase();
+const normalizeDuplicateKey = (value: string) => value.trim().replace(/\s+/g, ' ').normalize('NFC').toLowerCase();
 
 const supportsAttributeOptions = (
   inputType: string,
@@ -142,6 +143,8 @@ const CategoryManagement: FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [categoryModalError, setCategoryModalError] = useState<string | null>(null);
+  const [attributeModalError, setAttributeModalError] = useState<string | null>(null);
   //@GET Danh sach id cac node dang mo rong trong cay danh muc.
   const [expandedIds, setExpandedIds] = useState<number[]>([]);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -364,6 +367,7 @@ const CategoryManagement: FC = () => {
   const openCategoryModal = () => {
     setError(null);
     setSuccessMessage(null);
+    setCategoryModalError(null);
     setEditingCategory(null);
     setCategoryForm(createDefaultCategoryForm(selectedCategory));
     setParentSelectionPath(buildParentSelectionPath(selectedCategory?.id ?? null));
@@ -374,6 +378,7 @@ const CategoryManagement: FC = () => {
   const openEditCategoryModal = (category: Category) => {
     setError(null);
     setSuccessMessage(null);
+    setCategoryModalError(null);
     //@Put Dat editingCategory de modal biet dang o che do chinh sua.
     setEditingCategory(category);
     //@Put Copy name, slug, sort_order, icon_url va is_active hien tai vao categoryForm.
@@ -387,6 +392,7 @@ const CategoryManagement: FC = () => {
   const closeCategoryModal = () => {
     if (submittingCategory) return;
     setIsCategoryModalOpen(false);
+    setCategoryModalError(null);
     setEditingCategory(null);
     setCategoryForm(createDefaultCategoryForm(selectedCategory));
     setParentSelectionPath(buildParentSelectionPath(selectedCategory?.id ?? null));
@@ -443,6 +449,7 @@ const CategoryManagement: FC = () => {
     if (!selectedCategory) return;
     setError(null);
     setSuccessMessage(null);
+    setAttributeModalError(null);
     //@CATT Reset editingAttribute ve null de submit theo nhanh POST tao moi.
     setEditingAttribute(null);
     //@CATT Reset form ve gia tri mac dinh khi bat dau tao thuoc tinh.
@@ -456,6 +463,7 @@ const CategoryManagement: FC = () => {
   const openEditAttributeModal = (attribute: Attribute) => {
     setError(null);
     setSuccessMessage(null);
+    setAttributeModalError(null);
     //@PATT Dat editingAttribute de form biet dang o che do edit.
     setEditingAttribute(attribute);
     const normalizedInputType = normalizeAttributeInputType(attribute.input_type);
@@ -475,6 +483,7 @@ const CategoryManagement: FC = () => {
   const closeAttributeModal = () => {
     if (submittingAttribute) return;
     setIsAttributeModalOpen(false);
+    setAttributeModalError(null);
     setEditingAttribute(null);
     setAttributeForm(createDefaultAttributeForm());
     setAttributeOptions(createAttributeOptionDrafts('radio'));
@@ -483,6 +492,7 @@ const CategoryManagement: FC = () => {
   //@CATT Khi doi input_type, cap nhat form tao thuoc tinh.
   const handleAttributeTypeChange = (inputType: string) => {
     const normalizedInputType = normalizeAttributeInputType(inputType);
+    setAttributeModalError(null);
     setAttributeForm((prev) => ({ ...prev, input_type: normalizedInputType }));
     //@COPT Khi input_type can tuy chon, tao draft option neu hien tai chua co.
     setAttributeOptions((prev) =>
@@ -495,6 +505,7 @@ const CategoryManagement: FC = () => {
   //@COPT Cap nhat gia tri cua mot tuy chon trong form tao thuoc tinh.
   //@POPT Khi option co id, thay doi nay se duoc submit bang PUT cho option do.
   const handleAttributeOptionChange = (index: number, value: string) => {
+    setAttributeModalError(null);
     setAttributeOptions((prev) =>
       prev.map((option, optionIndex) =>
         optionIndex === index ? { ...option, value_name: value } : option,
@@ -523,7 +534,7 @@ const CategoryManagement: FC = () => {
     //@Create Ten danh muc la truong bat buoc truoc khi goi API tao moi.
     const trimmedName = categoryForm.name.trim();
     if (!trimmedName) {
-      setError('Category name is required.');
+      setCategoryModalError('Category name is required.');
       return;
     }
 
@@ -544,6 +555,7 @@ const CategoryManagement: FC = () => {
     try {
       setSubmittingCategory(true);
       setError(null);
+      setCategoryModalError(null);
       setSuccessMessage(null);
 
       //@Create Neu khong phai edit thi goi POST /categories de tao danh muc moi.
@@ -596,7 +608,7 @@ const CategoryManagement: FC = () => {
       setParentSelectionPath(buildParentSelectionPath(savedCategory.id));
     } catch (submitError) {
       console.error('Error saving category:', submitError);
-      setError(
+      setCategoryModalError(
         submitError instanceof Error
           ? submitError.message
           : isEditingCategory
@@ -668,14 +680,14 @@ const CategoryManagement: FC = () => {
 
     //@CATT Phai chon danh muc truoc khi tao thuoc tinh.
     if (!selectedCategory) {
-      setError('Select a category before adding an attribute.');
+      setAttributeModalError('Select a category before adding an attribute.');
       return;
     }
 
     //@CATT Ten thuoc tinh la bat buoc truoc khi goi API tao moi.
     const trimmedName = attributeForm.name.trim();
     if (!trimmedName) {
-      setError('Attribute name is required.');
+      setAttributeModalError('Attribute name is required.');
       return;
     }
 
@@ -695,13 +707,30 @@ const CategoryManagement: FC = () => {
 
     //@COPT Neu input_type can tuy chon thi phai co it nhat mot gia tri hop le.
     if (supportsAttributeOptions(normalizedInputType, attributeOptions) && normalizedOptions.length === 0) {
-      setError('At least one option is required for this input type.');
+      setAttributeModalError('At least one option is required for this input type.');
+      return;
+    }
+
+    const seenOptionNames = new Set<string>();
+    const hasDuplicateOptionName = normalizedOptions.some((option) => {
+      const key = normalizeDuplicateKey(option.value_name);
+      if (seenOptionNames.has(key)) {
+        return true;
+      }
+
+      seenOptionNames.add(key);
+      return false;
+    });
+
+    if (hasDuplicateOptionName) {
+      setAttributeModalError('Attribute option name already exists.');
       return;
     }
 
     try {
       setSubmittingAttribute(true);
       setError(null);
+      setAttributeModalError(null);
       setSuccessMessage(null);
 
       //@CATT Payload tao thuoc tinh gom name, input_type, required va sort_order.
@@ -811,7 +840,7 @@ const CategoryManagement: FC = () => {
       setAttributeOptions(createAttributeOptionDrafts('radio'));
     } catch (submitError) {
       console.error('Error creating attribute:', submitError);
-      setError(
+      setAttributeModalError(
         submitError instanceof Error
           ? submitError.message
           : editingAttribute
@@ -1300,6 +1329,12 @@ const CategoryManagement: FC = () => {
               </button>
             </div>
 
+            {categoryModalError && (
+              <div className="mb-5 rounded-2xl border border-[#ffdad6] bg-[#fff8f7] px-4 py-3 text-sm font-semibold text-[#ba1a1a]">
+                {categoryModalError}
+              </div>
+            )}
+
             {/* //@Create Form nhap thong tin va submit de tao danh muc moi. */}
             {/* //@Put Form nay submit cap nhat danh muc khi editingCategory co gia tri. */}
             <form className="space-y-5" onSubmit={handleCategorySubmit}>
@@ -1311,7 +1346,10 @@ const CategoryManagement: FC = () => {
                   <input
                     className="w-full rounded-2xl border border-[#d6e7f6] px-4 py-3 outline-none transition focus:border-[#00629d]"
                     value={categoryForm.name}
-                    onChange={(event) => setCategoryForm((prev) => ({ ...prev, name: event.target.value }))}
+                    onChange={(event) => {
+                      setCategoryModalError(null);
+                      setCategoryForm((prev) => ({ ...prev, name: event.target.value }));
+                    }}
                     placeholder="Example: Electronics"
                   />
                 </label>
@@ -1482,6 +1520,12 @@ const CategoryManagement: FC = () => {
               </button>
             </div>
 
+            {attributeModalError && (
+              <div className="mb-5 rounded-2xl border border-[#ffdad6] bg-[#fff8f7] px-4 py-3 text-sm font-semibold text-[#ba1a1a]">
+                {attributeModalError}
+              </div>
+            )}
+
             {/* //@CATT Form nhap thong tin va submit tao thuoc tinh moi. */}
             {/* //@PATT Form nay submit cap nhat thuoc tinh khi editingAttribute co gia tri. */}
             <form className="space-y-5" onSubmit={handleAttributeSubmit}>
@@ -1493,7 +1537,10 @@ const CategoryManagement: FC = () => {
                   <input
                     className="w-full rounded-2xl border border-[#d6e7f6] px-4 py-3 outline-none transition focus:border-[#00629d]"
                     value={attributeForm.name}
-                    onChange={(event) => setAttributeForm((prev) => ({ ...prev, name: event.target.value }))}
+                    onChange={(event) => {
+                      setAttributeModalError(null);
+                      setAttributeForm((prev) => ({ ...prev, name: event.target.value }));
+                    }}
                     placeholder="Example: Brand"
                   />
                 </label>
