@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useProducts } from '../hooks/useProducts';
 import { useCart } from '../hooks/useCart';
+import { useReviews, ReviewsData } from '../hooks/useReviews';
 import { formatVnd, formatPriceRange } from '../utils/currency';
 import ReportModal from '../components/shared/ReportModal';
 
@@ -21,8 +22,11 @@ export const ProductDetailPage: FC = () => {
   const [isRejecting, setIsRejecting] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [reviewsData, setReviewsData] = useState<ReviewsData | null>(null);
+  const [reviewPage, setReviewPage] = useState(1);
 
   const { addToCart } = useCart();
+  const { fetchProductReviews } = useReviews();
 
   useEffect(() => {
     const userStr = localStorage.getItem('c2c_user');
@@ -38,7 +42,8 @@ export const ProductDetailPage: FC = () => {
 
     const loadProduct = async () => {
       if (id) {
-        const data = await fetchProductDetail(parseInt(id));
+        const productId = parseInt(id);
+        const data = await fetchProductDetail(productId);
         if (data) {
           setProduct(data);
           setSelectedImage(data.thumbnail_url || '');
@@ -50,10 +55,13 @@ export const ProductDetailPage: FC = () => {
              }
           }
         }
+        const revData = await fetchProductReviews(productId, 1, 10);
+        setReviewPage(1);
+        setReviewsData(revData);
       }
     };
     loadProduct();
-  }, [id, fetchProductDetail]);
+  }, [id, fetchProductDetail, fetchProductReviews]);
 
   // Derive attribute groups from variants
   const attributeGroups = useMemo(() => {
@@ -236,6 +244,37 @@ export const ProductDetailPage: FC = () => {
     });
   };
 
+  const totalReviews = reviewsData?.total || 0;
+  const avgRating = reviewsData?.avg_rating ?? (Number(product?.rating || 0) || 0);
+  const soldCount = Number(product?.sold_count || 0);
+  const ratingDistribution = reviewsData?.rating_distribution || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  const featuredReviews = reviewsData?.reviews?.slice(0, 2) || [];
+
+  const maskUserName = (review: any) => {
+    const fullName = review?.user?.full_name?.trim();
+    if (fullName) return fullName;
+    const userId = review?.user_id;
+    if (!userId) return 'Người mua';
+    const str = String(userId);
+    if (str.length <= 2) return `U${str}`;
+    return `${str[0]}***${str[str.length - 1]}`;
+  };
+
+  const formatReviewDate = (value?: string) => {
+    if (!value) return '';
+    return new Date(value).toLocaleDateString('vi-VN');
+  };
+
+  const renderStars = (rating: number) => (
+    <div className="flex text-[#ffb952]">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <span key={star} className={`material-symbols-outlined text-[16px] ${star <= rating ? 'fill-current' : 'text-[#e4e9f0] fill-current'}`}>
+          star
+        </span>
+      ))}
+    </div>
+  );
+
   return (
     <MarketplaceLayout>
       <div className="bg-[#f9fafc] min-h-screen pb-20 font-['Inter']">
@@ -293,20 +332,14 @@ export const ProductDetailPage: FC = () => {
               
               {/* Reviews & Sales Badge */}
               <div className="flex items-center gap-4 mb-6">
-                 <div className="flex items-center gap-1 text-[#ffb952]">
-                   <span className="material-symbols-outlined text-[16px] fill-current">star</span>
-                   <span className="material-symbols-outlined text-[16px] fill-current">star</span>
-                   <span className="material-symbols-outlined text-[16px] fill-current">star</span>
-                   <span className="material-symbols-outlined text-[16px] fill-current">star</span>
-                   <span className="material-symbols-outlined text-[16px] fill-current">star_half</span>
-                 </div>
+                 {renderStars(Math.round(avgRating))}
                  <div className="text-sm">
-                   <span className="font-bold text-[#0f1d25] mr-1">4.9</span>
-                   <span className="text-[#707882]">(1.248 đánh giá)</span>
+                   <span className="font-bold text-[#0f1d25] mr-1">{avgRating.toFixed(1)}</span>
+                   <span className="text-[#707882]">({totalReviews.toLocaleString('vi-VN')} đánh giá)</span>
                  </div>
                  <div className="w-[1px] h-4 bg-[#dbeaf5]"></div>
                  <div className="text-sm">
-                   <span className="font-bold text-[#0f1d25] mr-1">2.4k</span>
+                   <span className="font-bold text-[#0f1d25] mr-1">{soldCount.toLocaleString('vi-VN')}</span>
                    <span className="text-[#707882]">Đã bán</span>
                  </div>
               </div>
@@ -481,7 +514,7 @@ export const ProductDetailPage: FC = () => {
                   </div>
                   <div className="bg-[#f0f7ff] rounded-xl p-4">
                     <p className="text-[10px] font-black uppercase tracking-widest text-[#707882] mb-1">Đánh giá</p>
-                    <p className="text-xl font-black text-[#0f1d25]">4.9/5.0</p>
+                    <p className="text-xl font-black text-[#0f1d25]">{Number(product.shop?.rating || 0).toFixed(1)}/5.0</p>
                   </div>
                 </div>
 
@@ -529,82 +562,102 @@ export const ProductDetailPage: FC = () => {
             <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
               <div>
                 <h2 className="text-3xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25] mb-2">Đánh giá từ cộng đồng</h2>
-                <p className="text-[#707882] text-sm font-medium">Dựa trên 1.248 đơn hàng đã xác nhận</p>
+                <p className="text-[#707882] text-sm font-medium">
+                  Dựa trên {totalReviews.toLocaleString('vi-VN')} đánh giá đã xác nhận
+                </p>
               </div>
               <div className="bg-white px-8 py-6 rounded-[2rem] shadow-sm border border-[#e4e9f0] flex items-center gap-8 min-w-[340px]">
                 <div className="text-center">
-                  <div className="text-[#00629d] text-5xl font-black font-['Plus_Jakarta_Sans'] leading-none">4.9</div>
+                  <div className="text-[#00629d] text-5xl font-black font-['Plus_Jakarta_Sans'] leading-none">{avgRating.toFixed(1)}</div>
                   <div className="text-[10px] font-black uppercase tracking-widest text-[#707882] mt-2">TRÊN 5</div>
                 </div>
                 <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="flex text-[#ffb952]"><span className="material-symbols-outlined text-[12px] fill-current">star</span><span className="material-symbols-outlined text-[12px] fill-current">star</span><span className="material-symbols-outlined text-[12px] fill-current">star</span><span className="material-symbols-outlined text-[12px] fill-current">star</span><span className="material-symbols-outlined text-[12px] fill-current">star</span></div>
-                    <div className="flex-1 h-1.5 bg-[#f0f3f8] rounded-full overflow-hidden"><div className="w-[92%] h-full bg-[#00629d] rounded-full"></div></div>
-                    <span className="text-[#707882] font-semibold">92%</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="flex text-[#ffb952]"><span className="material-symbols-outlined text-[12px] fill-current">star</span><span className="material-symbols-outlined text-[12px] fill-current">star</span><span className="material-symbols-outlined text-[12px] fill-current">star</span><span className="material-symbols-outlined text-[12px] fill-current">star</span><span className="material-symbols-outlined text-[12px] text-[#e4e9f0] fill-current">star</span></div>
-                    <div className="flex-1 h-1.5 bg-[#f0f3f8] rounded-full overflow-hidden"><div className="w-[6%] h-full bg-[#00629d] rounded-full"></div></div>
-                    <span className="text-[#707882] font-semibold">6%</span>
-                  </div>
+                  {[5, 4, 3, 2, 1].map((rating) => {
+                    const count = ratingDistribution[rating as 1 | 2 | 3 | 4 | 5] || 0;
+                    const percent = totalReviews > 0 ? Math.round((count / totalReviews) * 100) : 0;
+                    return (
+                      <div key={rating} className="flex items-center gap-2 text-xs">
+                        <div className="flex text-[#ffb952]">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <span key={star} className={`material-symbols-outlined text-[12px] fill-current ${star <= rating ? '' : 'text-[#e4e9f0]'}`}>
+                              star
+                            </span>
+                          ))}
+                        </div>
+                        <div className="flex-1 h-1.5 bg-[#f0f3f8] rounded-full overflow-hidden">
+                          <div className="h-full bg-[#00629d] rounded-full" style={{ width: `${percent}%` }}></div>
+                        </div>
+                        <span className="text-[#707882] font-semibold">{percent}%</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-              {/* Review 1 */}
-              <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-[#e4e9f0]">
-                <div className="flex items-start justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-[#e0efff] text-[#00629d] rounded-full flex items-center justify-center font-bold">J</div>
-                    <div>
-                      <p className="font-bold text-[#0f1d25] text-sm">J***n</p>
-                      <p className="text-xs text-[#707882]">Oct 12, 2023</p>
+              {featuredReviews.length === 0 ? (
+                <div className="md:col-span-2 bg-white rounded-[2rem] p-8 shadow-sm border border-[#e4e9f0] text-center text-[#707882] text-sm">
+                  Chưa có đánh giá nào cho sản phẩm này.
+                </div>
+              ) : (
+                featuredReviews.map((review) => (
+                  <div key={review.id} className="bg-white rounded-[2rem] p-8 shadow-sm border border-[#e4e9f0]">
+                    <div className="flex items-start justify-between mb-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-[#e0efff] text-[#00629d] rounded-full flex items-center justify-center font-bold">
+                          {maskUserName(review).charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-bold text-[#0f1d25] text-sm">{maskUserName(review)}</p>
+                          <p className="text-xs text-[#707882]">{formatReviewDate(review.created_at)}</p>
+                        </div>
+                      </div>
+                      {renderStars(review.rating)}
                     </div>
+                    <p className="text-[#404751] text-sm leading-relaxed mb-6">
+                      {review.comment?.trim() || 'Người mua không để lại bình luận.'}
+                    </p>
+                    {Array.isArray(review.media_urls) && review.media_urls.length > 0 && (
+                      <div className="flex gap-3 flex-wrap">
+                        {review.media_urls.slice(0, 3).map((mediaUrl, index) => (
+                          <div key={`${review.id}-${index}`} className="w-16 h-16 rounded-xl bg-slate-200 overflow-hidden">
+                            <img src={mediaUrl} className="w-full h-full object-cover" alt="review media" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {review.seller_reply && (
+                      <div className="mt-4 p-3 rounded-xl bg-[#f5faff] border border-[#e1f0fb]">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-[#00629d] mb-1">Phản hồi từ shop</p>
+                        <p className="text-sm text-[#404751]">{review.seller_reply}</p>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex text-[#ffb952]"><span className="material-symbols-outlined text-[16px] fill-current">star</span><span className="material-symbols-outlined text-[16px] fill-current">star</span><span className="material-symbols-outlined text-[16px] fill-current">star</span><span className="material-symbols-outlined text-[16px] fill-current">star</span><span className="material-symbols-outlined text-[16px] fill-current">star</span></div>
-                </div>
-                <div className="inline-block px-2 py-1 bg-[#f0f3f8] text-[#707882] text-[9px] font-black uppercase tracking-widest rounded mb-4">
-                  VARIANT: ARCTIC MIST / ALUMINUM
-                </div>
-                <p className="text-[#404751] text-sm leading-relaxed mb-6">
-                  Tổng thể mà nói sản phẩm rất tốt, đóng gói cẩn thận, giao hàng nhanh. Sẽ mua lại lần sau.
-                </p>
-                <div className="flex gap-3">
-                  <div className="w-16 h-16 rounded-xl bg-slate-200 overflow-hidden"><img src="https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?q=80&w=200&auto=format&fit=crop" className="w-full h-full object-cover" alt="review pic" /></div>
-                  <div className="w-16 h-16 rounded-xl bg-[#f0f3f8] flex items-center justify-center text-[#00629d] border border-[#e4e9f0] cursor-pointer hover:bg-[#e0efff]"><span className="material-symbols-outlined">play_circle</span></div>
-                </div>
-              </div>
-
-              {/* Review 2 */}
-              <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-[#e4e9f0]">
-                <div className="flex items-start justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-[#f0f3f8] text-[#404751] rounded-full flex items-center justify-center font-bold">A</div>
-                    <div>
-                      <p className="font-bold text-[#0f1d25] text-sm">a***b</p>
-                      <p className="text-xs text-[#707882]">Nov 05, 2023</p>
-                    </div>
-                  </div>
-                  <div className="flex text-[#ffb952]"><span className="material-symbols-outlined text-[16px] fill-current">star</span><span className="material-symbols-outlined text-[16px] fill-current">star</span><span className="material-symbols-outlined text-[16px] fill-current">star</span><span className="material-symbols-outlined text-[16px] fill-current">star</span><span className="material-symbols-outlined text-[16px] fill-current">star</span></div>
-                </div>
-                <div className="inline-block px-2 py-1 bg-[#f0f3f8] text-[#707882] text-[9px] font-black uppercase tracking-widest rounded mb-4">
-                  VARIANT: ONYX / POLISHED CHROME
-                </div>
-                <p className="text-[#404751] text-sm leading-relaxed mb-6">
-                  Chất lượng xuất sắc, cảm giác rất chắc chắn và cao cấp. Rất hài lòng với sản phẩm, đáng để đầu tư.
-                </p>
-                <div className="flex gap-3">
-                  <div className="w-16 h-16 rounded-xl bg-slate-200 overflow-hidden"><img src="https://images.unsplash.com/photo-1541558869434-2ce522ce1cb0?q=80&w=200&auto=format&fit=crop" className="w-full h-full object-cover" alt="review pic" /></div>
-                </div>
-              </div>
+                ))
+              )}
             </div>
 
-            <div className="flex justify-center">
-              <button className="px-8 py-3 rounded-full border-2 border-[#00629d] text-[#00629d] font-bold text-sm hover:bg-[#f0f7ff] transition-colors">
-                Xem tất cả 1.248 đánh giá
-              </button>
-            </div>
+            {reviewsData && reviewsData.total > reviewsData.reviews.length && (
+              <div className="flex justify-center">
+                <button
+                  onClick={async () => {
+                    const nextPage = reviewPage + 1;
+                    setReviewPage(nextPage);
+                    const data = await fetchProductReviews(parseInt(id!), nextPage, 10);
+                    if (data) {
+                      setReviewsData(prev => prev ? {
+                        ...data,
+                        reviews: [...prev.reviews, ...data.reviews]
+                      } : data);
+                    }
+                  }}
+                  className="px-8 py-3 rounded-full border-2 border-[#00629d] text-[#00629d] font-bold text-sm hover:bg-[#f0f7ff] transition-colors"
+                >
+                  Xem thêm đánh giá
+                </button>
+              </div>
+            )}
           </div>
 
         </div>

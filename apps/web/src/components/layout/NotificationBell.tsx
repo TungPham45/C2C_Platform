@@ -16,11 +16,13 @@ export const NotificationBell: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   const NOTIFICATIONS_API_URL = `${API_BASE_URL}/notifications`;
 
   const fetchNotifications = async () => {
+    if (!notificationsEnabled) return;
     const token = localStorage.getItem('c2c_token');
     if (!token) return;
     try {
@@ -32,16 +34,18 @@ export const NotificationBell: React.FC = () => {
         setUnreadCount(data.unreadCount || 0);
         setNotifications(data.notifications || []);
       }
-    } catch (e) {
-      console.error('Failed to fetch notifications', e);
+    } catch {
+      // Avoid spamming requests/logs when notification service is unavailable.
+      setNotificationsEnabled(false);
     }
   };
 
   useEffect(() => {
+    if (!notificationsEnabled) return;
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 15000); // Poll every 15s
     return () => clearInterval(interval);
-  }, []);
+  }, [notificationsEnabled]);
 
   const markAsRead = async (id: number) => {
     const token = localStorage.getItem('c2c_token');

@@ -226,12 +226,32 @@ export class VoucherService {
 
   async createSellerVoucher(userId: number, data: any) {
     const shop = await this.requireActiveSellerShop(userId);
-    const voucher = await this.prisma.voucher.create({
-      data: {
-        ...this.normalizeVoucherData(data, true),
-        shop_id: shop.id,
-      },
-    });
+    const normalizedData = this.normalizeVoucherData(data, true);
+
+    if (normalizedData.code) {
+      const existingVoucher = await this.prisma.voucher.findUnique({
+        where: { code: normalizedData.code },
+        select: { id: true },
+      });
+      if (existingVoucher) {
+        throw new BadRequestException('Đã có mã voucher này. Vui lòng nhập mã khác.');
+      }
+    }
+
+    let voucher: any;
+    try {
+      voucher = await this.prisma.voucher.create({
+        data: {
+          ...normalizedData,
+          shop_id: shop.id,
+        },
+      });
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        throw new BadRequestException('Đã có mã voucher này. Vui lòng nhập mã khác.');
+      }
+      throw error;
+    }
 
     // Notify all followers about new voucher
     try {
@@ -260,10 +280,29 @@ export class VoucherService {
 
   async updateSellerVoucher(userId: number, id: number, data: any) {
     await this.requireSellerVoucher(userId, id);
-    return this.prisma.voucher.update({
-      where: { id },
-      data: this.normalizeVoucherData(data, false),
-    });
+    const normalizedData = this.normalizeVoucherData(data, false);
+
+    if (normalizedData.code) {
+      const existingVoucher = await this.prisma.voucher.findUnique({
+        where: { code: normalizedData.code },
+        select: { id: true },
+      });
+      if (existingVoucher && existingVoucher.id !== id) {
+        throw new BadRequestException('Đã có mã voucher này. Vui lòng nhập mã khác.');
+      }
+    }
+
+    try {
+      return await this.prisma.voucher.update({
+        where: { id },
+        data: normalizedData,
+      });
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        throw new BadRequestException('Đã có mã voucher này. Vui lòng nhập mã khác.');
+      }
+      throw error;
+    }
   }
 
   async deleteSellerVoucher(userId: number, id: number) {

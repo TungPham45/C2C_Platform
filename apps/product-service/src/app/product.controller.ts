@@ -462,7 +462,9 @@ export class ProductController {
   @Post(':id/reviews')
   createReview(@Headers() headers: any, @Param('id') id: string, @Body() data: any) {
     const userId = this.getProviderUserId(headers);
-    return this.productService.createReview(userId, +id, data);
+    const productId = parseInt(id, 10);
+    if (isNaN(productId)) throw new BadRequestException('Invalid product ID');
+    return this.productService.createReview(userId, productId, data);
   }
 
   @Put(':id/reviews/:reviewId')

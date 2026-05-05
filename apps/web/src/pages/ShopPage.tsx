@@ -43,6 +43,7 @@ interface ShopVoucher {
   discount_value: string;
   min_spend: string;
   max_discount?: string;
+  start_date: string;
   end_date: string;
   target_type: string;
   shop_id?: number;

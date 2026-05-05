@@ -20,6 +20,36 @@ export class ProductService {
     }
   }
 
+  private async getUsersByIds(userIds: number[]) {
+    if (!userIds.length) return new Map<number, { id: number; full_name?: string | null; avatar_url?: string | null }>();
+    try {
+      const authUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:3002/api/auth';
+      const token = process.env.INTERNAL_SERVICE_TOKEN || 'internal-dev-token';
+      const ids = Array.from(new Set(userIds)).join(',');
+      const res = await fetch(`${authUrl}/internal/admin/users-by-ids?ids=${ids}`, {
+        headers: {
+          'x-internal-token': token,
+        },
+      });
+      if (!res.ok) {
+        return new Map();
+      }
+      const users = await res.json();
+      return new Map(
+        (Array.isArray(users) ? users : []).map((user: any) => [
+          Number(user.id),
+          {
+            id: Number(user.id),
+            full_name: user.full_name ?? null,
+            avatar_url: user.avatar_url ?? null,
+          },
+        ]),
+      );
+    } catch {
+      return new Map();
+    }
+  }
+
   private async getCategoryLineageIds(categoryId: number) {
     const lineage: number[] = [];
     const visited = new Set<number>();
@@ -1787,6 +1817,12 @@ export class ProductService {
       this.prisma.review.count({ where: { product_id: productId } }),
     ]);
 
+    const userMap = await this.getUsersByIds(reviews.map((review) => review.user_id));
+    const reviewsWithUsers = reviews.map((review) => ({
+      ...review,
+      user: userMap.get(review.user_id) ?? null,
+    }));
+
     // Rating distribution
     const distribution = await this.prisma.review.groupBy({
       by: ['rating'],
@@ -1802,7 +1838,7 @@ export class ProductService {
       : 0;
 
     return {
-      reviews,
+      reviews: reviewsWithUsers,
       total,
       page,
       limit,
@@ -1812,6 +1848,9 @@ export class ProductService {
   }
 
   async createReview(userId: number, productId: number, data: { rating: number; comment?: string; media_urls?: string[]; shop_order_id: number }) {
+    if (!productId || isNaN(productId)) {
+      throw new BadRequestException('Invalid product ID');
+    }
     const product = await this.prisma.product.findUnique({ where: { id: productId }, select: { id: true, shop_id: true } });
     if (!product) throw new NotFoundException('Product not found');
 

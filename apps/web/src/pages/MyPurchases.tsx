@@ -4,7 +4,7 @@ import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useOrders } from '../hooks/useOrders';
 import { formatVnd } from '../utils/currency';
 import { getOrderPricing } from '../utils/orderPricing';
-import { resolveAssetUrl } from '../config/api';
+import { resolveAssetUrl, PRODUCT_API_URL } from '../config/api';
 
 const statusConfig: Record<string, { label: string; color: string; icon: string }> = {
   pending:    { label: 'CHờ Xử LÝ',     color: 'bg-[#fff8e5] text-[#e09110] border-[#ffb952]/30', icon: 'schedule' },
@@ -33,14 +33,20 @@ export const MyPurchasesPage: FC = () => {
   const [reviewComment, setReviewComment] = useState<string>('');
   const [submittingReview, setSubmittingReview] = useState<boolean>(false);
   const [reviewSuccess, setReviewSuccess] = useState<boolean>(false);
-  const [reviewedOrders, setReviewedOrders] = useState<Set<number>>(new Set());
+  const [reviewedItems, setReviewedItems] = useState<Set<string>>(new Set());
+
+  const makeReviewKey = (shopOrderId: number, productId?: number | null) => `${shopOrderId}-${productId ?? 'unknown'}`;
 
   const handleSubmitReview = async () => {
     if (!reviewOrder || !reviewItem) return;
+    if (!reviewItem.product_id) {
+      alert('Không thể đánh giá vì sản phẩm này đã không còn tồn tại trên hệ thống (bị xóa hoặc gỡ bỏ).');
+      return;
+    }
     setSubmittingReview(true);
     try {
       const token = localStorage.getItem('c2c_token');
-      const res = await fetch(`http://localhost:3000/api/products/${reviewItem.product_id}/reviews`, { // using correct API gateway endpoint
+      const res = await fetch(`${PRODUCT_API_URL}/${reviewItem.product_id}/reviews`, { // using correct API gateway endpoint
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -60,9 +66,9 @@ export const MyPurchasesPage: FC = () => {
       }
 
       setReviewSuccess(true);
-      setReviewedOrders(prev => {
+      setReviewedItems(prev => {
         const next = new Set(prev);
-        next.add(reviewOrder.id);
+        next.add(makeReviewKey(reviewOrder.id, reviewItem.product_id));
         return next;
       });
       setTimeout(() => {
@@ -95,12 +101,12 @@ export const MyPurchasesPage: FC = () => {
     // Fetch user's reviewed orders
     const fetchReviews = async () => {
       try {
-        const res = await fetch('http://localhost:3000/api/products/reviews/me', {
+        const res = await fetch(`${PRODUCT_API_URL}/reviews/me`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
           const data = await res.json();
-          setReviewedOrders(new Set(data.map((r: any) => r.shop_order_id)));
+          setReviewedItems(new Set(data.map((r: any) => makeReviewKey(r.shop_order_id, r.product_id))));
         }
       } catch (e) {}
     };
@@ -271,11 +277,15 @@ export const MyPurchasesPage: FC = () => {
                               Theo dõi
                             </button>
                           )}
-                          {order.status?.toLowerCase() === 'delivered' && !reviewedOrders.has(order.id) && (
+                          {order.status?.toLowerCase() === 'delivered' &&
+                            (order.items || []).some((item: any) => !reviewedItems.has(makeReviewKey(order.id, item.product_id))) && (
                             <button 
                               onClick={() => {
+                                const firstUnreviewedItem = (order.items || []).find(
+                                  (item: any) => !reviewedItems.has(makeReviewKey(order.id, item.product_id))
+                                );
                                 setReviewOrder(order);
-                                setReviewItem(order.items?.[0] || null);
+                                setReviewItem(firstUnreviewedItem || order.items?.[0] || null);
                                 setReviewRating(5);
                                 setReviewComment('');
                                 setReviewSuccess(false);
@@ -286,7 +296,9 @@ export const MyPurchasesPage: FC = () => {
                               Đánh giá
                             </button>
                           )}
-                          {order.status?.toLowerCase() === 'delivered' && reviewedOrders.has(order.id) && (
+                          {order.status?.toLowerCase() === 'delivered' &&
+                            (order.items || []).length > 0 &&
+                            (order.items || []).every((item: any) => reviewedItems.has(makeReviewKey(order.id, item.product_id))) && (
                             <button disabled className="flex items-center gap-2 px-5 py-2.5 bg-[#f5faff] border border-[#e1f0fb] text-[#a0aab5] rounded-full text-xs font-bold cursor-not-allowed">
                               <span className="material-symbols-outlined text-base fill-current">star</span>
                               Đã đánh giá
@@ -335,7 +347,7 @@ export const MyPurchasesPage: FC = () => {
                   <div className="flex gap-4 p-4 rounded-2xl bg-[#f5faff] border border-[#e1f0fb]">
                     <div className="w-14 h-14 bg-white rounded-xl flex-shrink-0 flex items-center justify-center overflow-hidden border border-[#e4e9f0]">
                       {reviewItem.product_thumbnail_url ? (
-                        <img src={`http://localhost:3000${reviewItem.product_thumbnail_url}`} className="w-full h-full object-cover" alt="thumbnail" />
+                        <img src={resolveAssetUrl(reviewItem.product_thumbnail_url)} className="w-full h-full object-cover" alt="thumbnail" />
                       ) : (
                         <span className="material-symbols-outlined text-[#bfc7d3]">inventory_2</span>
                       )}

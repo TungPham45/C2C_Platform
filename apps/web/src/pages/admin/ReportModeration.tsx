@@ -45,6 +45,9 @@ interface Report {
   admin_note?: string | null;
   resolution?: string | null;
   resolution_action?: string | null;
+  reporter?: {
+    status?: string;
+  } | null;
 }
 
 export const ReportModeration: FC = () => {

@@ -5,7 +5,7 @@ import { useOrders } from '../hooks/useOrders';
 import { useReviews } from '../hooks/useReviews';
 import { formatVnd } from '../utils/currency';
 import { getOrderPricing } from '../utils/orderPricing';
-import { resolveAssetUrl } from '../config/api';
+import { resolveAssetUrl, PRODUCT_API_URL } from '../config/api';
 
 const ORDER_STEPS = [
   { key: 'pending',   label: 'Đã đặt hàng',  icon: 'receipt_long' },
@@ -51,7 +51,7 @@ export const BuyerOrderDetail: FC = () => {
       if (!order) return;
       try {
         const token = localStorage.getItem('c2c_token');
-        const res = await fetch('http://localhost:3000/api/products/reviews/me', {
+        const res = await fetch(`${PRODUCT_API_URL}/reviews/me`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
