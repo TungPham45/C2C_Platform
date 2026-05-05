@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, UnauthorizedException, Inject, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
-import { MAX_ATTRIBUTES_PER_CATEGORY } from '../../../../libs/shared/category.constants';
 
+const MAX_ATTRIBUTES_PER_CATEGORY = 8;
 @Injectable()
 export class ProductService {
   constructor(@Inject(PrismaService) private prisma: PrismaService) { }

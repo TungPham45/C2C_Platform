@@ -1,1 +1,0 @@
-export const MAX_ATTRIBUTES_PER_CATEGORY = 8;

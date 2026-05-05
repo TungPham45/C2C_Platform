@@ -1,11 +1,10 @@
 import { FC, FormEvent, useEffect, useMemo, useState } from 'react';
 import { AdminLayout } from '../../components/layout/AdminLayout';
-import { MAX_ATTRIBUTES_PER_CATEGORY } from '../../../../../libs/shared/category.constants';
 
 /*                              CAU HINH API                              */
 
 const ADMIN_API_BASE_URL = '/api/admin';
-
+const MAX_ATTRIBUTES_PER_CATEGORY = 8;
 /*                         KHAI BAO TYPE / INTERFACE                         */
 
 //@GET
