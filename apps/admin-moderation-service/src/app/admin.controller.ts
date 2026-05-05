@@ -11,8 +11,8 @@ export class AdminController {
   }
 
   @Get('users')
-  getUsers() {
-    return this.adminService.getUsers();
+  getUsers(@Query() query: any) {
+    return this.adminService.getUsers(query);
   }
 
   @Put('users/:id/status')
@@ -31,8 +31,8 @@ export class AdminController {
   }
 
   @Get('applications')
-  getPendingShops() {
-    return this.adminService.getPendingShops();
+  getPendingShops(@Query() query: any) {
+    return this.adminService.getPendingShops(query);
   }
 
   @Put('applications/:id/approve')
@@ -41,8 +41,8 @@ export class AdminController {
   }
 
   @Get('shops')
-  getShops() {
-    return this.adminService.getShops();
+  getShops(@Query() query: any) {
+    return this.adminService.getShops(query);
   }
 
   @Put('shops/:id/status')

@@ -174,8 +174,34 @@ export const SettingsPage: FC = () => {
     }
   };
 
-  const handleDeleteShop = () => {
-    window.alert('Tính năng xóa cửa hàng hiện chưa được hỗ trợ. Vui lòng liên hệ bộ phận hỗ trợ để được xử lý.');
+  const handleDeleteShop = async () => {
+    if (!window.confirm('CẢNH BÁO: Hành động này sẽ xóa VĨNH VIỄN cửa hàng, bao gồm toàn bộ sản phẩm, danh mục và lượt đánh giá. Bạn sẽ trở về quyền Người dùng bình thường. Bạn có CHẮC CHẮN muốn tiếp tục?')) return;
+    
+    try {
+      const token = localStorage.getItem('c2c_token');
+      const res = await fetch(`${PRODUCT_API_URL}/seller/shop`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Không thể xóa cửa hàng');
+      
+      alert('Cửa hàng của bạn đã bị xóa vĩnh viễn. Bạn đã trở lại quyền người dùng bình thường.');
+      
+      // Update local storage to remove shop and reset role
+      const currentUserStr = localStorage.getItem('c2c_user');
+      if (currentUserStr) {
+        const currentUser = JSON.parse(currentUserStr);
+        delete currentUser.shop;
+        currentUser.role = 'user'; // Ensure role is back to user visually
+        localStorage.setItem('c2c_user', JSON.stringify(currentUser));
+        setUser(currentUser);
+      }
+      
+      window.dispatchEvent(new Event('user-updated'));
+      navigate('/');
+    } catch (e: any) {
+      setError(e.message || 'Đã xảy ra lỗi khi xóa cửa hàng');
+    }
   };
 
   const statusMap: Record<string, { label: string; color: string; bg: string }> = {
@@ -366,8 +392,8 @@ export const SettingsPage: FC = () => {
                 </button>
                 <button
                   onClick={handleDeleteShop}
-                  className="px-6 py-3 rounded-xl border-2 border-slate-200 text-slate-400 font-bold text-sm cursor-not-allowed opacity-60"
-                  title="Liên hệ hỗ trợ để xóa cửa hàng"
+                  className="px-6 py-3 rounded-xl border-2 border-rose-500 text-rose-500 font-bold text-sm hover:bg-rose-500 hover:text-white transition-colors"
+                  title="Xóa vĩnh viễn cửa hàng của bạn"
                 >
                   Xóa cửa hàng
                 </button>

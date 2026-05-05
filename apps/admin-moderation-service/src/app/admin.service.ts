@@ -137,9 +137,13 @@ export class AdminService {
     };
   }
 
-  async getUsers() {
+  async getUsers(query: any = {}) {
+    const { role, ...authQuery } = query;
+    const authQs = new URLSearchParams(authQuery as Record<string, string>).toString();
+    const authQueryStr = authQs ? `?${authQs}` : '';
+
     const [users, shops] = await Promise.all([
-      this.requestJson<Array<any>>(`${this.authBaseUrl}/internal/admin/users`),
+      this.requestJson<Array<any>>(`${this.authBaseUrl}/internal/admin/users${authQueryStr}`),
       this.requestJson<Array<{ owner_id: number | null, status: string | null }>>(
         `${this.productBaseUrl}/internal/admin/shops`
       ).catch(() => []),
@@ -152,12 +156,18 @@ export class AdminService {
       shops.filter(s => s.owner_id !== null).map(s => s.owner_id)
     );
 
-    return users.map(user => {
+    let mappedUsers = users.map(user => {
       if (user.role === 'user' && sellerIds.has(user.id)) {
         return { ...user, role: 'seller' };
       }
       return user;
     });
+
+    if (role && role !== 'all') {
+      mappedUsers = mappedUsers.filter(u => u.role === role);
+    }
+
+    return mappedUsers;
   }
 
   async updateUserStatus(id: number, status: string) {
@@ -206,7 +216,9 @@ export class AdminService {
     });
   }
 
-  async getPendingShops() {
+  async getPendingShops(query: any = {}) {
+    const qs = new URLSearchParams(query as Record<string, string>).toString();
+    const queryStr = qs ? `?${qs}` : '';
     return this.requestJson<Array<{
       id: number;
       name: string | null;
@@ -214,7 +226,7 @@ export class AdminService {
       owner_id: number | null;
       status: string | null;
       created_at: string | null;
-    }>>(`${this.productBaseUrl}/internal/admin/pending-shops`);
+    }>>(`${this.productBaseUrl}/internal/admin/pending-shops${queryStr}`);
   }
 
   async approveShop(id: number) {
@@ -226,7 +238,9 @@ export class AdminService {
     );
   }
 
-  async getShops() {
+  async getShops(query: any = {}) {
+    const qs = new URLSearchParams(query as Record<string, string>).toString();
+    const queryStr = qs ? `?${qs}` : '';
     return this.requestJson<Array<{
       id: number;
       name: string | null;
@@ -234,7 +248,7 @@ export class AdminService {
       owner_id: number | null;
       status: string | null;
       created_at: string | null;
-    }>>(`${this.productBaseUrl}/internal/admin/shops`);
+    }>>(`${this.productBaseUrl}/internal/admin/shops${queryStr}`);
   }
 
   async updateShopStatus(id: number, status: string) {

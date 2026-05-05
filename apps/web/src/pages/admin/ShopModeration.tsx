@@ -15,11 +15,27 @@ const ShopModeration: FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [sortBy, setSortBy] = useState('newest');
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
+
   // lấy danh sách các cửa hàng chờ duyệt
   const fetchShops = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/applications');
+      const queryParams = new URLSearchParams({
+        ...(debouncedSearch && { search: debouncedSearch }),
+        sortBy: sortBy,
+      }).toString();
+
+      const response = await fetch(`/api/admin/applications?${queryParams}`);
       if (!response.ok) throw new Error('Failed to fetch pending shops');
       const data = await response.json();
       setShops(data);
@@ -32,7 +48,7 @@ const ShopModeration: FC = () => {
 
   useEffect(() => {
     fetchShops();
-  }, []);
+  }, [debouncedSearch, sortBy]);
 
   // xử lý duyệt cửa hàng
   const handleApprove = async (id: number, shopName: string) => {
@@ -56,12 +72,38 @@ const ShopModeration: FC = () => {
     <AdminLayout pageTitle="Duyệt Đăng ký Cửa hàng">
       <div className="max-w-5xl mx-auto">
         <div className="bg-white rounded-[2rem] shadow-[0_8px_40px_rgba(0,0,0,0.03)] border border-[#e1f0fb] overflow-hidden">
-          <div className="px-10 py-8 border-b border-[#f5faff] flex items-center justify-between">
-            <h3 className="text-lg font-bold text-[#0f1d25] font-['Plus_Jakarta_Sans']">Danh sách hồ sơ chờ duyệt</h3>
-            <div className="flex gap-2">
-              <span className="px-4 py-1.5 bg-[#fff8e5] text-[#ffb952] rounded-full text-[10px] font-bold uppercase tracking-wider">
-                Tổng cộng {shops.length} hồ sơ
-              </span>
+          <div className="px-10 py-8 border-b border-[#f5faff] flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-[#0f1d25] font-['Plus_Jakarta_Sans']">Danh sách hồ sơ chờ duyệt</h3>
+              <div className="flex gap-2">
+                <span className="px-4 py-1.5 bg-[#fff8e5] text-[#ffb952] rounded-full text-[10px] font-bold uppercase tracking-wider">
+                  Tổng cộng {shops.length} hồ sơ
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-4 items-center bg-[#f5faff] p-4 rounded-xl">
+              <div className="flex-1 min-w-[200px] relative">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#707882] text-lg">search</span>
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm theo tên shop, slug..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-[#cfe5ff] focus:outline-none focus:border-[#00629d] focus:ring-1 focus:ring-[#00629d] text-sm"
+                />
+              </div>
+              <div className="flex gap-4">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="px-4 py-2 rounded-lg border border-[#cfe5ff] focus:outline-none focus:border-[#00629d] text-sm text-[#0f1d25] bg-white"
+                >
+                  <option value="newest">Mới nhất</option>
+                  <option value="oldest">Cũ nhất</option>
+                  <option value="name_asc">Tên (A-Z)</option>
+                  <option value="name_desc">Tên (Z-A)</option>
+                </select>
+              </div>
             </div>
           </div>
 

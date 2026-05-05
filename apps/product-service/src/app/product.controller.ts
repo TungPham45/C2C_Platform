@@ -75,6 +75,12 @@ export class ProductController {
     return this.productService.updateShop(userId, data);
   }
 
+  @Delete('seller/shop')
+  deleteShop(@Headers() headers: any) {
+    const userId = this.getProviderUserId(headers);
+    return this.productService.deleteShop(userId);
+  }
+
   @Get('seller/context')
   getSellerContext(@Headers() headers: any) {
     const userId = this.getProviderUserId(headers);
@@ -198,9 +204,13 @@ export class ProductController {
   }
 
   @Get('internal/admin/pending-shops')
-  getPendingShops(@Headers() headers: Record<string, string | string[] | undefined>) {
+  getPendingShops(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+  ) {
     this.requireInternalAccess(headers);
-    return this.productService.getPendingShops();
+    return this.productService.getPendingShops(search, sortBy);
   }
 
   @Put('internal/admin/shops/:id/approve')
@@ -213,9 +223,14 @@ export class ProductController {
   }
 
   @Get('internal/admin/shops')
-  getAllShops(@Headers() headers: Record<string, string | string[] | undefined>) {
+  getAllShops(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('sortBy') sortBy?: string,
+  ) {
     this.requireInternalAccess(headers);
-    return this.productService.getAllShops();
+    return this.productService.getAllShops(search, status, sortBy);
   }
 
   @Put('internal/admin/shops/:id/status')

@@ -62,9 +62,14 @@ export class AuthController {
   }
 
   @Get('internal/admin/users')
-  getAllUsers(@Headers() headers: Record<string, string | string[] | undefined>) {
+  getAllUsers(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('sortBy') sortBy?: string,
+  ) {
     this.requireInternalAccess(headers);
-    return this.authService.getAllUsers();
+    return this.authService.getAllUsers(search, status, sortBy);
   }
 
   @Put('internal/admin/users/:id/status')

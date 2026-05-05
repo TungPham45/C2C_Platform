@@ -197,6 +197,19 @@ export class ProductService {
       const trimmedName = data.name.trim();
       if (!trimmedName) throw new BadRequestException('Tên shop không được để trống');
       if (trimmedName.length > 255) throw new BadRequestException('Tên shop quá dài (tối đa 255 ký tự)');
+      
+      // Thêm kiểm tra trùng tên shop (bỏ qua shop hiện tại)
+      if (trimmedName.toLowerCase() !== shop.name?.toLowerCase()) {
+        const existingName = await this.prisma.shop.findFirst({
+          where: {
+            name: { equals: trimmedName, mode: 'insensitive' }
+          }
+        });
+        if (existingName) {
+          throw new BadRequestException('Tên shop đã tồn tại, vui lòng chọn tên khác');
+        }
+      }
+
       updateData.name = trimmedName;
     }
 
@@ -210,6 +223,19 @@ export class ProductService {
     return this.prisma.shop.update({
       where: { id: shop.id },
       data: updateData,
+    });
+  }
+
+  // Delete shop (revert to normal user)
+  async deleteShop(userId: number) {
+    const shop = await this.findSellerShopAnyStatus(userId);
+    if (!shop) {
+      throw new UnauthorizedException('No seller shop found for this user');
+    }
+
+    // Xóa shop (cascade delete toàn bộ product, review, follow liên quan)
+    return this.prisma.shop.delete({
+      where: { id: shop.id }
     });
   }
 
@@ -711,6 +737,16 @@ export class ProductService {
     const name = String(data?.name || '').trim();
     if (!name) {
       throw new BadRequestException('Shop name is required');
+    }
+
+    // Kiểm tra trùng tên shop
+    const nameExists = await this.prisma.shop.findFirst({
+      where: {
+        name: { equals: name, mode: 'insensitive' }
+      }
+    });
+    if (nameExists) {
+      throw new BadRequestException('Tên shop đã tồn tại, vui lòng chọn tên khác');
     }
 
     const slug = this.generateSlug(name || 'shop'); // tạo đg dẫn url dễ nhìn từ tên cửa hàng
@@ -1286,9 +1322,27 @@ export class ProductService {
   }
 
   // lấy danh sách các cửa hàng chờ duyệt
-  async getPendingShops() {
+  async getPendingShops(search?: string, sortBy?: string) {
+    const where: any = { status: 'pending' };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { slug: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    let orderBy: any = { created_at: 'asc' };
+    if (sortBy === 'newest') {
+      orderBy = { created_at: 'desc' };
+    } else if (sortBy === 'name_asc') {
+      orderBy = { name: 'asc' };
+    } else if (sortBy === 'name_desc') {
+      orderBy = { name: 'desc' };
+    }
+
     return this.prisma.shop.findMany({
-      where: { status: 'pending' },
+      where,
       select: {
         id: true,
         name: true,
@@ -1297,7 +1351,7 @@ export class ProductService {
         status: true,
         created_at: true,
       },
-      orderBy: { created_at: 'asc' },
+      orderBy,
     });
   }
 
@@ -1335,9 +1389,32 @@ export class ProductService {
     return updated;
   }
 
-  async getAllShops() {
+  async getAllShops(search?: string, status?: string, sortBy?: string) {
+    const where: any = {};
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { slug: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (status && status !== 'all') {
+      where.status = status;
+    }
+
+    let orderBy: any = { created_at: 'desc' };
+    if (sortBy === 'oldest') {
+      orderBy = { created_at: 'asc' };
+    } else if (sortBy === 'name_asc') {
+      orderBy = { name: 'asc' };
+    } else if (sortBy === 'name_desc') {
+      orderBy = { name: 'desc' };
+    }
+
     return this.prisma.shop.findMany({
-      orderBy: { created_at: 'desc' },
+      where,
+      orderBy,
       select: {
         id: true,
         name: true,
