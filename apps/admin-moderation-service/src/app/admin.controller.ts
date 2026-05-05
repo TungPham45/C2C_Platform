@@ -87,9 +87,14 @@ export class AdminController {
     return this.adminService.updateCategory(+id, data);
   }
 
+  @Get('categories/:id/delete-impact')
+  getCategoryDeleteImpact(@Param('id') id: string) {
+    return this.adminService.getCategoryDeleteImpact(+id);
+  }
+
   @Delete('categories/:id')
-  deleteCategory(@Param('id') id: string) {
-    return this.adminService.deleteCategory(+id);
+  deleteCategory(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.deleteCategory(+id, data);
   }
 
   // --- ATTRIBUTES ---

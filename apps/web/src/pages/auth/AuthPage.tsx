@@ -8,7 +8,9 @@ export const AuthPage: FC = () => {
   const [state, setState] = useState<AuthState>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [otpPurpose, setOtpPurpose] = useState<'REGISTER' | 'RESET_PASSWORD'>('REGISTER');
@@ -43,7 +45,7 @@ export const AuthPage: FC = () => {
           body: JSON.stringify({ email, password })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Login failed');
+        if (!res.ok) throw new Error(data.message || 'Đăng nhập thất bại');
 
         localStorage.setItem('c2c_token', data.access_token);
         // ... (Seller context fetching logic same as before) ...
@@ -62,16 +64,20 @@ export const AuthPage: FC = () => {
       }
 
       else if (state === 'register') {
+        if (password !== confirmPassword) {
+          throw new Error('Mật khẩu nhập lại không khớp');
+        }
         const res = await fetch(`${AUTH_API_URL}/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, full_name: fullName })
+          body: JSON.stringify({ email, password, full_name: fullName, phone })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Registration failed');
+        if (!res.ok) throw new Error(data.message || 'Đăng ký thất bại');
 
-        setState('login');
-        setSuccess('Tạo tài khoản thành công. Bây giờ bạn có thể đăng nhập ngay!');
+        setOtpPurpose('REGISTER');
+        setState('verify-otp');
+        setSuccess('Mã OTP đã được gửi đến email của bạn để xác thực tài khoản.');
       }
 
       else if (state === 'forgot-password') {
@@ -81,14 +87,36 @@ export const AuthPage: FC = () => {
           body: JSON.stringify({ email })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Failed to request OTP');
+        if (!res.ok) throw new Error(data.message || 'Yêu cầu gửi OTP thất bại');
 
         setOtpPurpose('RESET_PASSWORD');
         setState('verify-otp');
-        setSuccess('OTP sent to your email for password reset.');
+        setSuccess('Mã OTP đã được gửi đến email của bạn để khôi phục mật khẩu.');
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      setError(err.message || 'Đã xảy ra lỗi');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setError('');
+    setSuccess('');
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${AUTH_API_URL}/resend-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, purpose: otpPurpose })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Gửi lại OTP thất bại');
+
+      setSuccess('Mã OTP mới đã được gửi vào email của bạn.');
+    } catch (err: any) {
+      setError(err.message || 'Gửi lại OTP thất bại');
     } finally {
       setLoading(false);
     }
@@ -107,16 +135,16 @@ export const AuthPage: FC = () => {
         body: JSON.stringify({ email, code, purpose: otpPurpose })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Invalid OTP');
+      if (!res.ok) throw new Error(data.message || 'Mã OTP không hợp lệ');
 
       if (otpPurpose === 'REGISTER') {
-        setSuccess('Account verified successfully! You can now login.');
+        setSuccess('Xác thực tài khoản thành công! Bạn có thể đăng nhập ngay.');
         setState('login');
       } else {
         setState('reset-password');
       }
     } catch (err: any) {
-      setError(err.message || 'OTP verification failed');
+      setError(err.message || 'Xác thực OTP thất bại');
     } finally {
       setLoading(false);
     }
@@ -135,12 +163,12 @@ export const AuthPage: FC = () => {
         body: JSON.stringify({ email, code, newPassword: password })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to reset password');
+      if (!res.ok) throw new Error(data.message || 'Đặt lại mật khẩu thất bại');
 
-      setSuccess('Password reset successful. Please login with your new password.');
+      setSuccess('Đặt lại mật khẩu thành công. Vui lòng đăng nhập bằng mật khẩu mới.');
       setState('login');
     } catch (err: any) {
-      setError(err.message || 'Password reset failed');
+      setError(err.message || 'Đặt lại mật khẩu thất bại');
     } finally {
       setLoading(false);
     }
@@ -184,21 +212,21 @@ export const AuthPage: FC = () => {
               <h1 className="text-3xl font-black font-['Plus_Jakarta_Sans'] tracking-tight">Serene</h1>
             </div>
             <h2 className="text-5xl font-black font-['Plus_Jakarta_Sans'] leading-tight">
-              Welcome to the <br />
+              Chào mừng đến với <br />
               <span className="text-[#99cbff]">Digital Sanctuary</span>
             </h2>
             <p className="mt-8 text-blue-100/60 text-lg leading-relaxed max-w-sm">
-              The most beautiful curated C2C marketplace for seekers and creators.
+              Nền tảng thương mại C2C tuyệt đẹp dành cho những người đam mê mua sắm và sáng tạo.
             </p>
           </div>
           <div className="relative z-10">
             <div className="p-8 bg-white/10 backdrop-blur-2xl rounded-[2.5rem] border border-white/20">
-              <p className="text-white font-medium italic text-lg mb-6">"Discovery has never felt so peaceful and premium."</p>
+              <p className="text-white font-medium italic text-lg mb-6">"Trải nghiệm khám phá các món đồ chưa bao giờ yên bình và cao cấp đến thế."</p>
               <div className="flex items-center gap-4">
                 <img src="https://i.pravatar.cc/100?img=32" className="w-12 h-12 rounded-2xl border-2 border-white/20" alt="" />
                 <div>
                   <p className="font-bold">Julia Roberts</p>
-                  <p className="text-xs text-blue-200 uppercase tracking-widest font-black">Top Curator</p>
+                  <p className="text-xs text-blue-200 uppercase tracking-widest font-black">Nhà Sáng Tạo Nổi Bật</p>
                 </div>
               </div>
             </div>
@@ -210,18 +238,18 @@ export const AuthPage: FC = () => {
           <div className="max-w-sm mx-auto w-full space-y-8">
             <div>
               <h2 className="text-3xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">
-                {state === 'login' && 'Sign In'}
-                {state === 'register' && 'Create Account'}
-                {state === 'forgot-password' && 'Reset Password'}
-                {state === 'verify-otp' && 'Verify Email'}
-                {state === 'reset-password' && 'New Password'}
+                {state === 'login' && 'Đăng Nhập'}
+                {state === 'register' && 'Tạo Tài Khoản'}
+                {state === 'forgot-password' && 'Khôi Phục Mật Khẩu'}
+                {state === 'verify-otp' && 'Xác Thực Email'}
+                {state === 'reset-password' && 'Mật Khẩu Mới'}
               </h2>
               <p className="text-sm text-[#707882] mt-2 font-medium">
-                {state === 'login' && 'Enter your credentials to continue discovery.'}
-                {state === 'register' && 'Join our community of unique creators.'}
-                {state === 'forgot-password' && 'Enter your email to receive a secure OTP.'}
-                {state === 'verify-otp' && `We've sent a 6-digit code to your email.`}
-                {state === 'reset-password' && 'Choose a strong new password.'}
+                {state === 'login' && 'Nhập thông tin của bạn để tiếp tục.'}
+                {state === 'register' && 'Tham gia cộng đồng những nhà sáng tạo độc đáo.'}
+                {state === 'forgot-password' && 'Nhập email để nhận mã xác thực an toàn.'}
+                {state === 'verify-otp' && `Chúng tôi đã gửi mã 6 số tới email của bạn.`}
+                {state === 'reset-password' && 'Chọn một mật khẩu mới thật mạnh.'}
               </p>
             </div>
 
@@ -243,24 +271,40 @@ export const AuthPage: FC = () => {
             {(state === 'login' || state === 'register' || state === 'forgot-password') && (
               <form onSubmit={handleAuth} className="space-y-6">
                 {state === 'register' && (
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-[#707882] mb-3 ml-1">Full Name</label>
-                    <div className="relative group">
-                      <span className="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-[#bfc7d3] group-focus-within:text-[#00629d] transition-colors">person</span>
-                      <input
-                        type="text"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        required
-                        placeholder="John Doe"
-                        className="w-full h-14 pl-14 pr-5 bg-[#f5faff] border border-[#dbeaf5] rounded-[1.25rem] text-sm font-medium focus:bg-white focus:border-[#00629d] focus:ring-4 focus:ring-[#00629d]/5 outline-none transition-all"
-                      />
+                  <>
+                    <div>
+                      <label className="block text-sm font-bold text-[#454e58] mb-2 ml-1">Họ và Tên</label>
+                      <div className="relative group">
+                        <span className="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-[#bfc7d3] group-focus-within:text-[#00629d] transition-colors">person</span>
+                        <input
+                          type="text"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          required
+                          placeholder="Nguyễn Văn A"
+                          className="w-full h-14 pl-14 pr-5 bg-[#f5faff] border border-[#dbeaf5] rounded-[1.25rem] text-sm font-medium focus:bg-white focus:border-[#00629d] focus:ring-4 focus:ring-[#00629d]/5 outline-none transition-all"
+                        />
+                      </div>
                     </div>
-                  </div>
+                    <div>
+                      <label className="block text-sm font-bold text-[#454e58] mb-2 ml-1">Số Điện Thoại</label>
+                      <div className="relative group">
+                        <span className="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-[#bfc7d3] group-focus-within:text-[#00629d] transition-colors">call</span>
+                        <input
+                          type="tel"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          required
+                          placeholder="0123456789"
+                          className="w-full h-14 pl-14 pr-5 bg-[#f5faff] border border-[#dbeaf5] rounded-[1.25rem] text-sm font-medium focus:bg-white focus:border-[#00629d] focus:ring-4 focus:ring-[#00629d]/5 outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                  </>
                 )}
 
                 <div>
-                  <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-[#707882] mb-3 ml-1">Email Address</label>
+                  <label className="block text-sm font-bold text-[#454e58] mb-2 ml-1">Địa chỉ Email</label>
                   <div className="relative group">
                     <span className="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-[#bfc7d3] group-focus-within:text-[#00629d] transition-colors">mail</span>
                     <input
@@ -275,35 +319,53 @@ export const AuthPage: FC = () => {
                 </div>
 
                 {state !== 'forgot-password' && (
-                  <div>
-                    <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-[#707882] mb-3 ml-1 flex justify-between">
-                      Password
-                      {state === 'login' && (
-                        <button type="button" onClick={() => setState('forgot-password')} className="normal-case text-[#00629d] hover:underline font-bold">Lost yours?</button>
-                      )}
-                    </label>
-                    <div className="relative group">
-                      <span className="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-[#bfc7d3] group-focus-within:text-[#00629d] transition-colors">lock</span>
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        placeholder="••••••••"
-                        className="w-full h-14 pl-14 pr-12 bg-[#f5faff] border border-[#dbeaf5] rounded-[1.25rem] text-sm font-medium focus:bg-white focus:border-[#00629d] focus:ring-4 focus:ring-[#00629d]/5 outline-none transition-all"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-5 top-1/2 -translate-y-1/2 text-[#bfc7d3] hover:text-[#00629d] transition-colors flex items-center justify-center p-1"
-                        tabIndex={-1}
-                      >
-                        <span className="material-symbols-outlined text-[20px]">
-                          {showPassword ? "visibility_off" : "visibility"}
-                        </span>
-                      </button>
+                  <>
+                    <div>
+                      <label className="block text-sm font-bold text-[#454e58] mb-2 ml-1 flex justify-between">
+                        Mật Khẩu
+                        {state === 'login' && (
+                          <button type="button" onClick={() => setState('forgot-password')} className="normal-case text-[#00629d] hover:underline font-bold">Quên mật khẩu?</button>
+                        )}
+                      </label>
+                      <div className="relative group">
+                        <span className="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-[#bfc7d3] group-focus-within:text-[#00629d] transition-colors">lock</span>
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          required
+                          placeholder="••••••••"
+                          className="w-full h-14 pl-14 pr-12 bg-[#f5faff] border border-[#dbeaf5] rounded-[1.25rem] text-sm font-medium focus:bg-white focus:border-[#00629d] focus:ring-4 focus:ring-[#00629d]/5 outline-none transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-5 top-1/2 -translate-y-1/2 text-[#bfc7d3] hover:text-[#00629d] transition-colors flex items-center justify-center p-1"
+                          tabIndex={-1}
+                        >
+                          <span className="material-symbols-outlined text-[20px]">
+                            {showPassword ? "visibility_off" : "visibility"}
+                          </span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                    {state === 'register' && (
+                      <div>
+                        <label className="block text-sm font-bold text-[#454e58] mb-2 ml-1">Xác nhận Mật khẩu</label>
+                        <div className="relative group">
+                          <span className="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-[#bfc7d3] group-focus-within:text-[#00629d] transition-colors">lock</span>
+                          <input
+                            type={showPassword ? "text" : "password"}
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            required
+                            placeholder="••••••••"
+                            className="w-full h-14 pl-14 pr-12 bg-[#f5faff] border border-[#dbeaf5] rounded-[1.25rem] text-sm font-medium focus:bg-white focus:border-[#00629d] focus:ring-4 focus:ring-[#00629d]/5 outline-none transition-all"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 <button
@@ -312,7 +374,7 @@ export const AuthPage: FC = () => {
                   className="w-full h-14 bg-[#0f1d25] text-white font-black text-xs uppercase tracking-[0.2em] rounded-[1.25rem] shadow-xl shadow-slate-200 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                 >
                   {loading && <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}
-                  {state === 'login' ? 'Sign In' : state === 'register' ? 'Join Now' : 'Send Code'}
+                  {state === 'login' ? 'Đăng Nhập' : state === 'register' ? 'Đăng Ký' : 'Gửi Mã OTP'}
                 </button>
               </form>
             )}
@@ -341,12 +403,12 @@ export const AuthPage: FC = () => {
                   className="w-full h-14 bg-[#00629d] text-white font-black text-xs uppercase tracking-[0.2em] rounded-[1.25rem] shadow-xl shadow-blue-200 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                 >
                   {loading && <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}
-                  Verify Account
+                  Xác Thực Tài Khoản
                 </button>
 
                 <div className="text-center">
-                  <p className="text-sm text-[#707882] font-medium">Didn't receive the code?</p>
-                  <button type="button" className="text-[#00629d] font-bold text-sm mt-2 hover:underline">Resend OTP</button>
+                  <p className="text-sm text-[#707882] font-medium">Chưa nhận được mã?</p>
+                  <button type="button" onClick={handleResendOtp} disabled={loading} className="text-[#00629d] font-bold text-sm mt-2 hover:underline disabled:opacity-50">Gửi lại OTP</button>
                 </div>
               </form>
             )}
@@ -355,7 +417,7 @@ export const AuthPage: FC = () => {
             {state === 'reset-password' && (
               <form onSubmit={handleResetPassword} className="space-y-6">
                 <div>
-                  <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-[#707882] mb-3 ml-1">New Password</label>
+                  <label className="block text-sm font-bold text-[#454e58] mb-2 ml-1">Mật Khẩu Mới</label>
                   <div className="relative group">
                     <span className="material-symbols-outlined absolute left-5 top-1/2 -translate-y-1/2 text-[#bfc7d3] group-focus-within:text-[#00629d] transition-colors">lock</span>
                     <input
@@ -385,7 +447,7 @@ export const AuthPage: FC = () => {
                   className="w-full h-14 bg-[#0f1d25] text-white font-black text-xs uppercase tracking-[0.2em] rounded-[1.25rem] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                 >
                   {loading && <span className="material-symbols-outlined animate-spin text-sm">progress_activity</span>}
-                  Save New Password
+                  Lưu Mật Khẩu
                 </button>
               </form>
             )}
@@ -393,12 +455,12 @@ export const AuthPage: FC = () => {
             <div className="pt-8 border-t border-[#f5faff] text-center">
               {state === 'login' ? (
                 <p className="text-sm font-medium text-[#707882]">
-                  New curator? <button onClick={() => setState('register')} className="text-[#00629d] font-black hover:underline">Create Account</button>
+                  Chưa có tài khoản? <button onClick={() => setState('register')} className="text-[#00629d] font-black hover:underline">Đăng Ký Ngay</button>
                 </p>
               ) : (
                 <button onClick={() => setState('login')} className="text-sm font-black text-[#00629d] hover:underline flex items-center justify-center gap-2 mx-auto">
                   <span className="material-symbols-outlined text-sm">arrow_back</span>
-                  Back to Sign In
+                  Quay lại Đăng Nhập
                 </button>
               )}
             </div>

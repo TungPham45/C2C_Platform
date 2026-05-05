@@ -10,9 +10,10 @@ interface Banner {
 }
 
 export const HomeHero: FC = () => {
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [banners, setBanners] = useState<Banner[]>([]); // dsach banner
+  const [activeIndex, setActiveIndex] = useState(0); // index của banner đang được hiển thị
 
+  // lấy dsach banner
   useEffect(() => {
     const fetchBanners = async () => {
       try {
@@ -29,6 +30,7 @@ export const HomeHero: FC = () => {
     fetchBanners();
   }, []);
 
+  // tự động chuyển banner sau 5s
   useEffect(() => {
     if (banners.length <= 1) return;
     const interval = setInterval(() => {
@@ -46,18 +48,18 @@ export const HomeHero: FC = () => {
       <div className="max-w-7xl mx-auto h-[600px] rounded-[4rem] overflow-hidden relative group shadow-2xl">
         {/* Background Image Carousel */}
         {banners.map((banner, index) => (
-          <img 
+          <img
             key={banner.id}
-            src={banner.image_url} 
-            alt={banner.title} 
+            src={banner.image_url}
+            alt={banner.title}
             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ease-in-out ${index === activeIndex ? 'opacity-100' : 'opacity-0'} group-hover:scale-105`}
             style={{ transitionProperty: 'opacity, transform' }}
           />
         ))}
-        
+
         {/* Overlay Gradient */}
         <div className="absolute inset-0 bg-gradient-to-r from-[#0f1d25]/80 via-[#0f1d25]/40 to-transparent"></div>
-        
+
         {/* Content */}
         <div className="absolute inset-0 flex items-center px-16 z-10">
           <div className="max-w-xl space-y-8 animate-in slide-in-from-bottom-10 fade-in duration-1000" key={currentBanner.id}>
@@ -69,11 +71,11 @@ export const HomeHero: FC = () => {
                 {currentBanner.title}
               </h1>
             </div>
-            
+
             {currentBanner.target_url && (
               <div className="flex items-center gap-4 pt-4">
-                <a 
-                  href={currentBanner.target_url} 
+                <a
+                  href={currentBanner.target_url}
                   target={currentBanner.target_url.startsWith('http') ? '_blank' : '_self'}
                   rel="noreferrer"
                   className="px-10 py-5 bg-white text-[#00629d] rounded-full font-black uppercase text-xs tracking-widest shadow-2xl hover:bg-[#cfe5ff] transition-all hover:scale-105 active:scale-95"
@@ -89,7 +91,7 @@ export const HomeHero: FC = () => {
         {banners.length > 1 && (
           <div className="absolute bottom-12 left-16 flex gap-3 z-20">
             {banners.map((_, idx) => (
-              <button 
+              <button
                 key={idx}
                 onClick={() => setActiveIndex(idx)}
                 className={`h-2 rounded-full transition-all duration-500 ${activeIndex === idx ? 'w-10 bg-white' : 'w-2 bg-white/40 hover:bg-white/70'}`}

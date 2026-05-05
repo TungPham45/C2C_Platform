@@ -5,8 +5,14 @@ import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { nxCopyAssetsPlugin } from '@nx/vite/plugins/nx-copy-assets.plugin';
 
 const devApiProxyTarget = process.env.VITE_DEV_API_PROXY_TARGET ?? 'http://localhost:3000';
+const devNotificationsProxyTarget =
+  process.env.VITE_DEV_NOTIFICATIONS_PROXY_TARGET ?? 'http://localhost:3002';
 const allowedHosts = ['localhost', '.ngrok-free.app'];
 const proxy = {
+  '/api/notifications': {
+    target: devNotificationsProxyTarget,
+    changeOrigin: true,
+  },
   '/api': {
     target: devApiProxyTarget,
     changeOrigin: true,

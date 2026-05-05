@@ -3,7 +3,7 @@ import { PrismaService } from './prisma.service';
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   private readonly authBaseUrl =
     process.env.AUTH_SERVICE_BASE_URL ?? 'http://localhost:3002/api/auth';
@@ -43,35 +43,97 @@ export class AdminService {
     }
 
     if (!response.ok) {
-      throw new BadGatewayException(`Upstream request failed: ${url} (${response.status})`);
+      let upstreamMessage = '';
+
+      try {
+        const data = await response.json();
+        if (typeof data?.message === 'string') {
+          upstreamMessage = data.message;
+        } else if (Array.isArray(data?.message)) {
+          upstreamMessage = data.message.join(', ');
+        }
+      } catch {
+        try {
+          upstreamMessage = await response.text();
+        } catch {
+          upstreamMessage = '';
+        }
+      }
+
+      throw new BadGatewayException(
+        upstreamMessage || `Upstream request failed: ${url} (${response.status})`,
+      );
     }
 
     return response.json() as Promise<T>;
   }
 
   async getStats() {
-    const [authStats, productStats] = await Promise.all([
-      this.requestJson<{ activeUsers: number }>(`${this.authBaseUrl}/internal/admin/stats`),
+    const emptyOrderStats = {
+      totalOrders: 0,
+      pendingOrders: 0,
+      confirmedOrders: 0,
+      shippedOrders: 0,
+      deliveredOrders: 0,
+      cancelledOrders: 0,
+      todayOrders: 0,
+      totalRevenue: 0,
+    };
+    const emptyVoucherStats = {
+      totalVouchers: 0,
+      activeVouchers: 0,
+      scheduledVouchers: 0,
+      expiredVouchers: 0,
+      platformVouchers: 0,
+      shopVouchers: 0,
+      totalClaims: 0,
+      usedClaims: 0,
+    };
+
+    const [authStats, productStats, orderStats, voucherStats, bannerStats] = await Promise.all([
+      this.requestJson<{
+        totalUsers: number;
+        activeUsers: number;
+        suspendedUsers: number;
+      }>(`${this.authBaseUrl}/internal/admin/stats`),
       this.requestJson<{ 
+        totalShops: number;
         activeShops: number; 
         pendingApplications: number; 
+        totalProducts: number;
+        activeProducts: number;
         pendingProducts: number;
         totalCategories: number;
+        activeCategories: number;
         rootCategories: number;
         maxAttributes: number;
       }>(
         `${this.productBaseUrl}/internal/admin/stats`,
       ),
+      this.requestJson<typeof emptyOrderStats>(`${this.orderBaseUrl}/internal/admin/stats`).catch(() => emptyOrderStats),
+      this.requestJson<typeof emptyVoucherStats>(`${this.orderServiceRootUrl}/api/vouchers/internal/admin/stats`).catch(
+        () => emptyVoucherStats,
+      ),
+      this.getBannerStats(),
     ]);
 
     return {
+      totalUsers: authStats.totalUsers,
       activeUsers: authStats.activeUsers,
+      suspendedUsers: authStats.suspendedUsers,
+      totalShops: productStats.totalShops,
       activeShops: productStats.activeShops,
       pendingApplications: productStats.pendingApplications,
+      totalProducts: productStats.totalProducts,
+      activeProducts: productStats.activeProducts,
       pendingProducts: productStats.pendingProducts,
       totalCategories: productStats.totalCategories,
+      activeCategories: productStats.activeCategories,
       rootCategories: productStats.rootCategories,
       maxAttributes: productStats.maxAttributes,
+      ...orderStats,
+      ...voucherStats,
+      ...bannerStats,
     };
   }
 
@@ -83,6 +145,9 @@ export class AdminService {
       ).catch(() => []),
     ]);
 
+    // lấy ra dsach id của những ng có mở shop
+    // filter(s => s.owner_id !== null): Loại bỏ những shop bị lỗi dữ liệu (không có chủ sở hữu).
+    // map(s => s.owner_id): Chỉ lấy ra cái owner_id (ID của chủ shop) thay vì lấy toàn bộ object shop.
     const sellerIds = new Set(
       shops.filter(s => s.owner_id !== null).map(s => s.owner_id)
     );
@@ -227,9 +292,15 @@ export class AdminService {
     });
   }
 
-  async deleteCategory(id: number) {
+  async getCategoryDeleteImpact(id: number) {
+    return this.requestJson<any>(`${this.productBaseUrl}/internal/admin/categories/${id}/delete-impact`);
+  }
+
+  async deleteCategory(id: number, data?: any) {
     return this.requestJson<any>(`${this.productBaseUrl}/internal/admin/categories/${id}`, {
       method: 'DELETE',
+      headers: data ? { 'Content-Type': 'application/json' } : undefined,
+      body: data ? JSON.stringify(data) : undefined,
     });
   }
 
@@ -299,6 +370,20 @@ export class AdminService {
     return banners;
   }
 
+  async getBannerStats() {
+    const [totalBanners, activeBanners, inactiveBanners] = await Promise.all([
+      this.prisma.banner.count(),
+      this.prisma.banner.count({ where: { is_active: true } }),
+      this.prisma.banner.count({ where: { is_active: false } }),
+    ]);
+
+    return {
+      totalBanners,
+      activeBanners,
+      inactiveBanners,
+    };
+  }
+
   async createBanner(data: { title: string; image_url: string; target_url?: string; is_active?: boolean; sort_order?: number }) {
     return this.prisma.banner.create({
       data,
@@ -333,4 +418,69 @@ export class AdminService {
       method: 'DELETE',
     });
   }
+
+  // --- REPORT HELPERS ---
+
+  async getShopsByIds(ids: number[]) {
+    if (!ids.length) return [];
+    return this.requestJson<Array<{ id: number; name: string | null; owner_id: number | null; slug: string | null; logo_url: string | null }>>(
+      `${this.productBaseUrl}/internal/admin/shops-by-ids?ids=${ids.join(',')}`
+    ).catch(() => [] as any[]);
+  }
+
+  async getProductsByIds(ids: number[]) {
+    if (!ids.length) return [];
+    return this.requestJson<Array<{ id: number; name: string | null; shop_id: number | null }>>(
+      `${this.productBaseUrl}/internal/admin/products-by-ids?ids=${ids.join(',')}`
+    ).catch(() => [] as any[]);
+  }
+
+  async adminUpdateProductStatus(id: number, status: string, note?: string) {
+    return this.requestJson<any>(
+      `${this.productBaseUrl}/internal/admin/products/${id}/status`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, moderation_note: note }),
+      }
+    );
+  }
+
+  async hydrateReports(reports: any[]) {
+    if (!reports.length) return reports;
+
+    const shopIds = [...new Set(reports.map(r => r.shop_id).filter(Boolean))] as number[];
+    const productIds = [...new Set(reports.map(r => r.product_id).filter(Boolean))] as number[];
+    const reporterIds = [...new Set(reports.map(r => r.reporter_id).filter(Boolean))] as number[];
+
+    const [shops, products, users] = await Promise.all([
+      shopIds.length ? this.getShopsByIds(shopIds) : Promise.resolve([]),
+      productIds.length ? this.getProductsByIds(productIds) : Promise.resolve([]),
+      reporterIds.length
+        ? this.requestJson<any[]>(`${this.authBaseUrl}/internal/admin/users-by-ids?ids=${reporterIds.join(',')}`)
+            .catch(() => [] as any[])
+        : Promise.resolve([]),
+    ]);
+
+    const shopMap = Object.fromEntries((shops as any[]).map((s: any) => [s.id, s]));
+    const productMap = Object.fromEntries((products as any[]).map((p: any) => [p.id, p]));
+    const userMap = Object.fromEntries((users as any[]).map((u: any) => [u.id, u]));
+
+    return reports.map(report => {
+      const shop = report.shop_id ? (shopMap[report.shop_id] ?? null) : null;
+      const product = report.product_id ? (productMap[report.product_id] ?? null) : null;
+      const reporter = report.reporter_id ? (userMap[report.reporter_id] ?? null) : null;
+
+      return {
+        ...report,
+        shop_name: shop?.name || null,
+        product_name: product?.name || null,
+        reporter_name: reporter?.name || reporter?.full_name || null,
+        shop,
+        product,
+        reporter,
+      };
+    });
+  }
 }
+

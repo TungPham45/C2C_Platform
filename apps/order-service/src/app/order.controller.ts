@@ -3,7 +3,7 @@ import { OrderService } from './order.service';
 
 @Controller('orders')
 export class OrderController {
-  constructor(private readonly orderService: OrderService) {}
+  constructor(private readonly orderService: OrderService) { }
 
   private requireInternalAccess(headers: Record<string, string | string[] | undefined>) {
     const expectedToken = process.env.INTERNAL_SERVICE_TOKEN ?? 'internal-dev-token';
@@ -82,5 +82,11 @@ export class OrderController {
       tracking_number,
       carrier_name,
     });
+  }
+
+  @Get('internal/admin/stats')
+  getAdminStats(@Headers() headers: Record<string, string | string[] | undefined>) {
+    this.requireInternalAccess(headers);
+    return this.orderService.getAdminStats();
   }
 }

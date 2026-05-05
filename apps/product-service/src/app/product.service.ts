@@ -3,7 +3,7 @@ import { PrismaService } from './prisma.service';
 
 @Injectable()
 export class ProductService {
-  constructor(@Inject(PrismaService) private prisma: PrismaService) {}
+  constructor(@Inject(PrismaService) private prisma: PrismaService) { }
 
   private async sendNotification(data: { user_id: number; title: string; message: string; type: string; link?: string }) {
     try {
@@ -16,6 +16,36 @@ export class ProductService {
       });
     } catch (e) {
       console.error('[PRODUCT NOTIFICATION ERROR]', e);
+    }
+  }
+
+  private async getUsersByIds(userIds: number[]) {
+    if (!userIds.length) return new Map<number, { id: number; full_name?: string | null; avatar_url?: string | null }>();
+    try {
+      const authUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:3002/api/auth';
+      const token = process.env.INTERNAL_SERVICE_TOKEN || 'internal-dev-token';
+      const ids = Array.from(new Set(userIds)).join(',');
+      const res = await fetch(`${authUrl}/internal/admin/users-by-ids?ids=${ids}`, {
+        headers: {
+          'x-internal-token': token,
+        },
+      });
+      if (!res.ok) {
+        return new Map();
+      }
+      const users = await res.json();
+      return new Map(
+        (Array.isArray(users) ? users : []).map((user: any) => [
+          Number(user.id),
+          {
+            id: Number(user.id),
+            full_name: user.full_name ?? null,
+            avatar_url: user.avatar_url ?? null,
+          },
+        ]),
+      );
+    } catch {
+      return new Map();
     }
   }
 
@@ -168,12 +198,12 @@ export class ProductService {
       if (trimmedName.length > 255) throw new BadRequestException('Tên shop quá dài (tối đa 255 ký tự)');
       updateData.name = trimmedName;
     }
-    
+
     // We can also let the user clear the description, or max length it if needed. Prisma Text type is huge so length isn't a hard limit crash here.
     if (data.description !== undefined) {
       updateData.description = data.description.trim();
     }
-    
+
     if (data.logo_url !== undefined) updateData.logo_url = data.logo_url;
 
     return this.prisma.shop.update({
@@ -196,7 +226,7 @@ export class ProductService {
         },
       }),
     ]);
-    
+
     return {
       activeProducts: active,
       pendingProducts: pending,
@@ -248,7 +278,7 @@ export class ProductService {
         const data = await res.json();
         totalOrders = data.totalOrders || 0;
         totalRevenue = data.totalRevenue || 0;
-        
+
         // Spread views evenly as approximation, since we only track a total counter natively
         const avgViews = totalViews > 0 ? Math.round(totalViews / days) : 0;
         trendData = (data.trendData || []).map((t: any) => ({
@@ -302,6 +332,103 @@ export class ProductService {
     return `${base}-${Date.now()}`;
   }
 
+  private normalizeCategoryName(name: string) {
+    return name.trim().replace(/\s+/g, ' ').normalize('NFC').toLowerCase();
+  }
+
+  private getValidCategoryName(name: unknown) {
+    const trimmedName = String(name ?? '').trim();
+    if (!trimmedName) {
+      throw new BadRequestException('Category name is required');
+    }
+
+    return trimmedName;
+  }
+
+  private async ensureCategoryNameIsUnique(name: string, shopId: number | null, excludedCategoryId?: number) {
+    const normalizedName = this.normalizeCategoryName(name);
+    const where: any = { shop_id: shopId };
+
+    if (excludedCategoryId !== undefined) {
+      where.id = { not: excludedCategoryId };
+    }
+
+    const categories = await this.prisma.category.findMany({
+      where,
+      select: { name: true },
+    });
+
+    const duplicate = categories.some(
+      (category) => this.normalizeCategoryName(category.name) === normalizedName,
+    );
+
+    if (duplicate) {
+      throw new BadRequestException('Category name already exists');
+    }
+  }
+
+  private getValidAttributeName(name: unknown) {
+    const trimmedName = String(name ?? '').trim();
+    if (!trimmedName) {
+      throw new BadRequestException('Attribute name is required');
+    }
+
+    return trimmedName;
+  }
+
+  private async ensureAttributeNameIsUnique(categoryId: number, name: string, excludedAttributeId?: number) {
+    const normalizedName = this.normalizeCategoryName(name);
+    const where: any = { category_id: categoryId };
+
+    if (excludedAttributeId !== undefined) {
+      where.id = { not: excludedAttributeId };
+    }
+
+    const attributes = await this.prisma.attributeDefinition.findMany({
+      where,
+      select: { name: true },
+    });
+
+    const duplicate = attributes.some(
+      (attribute) => this.normalizeCategoryName(attribute.name) === normalizedName,
+    );
+
+    if (duplicate) {
+      throw new BadRequestException('Attribute name already exists');
+    }
+  }
+
+  private getValidAttributeOptionName(name: unknown) {
+    const trimmedName = String(name ?? '').trim();
+    if (!trimmedName) {
+      throw new BadRequestException('Attribute option name is required');
+    }
+
+    return trimmedName;
+  }
+
+  private async ensureAttributeOptionNameIsUnique(attributeId: number, name: string, excludedOptionId?: number) {
+    const normalizedName = this.normalizeCategoryName(name);
+    const where: any = { attribute_id: attributeId };
+
+    if (excludedOptionId !== undefined) {
+      where.id = { not: excludedOptionId };
+    }
+
+    const options = await this.prisma.attributeOption.findMany({
+      where,
+      select: { value_name: true },
+    });
+
+    const duplicate = options.some(
+      (option) => this.normalizeCategoryName(option.value_name) === normalizedName,
+    );
+
+    if (duplicate) {
+      throw new BadRequestException('Attribute option name already exists');
+    }
+  }
+
   // Create a new product
 
   async createProduct(userId: number, data: any) {
@@ -322,7 +449,7 @@ export class ProductService {
           category_id: Number(data.category_id) || 1,
           base_price: Number(data.base_price),
           thumbnail_url: data.thumbnail_url || '',
-          shop_categories: data.shop_category_ids && Array.isArray(data.shop_category_ids) 
+          shop_categories: data.shop_category_ids && Array.isArray(data.shop_category_ids)
             ? { connect: data.shop_category_ids.map((id: number) => ({ id: Number(id) })) }
             : undefined
         }
@@ -344,19 +471,19 @@ export class ProductService {
       // Step 3: Create variants
       const variantData = data.has_variants && data.variants && data.variants.length > 0
         ? data.variants.map((v: any, idx: number) => ({
-            product_id: product.id,
-            sku: v.sku ? `${v.sku}-v${idx}` : `${slug}-v${idx}`,
-            stock_quantity: Number(v.stock) || 0,
-            price_override: Number(v.price) || Number(data.base_price),
-            attributes: v.attributes || {}
-          }))
+          product_id: product.id,
+          sku: v.sku ? `${v.sku}-v${idx}` : `${slug}-v${idx}`,
+          stock_quantity: Number(v.stock) || 0,
+          price_override: Number(v.price) || Number(data.base_price),
+          attributes: v.attributes || {}
+        }))
         : [{
-            product_id: product.id,
-            sku: defaultSku,
-            stock_quantity: Number(data.base_stock) || 0,
-            price_override: Number(data.base_price),
-            attributes: {}
-          }];
+          product_id: product.id,
+          sku: defaultSku,
+          stock_quantity: Number(data.base_stock) || 0,
+          price_override: Number(data.base_price),
+          attributes: {}
+        }];
       console.log('[CREATE] Step 3: Creating', variantData.length, 'variants...');
       await this.prisma.productVariant.createMany({ data: variantData });
 
@@ -418,10 +545,10 @@ export class ProductService {
     const shop = await this.requireActiveSellerShop(userId);
     return this.prisma.product.findMany({
       where: { shop_id: shop.id },
-      include: { 
-        category: true, 
-        images: true, 
-        variants: true, 
+      include: {
+        category: true,
+        images: true,
+        variants: true,
         shop_categories: true,
         _count: { select: { reviews: true } }
       },
@@ -457,7 +584,7 @@ export class ProductService {
           category_id: Number(data.category_id) || product.category_id,
           base_price: Number(data.base_price),
           thumbnail_url: data.thumbnail_url || '',
-          shop_categories: data.shop_category_ids !== undefined 
+          shop_categories: data.shop_category_ids !== undefined
             ? { set: Array.isArray(data.shop_category_ids) ? data.shop_category_ids.map((id: number) => ({ id: Number(id) })) : [] }
             : undefined
         }
@@ -478,19 +605,19 @@ export class ProductService {
       // Step 4: Create variants
       const variantData = data.has_variants && data.variants && data.variants.length > 0
         ? data.variants.map((v: any, idx: number) => ({
-            product_id: productId,
-            sku: v.sku ? `${v.sku}-v${idx}` : `${slug}-v${idx}`,
-            stock_quantity: Number(v.stock) || 0,
-            price_override: Number(v.price) || Number(data.base_price),
-            attributes: v.attributes || {}
-          }))
+          product_id: productId,
+          sku: v.sku ? `${v.sku}-v${idx}` : `${slug}-v${idx}`,
+          stock_quantity: Number(v.stock) || 0,
+          price_override: Number(v.price) || Number(data.base_price),
+          attributes: v.attributes || {}
+        }))
         : [{
-            product_id: productId,
-            sku: defaultSku,
-            stock_quantity: Number(data.base_stock) || 0,
-            price_override: Number(data.base_price),
-            attributes: {}
-          }];
+          product_id: productId,
+          sku: defaultSku,
+          stock_quantity: Number(data.base_stock) || 0,
+          price_override: Number(data.base_price),
+          attributes: {}
+        }];
       console.log('[UPDATE] Step 4: Creating', variantData.length, 'variants...');
       await this.prisma.productVariant.createMany({ data: variantData });
 
@@ -547,17 +674,25 @@ export class ProductService {
 
   // Get a single product for seller editing (no status filter, all relations)
   async getSellerContext(userId: number) {
+    // lấy ra shop đầu tiên mà user sở hữu
     const shop = await this.findSellerShopAnyStatus(userId);
     return {
       isSeller: !!shop,
       shop
     };
   }
+  /*
+  - !!shop: Dấu !! (double bang) là cách viết tắt trong JavaScript/TypeScript để ép một giá trị về kiểu Boolean.
+    Nó kiểm tra xem shop có tồn tại (không phải null hay undefined) hay không.
+  - shop.status === 'active': Kiểm tra xem trạng thái của cửa hàng có đang là active (đã được duyệt/đang hoạt động) hay không.
+  - Kết luận: isSeller chỉ trả về true khi và chỉ khi người dùng đã có cửa hàng VÀ cửa hàng đó đã được ban quản trị duyệt (active).
+    Nếu cửa hàng đang ở trạng thái pending (chờ duyệt) hoặc người dùng chưa có cửa hàng, isSeller sẽ là false.
+  */
 
-  async registerShop(userId: number, data: any) {
+  async registerShop(userId: number, data: any) { //data -> dlieu nhập từ form
     const existingShop = await this.findSellerShopAnyStatus(userId);
     if (existingShop) {
-      throw new BadRequestException('You have already registered a shop');
+      throw new BadRequestException('You have already registered a shop'); // http 400
     }
 
     const name = String(data?.name || '').trim();
@@ -565,7 +700,7 @@ export class ProductService {
       throw new BadRequestException('Shop name is required');
     }
 
-    const slug = this.generateSlug(name || 'shop');
+    const slug = this.generateSlug(name || 'shop'); // tạo đg dẫn url dễ nhìn từ tên cửa hàng
     return this.prisma.shop.create({
       data: {
         owner_id: userId,
@@ -623,25 +758,44 @@ export class ProductService {
   // =====================
 
   async getAdminStats() {
-    const [activeShops, pendingApplications, pendingProducts, totalCategories, rootCategories] = await Promise.all([
+    const [
+      totalShops,
+      activeShops,
+      pendingApplications,
+      totalProducts,
+      activeProducts,
+      pendingProducts,
+      totalCategories,
+      activeCategories,
+      rootCategories,
+    ] = await Promise.all([
+      this.prisma.shop.count(),
       this.prisma.shop.count({ where: { status: 'active' } }),
       this.prisma.shop.count({ where: { status: 'pending' } }),
+      this.prisma.product.count(),
+      this.prisma.product.count({ where: { status: 'active' } }),
       this.prisma.product.count({ where: { status: 'pending_approval' } }),
-      this.prisma.category.count(),
-      this.prisma.category.count({ where: { level: 1 } }),
+      this.prisma.category.count({ where: { shop_id: null } }),
+      this.prisma.category.count({ where: { shop_id: null, is_active: true } }),
+      this.prisma.category.count({ where: { shop_id: null, level: 1 } }),
     ]);
 
     // Get max attributes in a single category
     const categoriesWithAtts = await this.prisma.category.findMany({
+      where: { shop_id: null },
       include: { _count: { select: { attribute_defs: true } } }
     });
     const maxAttributes = categoriesWithAtts.reduce((max, cat) => Math.max(max, cat._count.attribute_defs), 0);
 
     return {
+      totalShops,
       activeShops,
       pendingApplications,
+      totalProducts,
+      activeProducts,
       pendingProducts,
       totalCategories,
+      activeCategories,
       rootCategories,
       maxAttributes,
     };
@@ -669,10 +823,13 @@ export class ProductService {
   }
 
   async createCategory(data: any) {
-    const slug = data.slug || this.generateSlug(data.name);
+    const name = this.getValidCategoryName(data.name);
+    await this.ensureCategoryNameIsUnique(name, null);
+
+    const slug = data.slug || this.generateSlug(name);
     return this.prisma.category.create({
       data: {
-        name: data.name,
+        name,
         slug: slug,
         parent_id: data.parent_id ? Number(data.parent_id) : null,
         icon_url: data.icon_url || null,
@@ -684,10 +841,24 @@ export class ProductService {
   }
 
   async updateCategory(id: number, data: any) {
+    const existingCategory = await this.prisma.category.findUnique({
+      where: { id },
+      select: { id: true, shop_id: true },
+    });
+
+    if (!existingCategory || existingCategory.shop_id !== null) {
+      throw new NotFoundException('Category not found');
+    }
+
+    const name = data.name !== undefined ? this.getValidCategoryName(data.name) : undefined;
+    if (name !== undefined) {
+      await this.ensureCategoryNameIsUnique(name, null, id);
+    }
+
     return this.prisma.category.update({
       where: { id },
       data: {
-        name: data.name,
+        name,
         slug: data.slug,
         parent_id: data.parent_id !== undefined ? (data.parent_id ? Number(data.parent_id) : null) : undefined,
         icon_url: data.icon_url,
@@ -698,19 +869,107 @@ export class ProductService {
     });
   }
 
-  async deleteCategory(id: number) {
+  private async getFallbackCategoryForReassignment(excludedCategoryId: number) {
+    const existingFallback = await this.prisma.category.findFirst({
+      where: {
+        shop_id: null,
+        OR: [{ slug: 'khac' }, { name: 'Khác' }],
+      },
+    });
+
+    if (existingFallback) {
+      if (existingFallback.id === excludedCategoryId) {
+        throw new BadRequestException('Cannot reassign products because this category is already "Khác"');
+      }
+
+      return existingFallback;
+    }
+
+    const existingKhacSlug = await this.prisma.category.findFirst({
+      where: { slug: 'khac' },
+      select: { id: true },
+    });
+
+    return this.prisma.category.create({
+      data: {
+        name: 'Khác',
+        slug: existingKhacSlug ? this.generateSlug('Khác') : 'khac',
+        parent_id: null,
+        level: 1,
+        sort_order: 9999,
+        is_active: true,
+      },
+    });
+  }
+
+  async getAdminCategoryDeleteImpact(id: number) {
+    const category = await this.prisma.category.findUnique({
+      where: { id },
+      select: { id: true, name: true, slug: true, shop_id: true },
+    });
+
+    if (!category || category.shop_id !== null) {
+      throw new NotFoundException('Category not found');
+    }
+
+    const childrenCount = await this.prisma.category.count({ where: { parent_id: id } });
+    const productCount = await this.prisma.product.count({ where: { category_id: id } });
+    const fallbackCategory = await this.prisma.category.findFirst({
+      where: {
+        shop_id: null,
+        OR: [{ slug: 'khac' }, { name: 'Khác' }],
+      },
+      select: { id: true, name: true },
+    });
+    const isFallbackCategory = category.slug === 'khac' || category.name === 'Khác' || fallbackCategory?.id === id;
+
+    return {
+      productCount,
+      childrenCount,
+      fallbackCategory: fallbackCategory?.id === id ? null : fallbackCategory,
+      canDelete: productCount === 0 && childrenCount === 0,
+      canReassignToFallback: productCount > 0 && childrenCount === 0 && !isFallbackCategory,
+    };
+  }
+
+  async deleteCategory(id: number, options?: { reassignProductsToOther?: boolean }) {
+    const category = await this.prisma.category.findUnique({
+      where: { id },
+      select: { id: true, shop_id: true },
+    });
+
+    if (!category || category.shop_id !== null) {
+      throw new NotFoundException('Category not found');
+    }
+
     // Check if category has children
     const childrenCount = await this.prisma.category.count({ where: { parent_id: id } });
     if (childrenCount > 0) {
       throw new BadRequestException('Cannot delete category with sub-categories');
     }
+
     // Check if category has products
     const productCount = await this.prisma.product.count({ where: { category_id: id } });
+    let fallbackCategoryId: number | null = null;
     if (productCount > 0) {
-      throw new BadRequestException('Cannot delete category with assigned products');
+      if (!options?.reassignProductsToOther) {
+        throw new BadRequestException('Cannot delete category with assigned products');
+      }
+
+      const fallbackCategory = await this.getFallbackCategoryForReassignment(id);
+      fallbackCategoryId = fallbackCategory.id;
     }
 
-    return this.prisma.category.delete({ where: { id } });
+    return this.prisma.$transaction(async (tx) => {
+      if (fallbackCategoryId) {
+        await tx.product.updateMany({
+          where: { category_id: id },
+          data: { category_id: fallbackCategoryId },
+        });
+      }
+
+      return tx.category.delete({ where: { id } });
+    });
   }
 
   // =====================
@@ -727,17 +986,20 @@ export class ProductService {
 
   async createShopCategory(userId: number, data: any) {
     const shop = await this.requireActiveSellerShop(userId);
-    
+    const name = this.getValidCategoryName(data.name);
+
     // Check limit (max 20 categories per shop)
     const count = await this.prisma.category.count({ where: { shop_id: shop.id } });
     if (count >= 20) {
       throw new BadRequestException('Mỗi cửa hàng chỉ được tạo tối đa 20 danh mục tùy chỉnh');
     }
 
-    const slug = this.generateSlug(data.name);
+    await this.ensureCategoryNameIsUnique(name, shop.id);
+
+    const slug = this.generateSlug(name);
     return this.prisma.category.create({
       data: {
-        name: data.name,
+        name,
         slug: slug,
         shop_id: shop.id,
         level: 1, // Flat structure
@@ -755,11 +1017,16 @@ export class ProductService {
       throw new UnauthorizedException('Không có quyền chỉnh sửa danh mục này');
     }
 
+    const name = data.name !== undefined ? this.getValidCategoryName(data.name) : undefined;
+    if (name !== undefined) {
+      await this.ensureCategoryNameIsUnique(name, shop.id, categoryId);
+    }
+
     return this.prisma.category.update({
       where: { id: categoryId },
       data: {
-        name: data.name,
-        slug: data.name ? this.generateSlug(data.name) : undefined,
+        name,
+        slug: name ? this.generateSlug(name) : undefined,
         sort_order: data.sort_order !== undefined ? data.sort_order : undefined,
         is_active: data.is_active !== undefined ? data.is_active : undefined
       }
@@ -782,7 +1049,7 @@ export class ProductService {
       where: { id: categoryId },
       include: { shop_products: { select: { id: true } } }
     });
-    
+
     if (!category || (category.shop_id !== shop.id && category.shop_id !== null)) {
       throw new UnauthorizedException('Không có quyền truy cập danh mục này');
     }
@@ -811,7 +1078,7 @@ export class ProductService {
   async syncCategoryProducts(userId: number, categoryId: number, productIds: number[]) {
     const shop = await this.requireActiveSellerShop(userId);
     const category = await this.prisma.category.findUnique({ where: { id: categoryId } });
-    
+
     if (!category || category.shop_id !== shop.id) {
       throw new UnauthorizedException('Không có quyền chỉnh sửa danh mục này');
     }
@@ -837,10 +1104,13 @@ export class ProductService {
   }
 
   async createAttributeDefinition(categoryId: number, data: any) {
+    const name = this.getValidAttributeName(data.name);
+    await this.ensureAttributeNameIsUnique(categoryId, name);
+
     return this.prisma.attributeDefinition.create({
       data: {
         category_id: categoryId,
-        name: data.name,
+        name,
         input_type: data.input_type || 'text',
         is_required: Boolean(data.is_required),
         sort_order: data.sort_order ? Number(data.sort_order) : 0,
@@ -849,10 +1119,24 @@ export class ProductService {
   }
 
   async updateAttributeDefinition(id: number, data: any) {
+    const existingAttribute = await this.prisma.attributeDefinition.findUnique({
+      where: { id },
+      select: { id: true, category_id: true },
+    });
+
+    if (!existingAttribute) {
+      throw new NotFoundException('Attribute not found');
+    }
+
+    const name = data.name !== undefined ? this.getValidAttributeName(data.name) : undefined;
+    if (name !== undefined) {
+      await this.ensureAttributeNameIsUnique(existingAttribute.category_id, name, id);
+    }
+
     return this.prisma.attributeDefinition.update({
       where: { id },
       data: {
-        name: data.name,
+        name,
         input_type: data.input_type,
         is_required: data.is_required !== undefined ? Boolean(data.is_required) : undefined,
         sort_order: data.sort_order !== undefined ? Number(data.sort_order) : undefined,
@@ -865,20 +1149,37 @@ export class ProductService {
   }
 
   async createAttributeOption(attributeId: number, data: any) {
+    const valueName = this.getValidAttributeOptionName(data.value_name);
+    await this.ensureAttributeOptionNameIsUnique(attributeId, valueName);
+
     return this.prisma.attributeOption.create({
       data: {
         attribute_id: attributeId,
-        value_name: data.value_name,
+        value_name: valueName,
         sort_order: data.sort_order ? Number(data.sort_order) : 0,
       },
     });
   }
 
   async updateAttributeOption(id: number, data: any) {
+    const existingOption = await this.prisma.attributeOption.findUnique({
+      where: { id },
+      select: { id: true, attribute_id: true },
+    });
+
+    if (!existingOption) {
+      throw new NotFoundException('Attribute option not found');
+    }
+
+    const valueName = data.value_name !== undefined ? this.getValidAttributeOptionName(data.value_name) : undefined;
+    if (valueName !== undefined) {
+      await this.ensureAttributeOptionNameIsUnique(existingOption.attribute_id, valueName, id);
+    }
+
     return this.prisma.attributeOption.update({
       where: { id },
       data: {
-        value_name: data.value_name,
+        value_name: valueName,
         sort_order: data.sort_order !== undefined ? Number(data.sort_order) : undefined,
       },
     });
@@ -977,6 +1278,7 @@ export class ProductService {
     return updated;
   }
 
+  // lấy danh sách các cửa hàng chờ duyệt
   async getPendingShops() {
     return this.prisma.shop.findMany({
       where: { status: 'pending' },
@@ -992,7 +1294,9 @@ export class ProductService {
     });
   }
 
+  // duyệt cửa hàng
   async approveShop(id: number) {
+    // findUnique -> tìm 1 bản ghi duy nhất theo khóa chính id
     const shop = await this.prisma.shop.findUnique({
       where: { id },
       select: { id: true, name: true, owner_id: true },
@@ -1042,7 +1346,7 @@ export class ProductService {
   async updateShopStatus(id: number, status: string) {
     const shop = await this.prisma.shop.findUnique({ where: { id } });
     if (!shop) throw new NotFoundException('Shop not found');
-    
+
     const updated = await this.prisma.shop.update({
       where: { id },
       data: { status },
@@ -1054,14 +1358,28 @@ export class ProductService {
         this.sendNotification({
           user_id: shop.owner_id,
           title: 'Yêu cầu mở Shop bị từ chối',
-          message: `Rất tiếc, yêu cầu mở Shop "${shop.name}" của bạn đã bị từ chối. Vui lòng liên hệ hỗ trợ để biết thêm thông tin.`,
+          message: `Rất tiếc, yêu cầu mở Shop "${shop.name}" của bạn đã bị từ chối. Vui lòng liên hệ bộ phận hỗ trợ để biết thêm thông tin.`,
+          type: 'SYSTEM'
+        });
+      } else if (status === 'suspended') {
+        this.sendNotification({
+          user_id: shop.owner_id,
+          title: 'Cửa hàng đã bị đình chỉ',
+          message: `Cửa hàng "${shop.name}" của bạn đã bị quản trị viên đình chỉ hoạt động do vi phạm chính sách hoặc có báo cáo tiêu cực.`,
           type: 'SYSTEM'
         });
       } else if (status === 'banned') {
         this.sendNotification({
           user_id: shop.owner_id,
-          title: 'Shop đã bị đình chỉ',
-          message: `Cửa hàng "${shop.name}" của bạn đã bị quản trị viên đình chỉ hoạt động.`,
+          title: 'Shop đã bị khoá vĩnh viễn',
+          message: `Cửa hàng "${shop.name}" của bạn đã bị khoá vĩnh viễn. Mọi lệnh rút tiền và giao dịch sẽ bị phong toả để đối soát.`,
+          type: 'SYSTEM'
+        });
+      } else if (status === 'active' && shop.status !== 'active') {
+        this.sendNotification({
+          user_id: shop.owner_id,
+          title: 'Cửa hàng đã được kích hoạt',
+          message: `Chúc mừng! Cửa hàng "${shop.name}" của bạn đã được kích hoạt trở lại.`,
           type: 'SYSTEM'
         });
       }
@@ -1073,7 +1391,27 @@ export class ProductService {
   async getShopsByIds(ids: number[]) {
     return this.prisma.shop.findMany({
       where: { id: { in: ids } },
-      select: { id: true, name: true, logo_url: true }
+      select: { id: true, name: true, logo_url: true, slug: true, owner_id: true }
+    });
+  }
+
+  async getProductsByIds(ids: number[]) {
+    return this.prisma.product.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true, shop_id: true, status: true }
+    });
+  }
+
+  async updateProductStatus(id: number, status: string, moderationNote?: string) {
+    const product = await this.prisma.product.findUnique({ where: { id }, select: { id: true, shop_id: true } });
+    if (!product) throw new Error('Product not found');
+    return this.prisma.product.update({
+      where: { id },
+      data: {
+        status,
+        ...(moderationNote ? { moderation_note: moderationNote } : {}),
+      },
+      select: { id: true, status: true, shop_id: true }
     });
   }
 
@@ -1093,14 +1431,14 @@ export class ProductService {
       }),
       userId
         ? this.prisma.shopFollow.findUnique({
-            where: {
-              shop_id_user_id: {
-                shop_id: shop.id,
-                user_id: userId,
-              },
+          where: {
+            shop_id_user_id: {
+              shop_id: shop.id,
+              user_id: userId,
             },
-            select: { id: true },
-          })
+          },
+          select: { id: true },
+        })
         : Promise.resolve(null),
       this.prisma.product.findMany({
         where: { shop_id: shop.id, status: 'active' },
@@ -1164,7 +1502,7 @@ export class ProductService {
         type: 'SYSTEM',
         link: '/seller/center',
       });
-    } catch (e) {}
+    } catch (e) { }
 
     return {
       shop_id: shop.id,
@@ -1229,26 +1567,26 @@ export class ProductService {
     const [productCounts, followerCounts] = await Promise.all([
       shopIds.length
         ? this.prisma.product.groupBy({
-            by: ['shop_id'],
-            where: {
-              shop_id: { in: shopIds },
-              status: 'active',
-            },
-            _count: {
-              _all: true,
-            },
-          })
+          by: ['shop_id'],
+          where: {
+            shop_id: { in: shopIds },
+            status: 'active',
+          },
+          _count: {
+            _all: true,
+          },
+        })
         : Promise.resolve([]),
       shopIds.length
         ? this.prisma.shopFollow.groupBy({
-            by: ['shop_id'],
-            where: {
-              shop_id: { in: shopIds },
-            },
-            _count: {
-              _all: true,
-            },
-          })
+          by: ['shop_id'],
+          where: {
+            shop_id: { in: shopIds },
+          },
+          _count: {
+            _all: true,
+          },
+        })
         : Promise.resolve([]),
     ]);
 
@@ -1272,7 +1610,7 @@ export class ProductService {
 
   // Homepage / Discovery: List all 'active' products
   async getActiveProducts(searchQuery?: string, categorySlug?: string) {
-    const where: any = { 
+    const where: any = {
       status: 'active',
       shop: { status: 'active' }
     };
@@ -1300,8 +1638,8 @@ export class ProductService {
 
     return this.prisma.product.findMany({
       where,
-      include: { 
-        shop: { select: { name: true, logo_url: true, rating: true, id: true } }, 
+      include: {
+        shop: { select: { name: true, logo_url: true, rating: true, id: true } },
         images: { where: { is_primary: true } },
         variants: true
       },
@@ -1472,6 +1810,12 @@ export class ProductService {
       this.prisma.review.count({ where: { product_id: productId } }),
     ]);
 
+    const userMap = await this.getUsersByIds(reviews.map((review) => review.user_id));
+    const reviewsWithUsers = reviews.map((review) => ({
+      ...review,
+      user: userMap.get(review.user_id) ?? null,
+    }));
+
     // Rating distribution
     const distribution = await this.prisma.review.groupBy({
       by: ['rating'],
@@ -1487,7 +1831,7 @@ export class ProductService {
       : 0;
 
     return {
-      reviews,
+      reviews: reviewsWithUsers,
       total,
       page,
       limit,
@@ -1508,18 +1852,18 @@ export class ProductService {
       const orderUrl = process.env.ORDER_SERVICE_URL || 'http://localhost:3004/api/orders';
       const res = await fetch(`${orderUrl}/${data.shop_order_id}`);
       if (res.ok) {
-         const orderData = await res.json();
-         const checkoutSession = orderData.checkout_session;
-         if (!checkoutSession || checkoutSession.user_id !== userId) {
-           throw new ForbiddenException('Bạn không phải chủ nhân của đơn hàng này');
-         }
-         if (orderData.status?.toLowerCase() !== 'delivered') {
-           throw new BadRequestException('Bạn chỉ được đánh giá các đơn hàng đã được giao thành công');
-         }
+        const orderData = await res.json();
+        const checkoutSession = orderData.checkout_session;
+        if (!checkoutSession || checkoutSession.user_id !== userId) {
+          throw new ForbiddenException('Bạn không phải chủ nhân của đơn hàng này');
+        }
+        if (orderData.status?.toLowerCase() !== 'delivered') {
+          throw new BadRequestException('Bạn chỉ được đánh giá các đơn hàng đã được giao thành công');
+        }
       }
     } catch (err: any) {
-       if (err instanceof ForbiddenException || err instanceof BadRequestException) throw err;
-       console.error('[ProductService] Lỗi kết nối liên dịch vụ (OrderService):', err.message);
+      if (err instanceof ForbiddenException || err instanceof BadRequestException) throw err;
+      console.error('[ProductService] Lỗi kết nối liên dịch vụ (OrderService):', err.message);
     }
 
     if (!data.rating || data.rating < 1 || data.rating > 5) {
@@ -1568,7 +1912,7 @@ export class ProductService {
       _count: { id: true },
       _avg: { rating: true },
     });
-    
+
     if (allShopReviews._count.id > 0) {
       await this.prisma.shop.update({
         where: { id: product.shop_id },
@@ -1582,7 +1926,7 @@ export class ProductService {
   async getShopReviews(userId: number, filters?: { rating?: number; status?: string }) {
     const shop = await this.requireActiveSellerShop(userId);
     const where: any = { product: { shop_id: shop.id } };
-    
+
     if (filters?.rating) {
       where.rating = filters.rating;
     }

@@ -25,6 +25,8 @@ export class VoucherService {
     private productPrisma: ProductPrismaService,
   ) {}
 
+  private readonly allowedTargetTypes = ['all_buyers', 'new_buyer', 'followers'] as const;
+
   private async sendNotification(data: { user_id: number; title: string; message: string; type: string; link?: string }) {
     try {
       const authUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:3002/api/auth';
@@ -36,8 +38,6 @@ export class VoucherService {
       });
     } catch (e) {}
   }
-
-  private readonly allowedTargetTypes = ['all_buyers', 'new_buyer', 'followers'] as const;
 
   async getUserVoucherContext(userId: number) {
     const [user, follows, ownedShops] = await Promise.all([
@@ -146,6 +146,54 @@ export class VoucherService {
     });
   }
 
+  async getAdminStats() {
+    const now = new Date();
+    const [
+      totalVouchers,
+      activeVouchers,
+      scheduledVouchers,
+      expiredVouchers,
+      platformVouchers,
+      shopVouchers,
+      totalClaims,
+      usedClaims,
+    ] = await Promise.all([
+      this.prisma.voucher.count(),
+      this.prisma.voucher.count({
+        where: {
+          status: 'active',
+          start_date: { lte: now },
+          end_date: { gte: now },
+        },
+      }),
+      this.prisma.voucher.count({
+        where: {
+          OR: [{ status: 'scheduled' }, { start_date: { gt: now } }],
+        },
+      }),
+      this.prisma.voucher.count({
+        where: {
+          OR: [{ status: 'expired' }, { end_date: { lt: now } }],
+        },
+      }),
+      this.prisma.voucher.count({ where: { shop_id: null } }),
+      this.prisma.voucher.count({ where: { shop_id: { not: null } } }),
+      this.prisma.userVoucherClaim.count(),
+      this.prisma.userVoucherClaim.count({ where: { is_used: true } }),
+    ]);
+
+    return {
+      totalVouchers,
+      activeVouchers,
+      scheduledVouchers,
+      expiredVouchers,
+      platformVouchers,
+      shopVouchers,
+      totalClaims,
+      usedClaims,
+    };
+  }
+
   async getVoucherById(id: number) {
     const voucher = await this.prisma.voucher.findUnique({
       where: { id },
@@ -178,12 +226,32 @@ export class VoucherService {
 
   async createSellerVoucher(userId: number, data: any) {
     const shop = await this.requireActiveSellerShop(userId);
-    const voucher = await this.prisma.voucher.create({
-      data: {
-        ...this.normalizeVoucherData(data, true),
-        shop_id: shop.id,
-      },
-    });
+    const normalizedData = this.normalizeVoucherData(data, true);
+
+    if (normalizedData.code) {
+      const existingVoucher = await this.prisma.voucher.findUnique({
+        where: { code: normalizedData.code },
+        select: { id: true },
+      });
+      if (existingVoucher) {
+        throw new BadRequestException('Đã có mã voucher này. Vui lòng nhập mã khác.');
+      }
+    }
+
+    let voucher: any;
+    try {
+      voucher = await this.prisma.voucher.create({
+        data: {
+          ...normalizedData,
+          shop_id: shop.id,
+        },
+      });
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        throw new BadRequestException('Đã có mã voucher này. Vui lòng nhập mã khác.');
+      }
+      throw error;
+    }
 
     // Notify all followers about new voucher
     try {
@@ -199,7 +267,7 @@ export class VoucherService {
       for (const follower of followers) {
         await this.sendNotification({
           user_id: follower.user_id,
-          title: `Ư u đãi mới từ ${shop.name}!`,
+          title: `Ưu đãi mới từ ${shop.name}!`,
           message: `Shop "${shop.name}" vừa phát hành mã giảm giá "${voucher.code}" ${discountText}. Đổi ngay trước khi hết!`,
           type: 'SYSTEM',
           link: '/vouchers',
@@ -212,10 +280,29 @@ export class VoucherService {
 
   async updateSellerVoucher(userId: number, id: number, data: any) {
     await this.requireSellerVoucher(userId, id);
-    return this.prisma.voucher.update({
-      where: { id },
-      data: this.normalizeVoucherData(data, false),
-    });
+    const normalizedData = this.normalizeVoucherData(data, false);
+
+    if (normalizedData.code) {
+      const existingVoucher = await this.prisma.voucher.findUnique({
+        where: { code: normalizedData.code },
+        select: { id: true },
+      });
+      if (existingVoucher && existingVoucher.id !== id) {
+        throw new BadRequestException('Đã có mã voucher này. Vui lòng nhập mã khác.');
+      }
+    }
+
+    try {
+      return await this.prisma.voucher.update({
+        where: { id },
+        data: normalizedData,
+      });
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        throw new BadRequestException('Đã có mã voucher này. Vui lòng nhập mã khác.');
+      }
+      throw error;
+    }
   }
 
   async deleteSellerVoucher(userId: number, id: number) {
@@ -225,15 +312,20 @@ export class VoucherService {
     });
   }
 
-  async getAvailableVouchers(userId: number) {
+  async getAvailableVouchers(userId: number, onlyActive = false) {
     const userContext = await this.getUserVoucherContext(userId);
 
+    const where: any = {
+      status: 'active',
+    };
+
+    if (onlyActive) {
+      where.start_date = { lte: new Date() };
+      where.end_date = { gte: new Date() };
+    }
+
     const vouchers = await this.prisma.voucher.findMany({
-      where: {
-        status: 'active',
-        start_date: { lte: new Date() },
-        end_date: { gte: new Date() },
-      },
+      where,
       include: {
         claims: {
           where: { user_id: userId },
@@ -247,18 +339,23 @@ export class VoucherService {
     });
 
     return vouchers.filter(v => {
+      // We still filter by target eligibility (e.g. new buyers only)
       if (!this.isVoucherTargetEligible(v, userContext)) {
         return false;
       }
 
-      const totalClaimCount = v._count.claims;
-      const totalQuantity = v.total_quantity || 0;
-      const userClaimCount = v.claims.length;
+      if (onlyActive) {
+        const totalClaimCount = v._count.claims;
+        const totalQuantity = v.total_quantity || 0;
+        const userClaimCount = v.claims.length;
 
-      return (
-        (totalQuantity === 0 || totalClaimCount < totalQuantity) &&
-        userClaimCount < (v.max_per_user || 1)
-      );
+        return (
+          (totalQuantity === 0 || totalClaimCount < totalQuantity) &&
+          userClaimCount < (v.max_per_user || 1)
+        );
+      }
+
+      return true;
     });
   }
 

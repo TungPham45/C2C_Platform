@@ -1,4 +1,5 @@
 import { FC, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { VoucherCard } from '../components/vouchers/VoucherCard';
 
@@ -9,9 +10,11 @@ interface VoucherClaim {
 }
 
 export const VoucherHub: FC = () => {
+    const navigate = useNavigate();
     const [availableVouchers, setAvailableVouchers] = useState<any[]>([]);
     const [myVouchers, setMyVouchers] = useState<VoucherClaim[]>([]);
     const [loading, setLoading] = useState(true);
+    const [showAllShops, setShowAllShops] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -69,8 +72,40 @@ export const VoucherHub: FC = () => {
         }
     };
 
-    const systemVouchers = availableVouchers.filter(v => !v.shop_id);
-    const shopVouchers = availableVouchers.filter(v => v.shop_id);
+    const handleUse = (voucher: any) => {
+        if (voucher.shop_id) {
+            navigate(`/shop/${voucher.shop_id}`);
+        } else {
+            navigate('/products');
+        }
+    };
+
+    const isVoucherActive = (v: any) => {
+        const now = new Date();
+        const start = new Date(v.start_date);
+        const end = new Date(v.end_date);
+        const isOutOfStock = v.total_quantity ? (v._count?.claims || 0) >= v.total_quantity : false;
+        return now >= start && now <= end && !isOutOfStock;
+    };
+
+    const sortedAvailable = [...availableVouchers].sort((a, b) => {
+        const aActive = isVoucherActive(a);
+        const bActive = isVoucherActive(b);
+        if (aActive && !bActive) return -1;
+        if (!aActive && bActive) return 1;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+    const allShopVouchers = sortedAvailable.filter(v => v.shop_id);
+    
+    // In Voucher Hub, we show ALL vouchers including expired ones, sorted by active status first.
+    // "Voucher Độc Quyền Cho Bạn" - First 6 prominent vouchers (active first)
+    const exclusiveVouchers = allShopVouchers.slice(0, 6);
+    
+    // "Voucher Từ Shop" - The rest of the shop vouchers
+    const otherShopVouchers = allShopVouchers.slice(6);
+    const displayedOtherVouchers = showAllShops ? otherShopVouchers : otherShopVouchers.slice(0, 8);
+
     const activeClaimedVouchers = myVouchers.filter((claim) => !claim.is_used);
     const usedVouchers = myVouchers.filter((claim) => Boolean(claim.is_used));
 
@@ -89,25 +124,29 @@ export const VoucherHub: FC = () => {
                 </div>
 
                 <div className="max-w-7xl mx-auto px-6 mt-12 space-y-20">
-                    {/* System Vouchers Section */}
-                    {systemVouchers.length > 0 && (
+                    {/* Exclusive Vouchers Section */}
+                    {exclusiveVouchers.length > 0 && (
                         <section>
                             <div className="flex items-center justify-between mb-8">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 bg-[#00629d] rounded-2xl flex items-center justify-center text-white">
-                                        <span className="material-symbols-outlined">security</span>
+                                        <span className="material-symbols-outlined">auto_awesome</span>
                                     </div>
-                                    <h2 className="text-2xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">Voucher Hệ Thống</h2>
+                                    <div>
+                                        <h2 className="text-2xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">Voucher Độc Quyền Cho Bạn</h2>
+                                        <p className="text-sm text-[#707882] font-medium mt-1">Phần thưởng được chọn lọc dành riêng cho bạn</p>
+                                    </div>
                                 </div>
-                                <button className="text-sm font-bold text-[#00629d] hover:underline">Xem Tất Cả</button>
+                                <button className="text-sm font-bold text-[#00629d] hover:underline" onClick={() => navigate('/products')}>Sử dụng ngay</button>
                             </div>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                {systemVouchers.map(v => (
+                                {exclusiveVouchers.map(v => (
                                     <VoucherCard 
                                         key={v.id} 
                                         voucher={v} 
                                         onClaim={handleClaim} 
+                                        onUse={handleUse}
                                         isClaimed={v.isClaimed}
                                     />
                                 ))}
@@ -131,7 +170,7 @@ export const VoucherHub: FC = () => {
                     </div>
 
                     {/* Shop Vouchers Section */}
-                    {shopVouchers.length > 0 && (
+                    {otherShopVouchers.length > 0 && (
                         <section>
                             <div className="flex items-center justify-between mb-8">
                                 <div className="flex items-center gap-3">
@@ -140,15 +179,23 @@ export const VoucherHub: FC = () => {
                                     </div>
                                     <h2 className="text-2xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">Voucher Từ Shop</h2>
                                 </div>
-                                <button className="text-sm font-bold text-[#00629d] hover:underline hover:text-[#004d7c]">Xem Thêm Shop</button>
+                                {allShopVouchers.length > 14 && !showAllShops && (
+                                    <button 
+                                        onClick={() => setShowAllShops(true)}
+                                        className="text-sm font-bold text-[#00629d] hover:underline hover:text-[#004d7c]"
+                                    >
+                                        Xem Thêm Shop ({allShopVouchers.length - 14})
+                                    </button>
+                                )}
                             </div>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                {shopVouchers.map(v => (
+                                {displayedOtherVouchers.map(v => (
                                     <VoucherCard 
                                         key={v.id} 
                                         voucher={v} 
                                         onClaim={handleClaim} 
+                                        onUse={handleUse}
                                         isClaimed={v.isClaimed}
                                     />
                                 ))}
@@ -170,6 +217,7 @@ export const VoucherHub: FC = () => {
                                     <VoucherCard 
                                         key={claim.id} 
                                         voucher={claim.voucher} 
+                                        onUse={handleUse}
                                         isClaimed={true}
                                     />
                                 ))}

@@ -208,3 +208,30 @@ FROM users u
 WHERE u.email = 'buyer@gmail.com'
 ON CONFLICT (user_id) DO UPDATE
 SET updated_at = NOW();
+
+-- Demo notifications for buyer/seller/admin flows.
+INSERT INTO notifications (user_id, title, message, type, link, is_read, created_at)
+SELECT u.id,
+       n.title,
+       n.message,
+       n.type,
+       n.link,
+       n.is_read,
+       n.created_at
+FROM users u
+JOIN (
+  VALUES
+    ('buyer@gmail.com', 'Đơn hàng #9001 đã giao thành công', 'Bạn có thể để lại đánh giá cho sản phẩm đã mua.', 'ORDER', '/orders/9001', false, NOW() - INTERVAL '1 day'),
+    ('buyer@gmail.com', 'Voucher mới cho bạn', 'Mã PLATFORM10 đang hoạt động, áp dụng cho đơn từ 200.000đ.', 'SYSTEM', '/checkout', true, NOW() - INTERVAL '2 days'),
+    ('seller1@gmail.com', 'Bạn có đánh giá mới', 'Khách hàng vừa để lại đánh giá cho Premium Hoodie.', 'SYSTEM', '/seller/reviews', false, NOW() - INTERVAL '6 hours'),
+    ('seller2@gmail.com', 'Đơn #9003 đang được giao', 'Đơn hàng sneaker đã được đơn vị vận chuyển tiếp nhận.', 'ORDER', '/seller/orders/9003', false, NOW() - INTERVAL '5 hours'),
+    ('admin@gmail.com', 'Có báo cáo mới cần xử lý', 'Người dùng vừa gửi báo cáo sản phẩm cần kiểm duyệt.', 'SYSTEM', '/admin/reports', false, NOW() - INTERVAL '3 hours')
+) AS n(email, title, message, type, link, is_read, created_at)
+  ON u.email = n.email
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM notifications existing
+  WHERE existing.user_id = u.id
+    AND existing.title = n.title
+    AND existing.message = n.message
+);

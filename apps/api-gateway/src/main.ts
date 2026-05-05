@@ -3,9 +3,12 @@ import { AppModule } from './app/app.module';
 import { Logger } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 import { createReverseProxy } from './app/reverse-proxy';
+import { json, urlencoded } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.use(json({ limit: '10mb' }));
+  app.use(urlencoded({ limit: '10mb', extended: true }));
   app.enableCors();
   const authServiceUrl = process.env.AUTH_SERVICE_URL ?? 'http://localhost:3002/api/auth';
   const productServiceUrl = process.env.PRODUCT_SERVICE_URL ?? 'http://localhost:3001/api/products';
@@ -14,7 +17,6 @@ async function bootstrap() {
   const chatServiceUrl = process.env.CHAT_SERVICE_URL ?? 'http://localhost:3006/api/chat';
   const productPublicUrl = process.env.PRODUCT_PUBLIC_URL ?? 'http://localhost:3001/uploads';
   const orderBaseUrl = orderServiceUrl.replace(/\/api\/orders\/?$/, '');
-  const authBaseUrl = authServiceUrl.replace(/\/api\/auth\/?$/, '');
   
   // Custom middleware to extract JWT and append headers safely downstream
   app.use((req, res, next) => {
@@ -34,9 +36,6 @@ async function bootstrap() {
 
   // Proxy Auth Service
   app.use('/api/auth', createReverseProxy(authServiceUrl));
-  
-  // Proxy Notifications from Auth Service
-  app.use('/api/notifications', createReverseProxy(`${authBaseUrl}/api/notifications`));
 
   // Proxy Chat Service
   app.use('/api/chat', createReverseProxy(chatServiceUrl));
@@ -46,6 +45,10 @@ async function bootstrap() {
 
   // Proxy Admin Service
   app.use('/api/admin', createReverseProxy(adminServiceUrl));
+
+  // Proxy Report API (part of Admin/Moderation Service)
+  const adminBaseUrl = adminServiceUrl.replace(/\/api\/admin\/?$/, '');
+  app.use('/api/reports', createReverseProxy(`${adminBaseUrl}/api/reports`));
 
   // Proxy Order Service
   app.use('/api/orders', createReverseProxy(orderServiceUrl));

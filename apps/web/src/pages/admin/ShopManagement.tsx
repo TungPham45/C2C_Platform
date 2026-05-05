@@ -47,7 +47,7 @@ const ShopManagement: FC = () => {
       });
       if (!response.ok) throw new Error(`Cập nhật trạng thái thất bại`);
 
-      // Update local state
+      // Update local state -> để cập nhật giao diện
       setShops(shops.map(s => (s.id === id ? { ...s, status: newStatus } : s)));
       alert(`Đã ${actionName} shop thành công!`);
     } catch (err: any) {
@@ -62,12 +62,12 @@ const ShopManagement: FC = () => {
           <div className="px-10 py-8 border-b border-[#f5faff] flex items-center justify-between">
             <h3 className="text-lg font-bold text-[#0f1d25] font-['Plus_Jakarta_Sans']">Danh sách các Shop</h3>
             <div className="flex gap-2">
-               <span className="px-4 py-1.5 bg-[#e9f5ff] text-[#00629d] rounded-full text-[10px] font-bold uppercase tracking-wider">
-                 Tổng cộng {shops.length} shop
-               </span>
+              <span className="px-4 py-1.5 bg-[#e9f5ff] text-[#00629d] rounded-full text-[10px] font-bold uppercase tracking-wider">
+                Tổng cộng {shops.length} shop
+              </span>
             </div>
           </div>
-          
+
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
@@ -88,54 +88,55 @@ const ShopManagement: FC = () => {
                 ) : shops.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-10 py-20 text-center">
-                       <span className="material-symbols-outlined text-4xl text-[#cfe5ff] mb-4">storefront</span>
-                       <p className="text-[#0f1d25] font-bold">Chưa có shop nào!</p>
+                      <span className="material-symbols-outlined text-4xl text-[#cfe5ff] mb-4">storefront</span>
+                      <p className="text-[#0f1d25] font-bold">Chưa có shop nào!</p>
                     </td>
                   </tr>
-                ) : (
-                  shops.map((shop) => (
-                    <tr key={shop.id} className="hover:bg-[#f5faff]/50 transition-colors group">
-                      <td className="px-10 py-6">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-2xl bg-[#e9f5ff] text-[#00629d] flex items-center justify-center font-bold text-lg">
-                            {shop.name ? shop.name.charAt(0).toUpperCase() : '?'}
+                ) :
+                  // duyệt tất cả các shop
+                  (
+                    shops.map((shop) => (
+                      <tr key={shop.id} className="hover:bg-[#f5faff]/50 transition-colors group">
+                        <td className="px-10 py-6">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-[#e9f5ff] text-[#00629d] flex items-center justify-center font-bold text-lg">
+                              {shop.name ? shop.name.charAt(0).toUpperCase() : '?'}
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-[#0f1d25] mb-1 group-hover:text-[#00629d] transition-colors">{shop.name}</p>
+                              <p className="text-[10px] text-[#707882] font-medium tracking-tight">Slug: {shop.slug}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-bold text-[#0f1d25] mb-1 group-hover:text-[#00629d] transition-colors">{shop.name}</p>
-                            <p className="text-[10px] text-[#707882] font-medium tracking-tight">Slug: {shop.slug}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-6 text-sm text-[#707882] font-medium">
-                        {shop.created_at ? new Date(shop.created_at).toLocaleDateString('vi-VN') : 'N/A'}
-                      </td>
-                      <td className="px-6 py-6">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                          shop.status === 'active' ? 'bg-[#dcfce7] text-[#166534]' : 
-                          shop.status === 'pending' ? 'bg-[#fef9c3] text-[#854d0e]' : 
-                          'bg-[#fee2e2] text-[#991b1b]'
-                        }`}>
-                          {shop.status === 'active' ? 'Đang hoạt động' : 
-                           shop.status === 'pending' ? 'Chờ duyệt' : 'Đã đình chỉ'}
-                        </span>
-                      </td>
-                      <td className="px-10 py-6 text-right space-x-2">
-                        {shop.status !== 'pending' && (
-                          <button 
-                            onClick={() => handleUpdateStatus(shop.id, shop.status)}
-                            className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all ${
-                              shop.status === 'active' 
-                                ? 'bg-[#fee2e2] text-[#991b1b] hover:bg-[#fecaca]' 
+                        </td>
+                        <td className="px-6 py-6 text-sm text-[#707882] font-medium">
+                          {shop.created_at ? new Date(shop.created_at).toLocaleDateString('vi-VN') : 'N/A'}
+                        </td>
+                        {/* hiển thị trạng thái của shop (active, pending, suspended) */}
+                        <td className="px-6 py-6">
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${shop.status === 'active' ? 'bg-[#dcfce7] text-[#166534]' :
+                            shop.status === 'pending' ? 'bg-[#fef9c3] text-[#854d0e]' :
+                              'bg-[#fee2e2] text-[#991b1b]'
+                            }`}>
+                            {shop.status === 'active' ? 'Đang hoạt động' :
+                              shop.status === 'pending' ? 'Chờ duyệt' : 'Đã đình chỉ'}
+                          </span>
+                        </td>
+                        <td className="px-10 py-6 text-right space-x-2">
+                          {shop.status !== 'pending' && (
+                            <button
+                              onClick={() => handleUpdateStatus(shop.id, shop.status)}
+                              className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all ${shop.status === 'active'
+                                ? 'bg-[#fee2e2] text-[#991b1b] hover:bg-[#fecaca]'
                                 : 'bg-[#dcfce7] text-[#166534] hover:bg-[#bbf7d0]'
-                            }`}
-                          >
-                            {shop.status === 'active' ? 'Đình chỉ' : 'Kích hoạt'}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
+                                }`}
+                            >
+                              {shop.status === 'active' ? 'Đình chỉ' : 'Kích hoạt'}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
               </tbody>
             </table>
           </div>

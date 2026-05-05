@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, Headers, ForbiddenException, Req, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, Headers, ForbiddenException, Req, UnauthorizedException, Query } from '@nestjs/common';
 import { VoucherService } from './voucher.service';
 
 @Controller('vouchers')
@@ -28,6 +28,12 @@ export class VoucherController {
   async getAllVouchers(@Headers() headers: any) {
     this.requireInternalAccess(headers);
     return this.voucherService.getAllVouchers();
+  }
+
+  @Get('internal/admin/stats')
+  async getAdminStats(@Headers() headers: any) {
+    this.requireInternalAccess(headers);
+    return this.voucherService.getAdminStats();
   }
 
   @Get('internal/admin/:id')
@@ -88,10 +94,10 @@ export class VoucherController {
   // --- User Routes ---
 
   @Get('available')
-  async getAvailableVouchers(@Req() req: any) {
+  async getAvailableVouchers(@Req() req: any, @Query('only_active') onlyActive?: string) {
     const userId = req.headers['x-user-id'];
     if (!userId) throw new UnauthorizedException('User not authenticated');
-    return this.voucherService.getAvailableVouchers(parseInt(userId));
+    return this.voucherService.getAvailableVouchers(parseInt(userId), onlyActive === 'true');
   }
 
   @Get('mine')

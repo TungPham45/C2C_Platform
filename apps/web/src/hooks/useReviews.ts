@@ -6,6 +6,11 @@ const API_BASE = PRODUCT_API_URL;
 export interface Review {
   id: number;
   user_id: number;
+  user?: {
+    id: number;
+    full_name?: string | null;
+    avatar_url?: string | null;
+  } | null;
   product_id: number;
   shop_order_id: number;
   rating: number;

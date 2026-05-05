@@ -63,12 +63,12 @@ const AccountManagement: FC = () => {
           <div className="px-10 py-8 border-b border-[#f5faff] flex items-center justify-between">
             <h3 className="text-lg font-bold text-[#0f1d25] font-['Plus_Jakarta_Sans']">Danh sách Tài Khoản</h3>
             <div className="flex gap-2">
-               <span className="px-4 py-1.5 bg-[#e9f5ff] text-[#00629d] rounded-full text-[10px] font-bold uppercase tracking-wider">
-                 Tổng cộng {users.length} user
-               </span>
+              <span className="px-4 py-1.5 bg-[#e9f5ff] text-[#00629d] rounded-full text-[10px] font-bold uppercase tracking-wider">
+                Tổng cộng {users.length} user
+              </span>
             </div>
           </div>
-          
+
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
@@ -90,8 +90,8 @@ const AccountManagement: FC = () => {
                 ) : users.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-10 py-20 text-center">
-                       <span className="material-symbols-outlined text-4xl text-[#cfe5ff] mb-4">group</span>
-                       <p className="text-[#0f1d25] font-bold">Chưa có tài khoản nào!</p>
+                      <span className="material-symbols-outlined text-4xl text-[#cfe5ff] mb-4">group</span>
+                      <p className="text-[#0f1d25] font-bold">Chưa có tài khoản nào!</p>
                     </td>
                   </tr>
                 ) : (
@@ -119,24 +119,22 @@ const AccountManagement: FC = () => {
                         {user.role}
                       </td>
                       <td className="px-6 py-6">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                          user.status === 'active' ? 'bg-[#dcfce7] text-[#166534]' : 
-                          user.status === 'pending_verification' ? 'bg-[#fef9c3] text-[#854d0e]' : 
-                          'bg-[#fee2e2] text-[#991b1b]'
-                        }`}>
-                          {user.status === 'active' ? 'Hoạt động' : 
-                           user.status === 'pending_verification' ? 'Chờ xác thực' : 'Đình chỉ'}
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${user.status === 'active' ? 'bg-[#dcfce7] text-[#166534]' :
+                            user.status === 'pending_verification' ? 'bg-[#fef9c3] text-[#854d0e]' :
+                              'bg-[#fee2e2] text-[#991b1b]'
+                          }`}>
+                          {user.status === 'active' ? 'Hoạt động' :
+                            user.status === 'pending_verification' ? 'Chờ xác thực' : 'Đình chỉ'}
                         </span>
                       </td>
                       <td className="px-10 py-6 text-right space-x-2">
                         {user.role !== 'admin' && user.status !== 'pending_verification' && (
-                          <button 
+                          <button
                             onClick={() => handleUpdateStatus(user.id, user.status)}
-                            className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all ${
-                              user.status === 'active' 
-                                ? 'bg-[#fee2e2] text-[#991b1b] hover:bg-[#fecaca]' 
+                            className={`px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all ${user.status === 'active'
+                                ? 'bg-[#fee2e2] text-[#991b1b] hover:bg-[#fecaca]'
                                 : 'bg-[#dcfce7] text-[#166534] hover:bg-[#bbf7d0]'
-                            }`}
+                              }`}
                           >
                             {user.status === 'active' ? 'Khóa' : 'Mở khóa'}
                           </button>
