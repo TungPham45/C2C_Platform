@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, UnauthorizedException, Inject, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
+import { MAX_ATTRIBUTES_PER_CATEGORY } from '../../../../libs/shared/category.constants';
 
 @Injectable()
 export class ProductService {
@@ -365,6 +366,18 @@ export class ProductService {
 
     if (duplicate) {
       throw new BadRequestException('Attribute name already exists');
+    }
+  }
+
+  private async ensureCategoryAttributeLimitNotExceeded(categoryId: number) {
+    const attributeCount = await this.prisma.attributeDefinition.count({
+      where: { category_id: categoryId },
+    });
+
+    if (attributeCount >= MAX_ATTRIBUTES_PER_CATEGORY) {
+      throw new BadRequestException(
+        `A category can have at most ${MAX_ATTRIBUTES_PER_CATEGORY} attributes.`,
+      );
     }
   }
 
@@ -750,13 +763,6 @@ export class ProductService {
       this.prisma.category.count({ where: { shop_id: null, level: 1 } }),
     ]);
 
-    // Get max attributes in a single category
-    const categoriesWithAtts = await this.prisma.category.findMany({
-      where: { shop_id: null },
-      include: { _count: { select: { attribute_defs: true } } }
-    });
-    const maxAttributes = categoriesWithAtts.reduce((max, cat) => Math.max(max, cat._count.attribute_defs), 0);
-
     return {
       totalShops,
       activeShops,
@@ -767,7 +773,7 @@ export class ProductService {
       totalCategories,
       activeCategories,
       rootCategories,
-      maxAttributes,
+      maxAttributes: MAX_ATTRIBUTES_PER_CATEGORY,
     };
   }
 
@@ -1075,13 +1081,14 @@ export class ProductService {
 
   async createAttributeDefinition(categoryId: number, data: any) {
     const name = this.getValidAttributeName(data.name);
+    await this.ensureCategoryAttributeLimitNotExceeded(categoryId);
     await this.ensureAttributeNameIsUnique(categoryId, name);
 
     return this.prisma.attributeDefinition.create({
       data: {
         category_id: categoryId,
         name,
-        input_type: data.input_type || 'text',
+        input_type: data.input_type || 'dropdown',
         is_required: Boolean(data.is_required),
         sort_order: data.sort_order ? Number(data.sort_order) : 0,
       },

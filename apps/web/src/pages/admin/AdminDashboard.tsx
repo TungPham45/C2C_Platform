@@ -1,6 +1,7 @@
 import { FC, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminLayout } from '../../components/layout/AdminLayout';
+import { MAX_ATTRIBUTES_PER_CATEGORY } from '../../../../../libs/shared/category.constants';
 
 interface AdminDashboardStats {
   totalUsers?: number;
@@ -350,7 +351,7 @@ const AdminDashboard: FC = () => {
                 </div>
                 <div className="rounded-2xl bg-[#e8f5e9] p-4">
                   <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#707882]">Thuộc tính tối đa</p>
-                  <p className="mt-3 text-2xl font-black text-[#0f1d25]">{formatNumber(stats?.maxAttributes)}</p>
+                  <p className="mt-3 text-2xl font-black text-[#0f1d25]">{formatNumber(stats?.maxAttributes ?? MAX_ATTRIBUTES_PER_CATEGORY)}</p>
                   <p className="mt-2 text-xs text-[#707882]">Trên một danh mục</p>
                 </div>
               </div>

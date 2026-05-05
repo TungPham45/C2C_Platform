@@ -1,5 +1,6 @@
 import { FC, FormEvent, useEffect, useMemo, useState } from 'react';
 import { AdminLayout } from '../../components/layout/AdminLayout';
+import { MAX_ATTRIBUTES_PER_CATEGORY } from '../../../../../libs/shared/category.constants';
 
 /*                              CAU HINH API                              */
 
@@ -66,6 +67,13 @@ interface CategoryDeleteImpact {
   canReassignToFallback: boolean;
 }
 
+interface CategoryDashboardStats {
+  totalCategories?: number;
+  activeCategories?: number;
+  rootCategories?: number;
+  maxAttributes?: number;
+}
+
 /*                          HELPER TAO FORM MAC DINH                          */
 
 //@Create Tao form rong cho modal them danh muc moi; neu dang chon category thi category do duoc gan lam cha mac dinh.
@@ -88,17 +96,28 @@ const createCategoryFormFromCategory = (category: Category): CategoryFormState =
   is_active: category.is_active,
 });
 
+const ATTRIBUTE_INPUT_TYPE = 'dropdown';
+const timeFormatter = new Intl.DateTimeFormat('vi-VN', {
+  hour: '2-digit',
+  minute: '2-digit',
+});
+const dateFormatter = new Intl.DateTimeFormat('vi-VN', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+});
+
 //@CATT Tao form mac dinh cho modal them thuoc tinh moi.
 const createDefaultAttributeForm = (): AttributeFormState => ({
   name: '',
-  input_type: 'radio',
+  input_type: ATTRIBUTE_INPUT_TYPE,
   is_required: false,
   sort_order: '',
 });
 
 /*                        HELPER XU LY TUY CHON ATTRIBUTE                        */
 
-const OPTION_INPUT_TYPES = new Set(['select', 'radio', 'checkbox', 'multiselect']);
+const OPTION_INPUT_TYPES = new Set([ATTRIBUTE_INPUT_TYPE]);
 
 //@CATT Chuan hoa input_type truoc khi tao attribute de tranh sai khac chu hoa/space.
 const normalizeAttributeInputType = (inputType: string) => inputType.trim().toLowerCase();
@@ -138,7 +157,8 @@ const CategoryManagement: FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   //@GATT Luu danh sach thuoc tinh cua danh muc dang duoc chon.
   const [attributes, setAttributes] = useState<Attribute[]>([]);
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<CategoryDashboardStats | null>(null);
+  const [statsUpdatedAt, setStatsUpdatedAt] = useState<Date | null>(null);
   //@GET Trang thai loading chinh cho lan tai du lieu cay danh muc va dashboard stats.
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -166,7 +186,9 @@ const CategoryManagement: FC = () => {
   const [attributeForm, setAttributeForm] = useState<AttributeFormState>(createDefaultAttributeForm());
   //@COPT Luu cac tuy chon dang nhap trong modal tao thuoc tinh.
   //@POPT Khi edit attribute, state nay chua ca option cu va id cua chung.
-  const [attributeOptions, setAttributeOptions] = useState<AttributeOptionDraft[]>(createAttributeOptionDrafts('radio'));
+  const [attributeOptions, setAttributeOptions] = useState<AttributeOptionDraft[]>(
+    createAttributeOptionDrafts(ATTRIBUTE_INPUT_TYPE),
+  );
   //@Put Luu danh muc dang duoc sua; co gia tri thi form se submit PUT thay vi POST.
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   //@CATT Khi null thi modal attribute dang o che do tao moi.
@@ -233,6 +255,7 @@ const CategoryManagement: FC = () => {
       //@GET API tra ve list danh muc phang; UI can dang cay nen chuyen doi tai day.
       setCategories(buildTree(catData));
       setStats(statsData);
+      setStatsUpdatedAt(new Date());
     } catch (error) {
       console.error('Error fetching data:', error);
       setError(error instanceof Error ? error.message : 'Failed to fetch category data');
@@ -447,6 +470,10 @@ const CategoryManagement: FC = () => {
   //@CATT Mo modal tao thuoc tinh moi cho danh muc dang duoc chon.
   const openAttributeModal = () => {
     if (!selectedCategory) return;
+    if (attributes.length >= MAX_ATTRIBUTES_PER_CATEGORY) {
+      setAttributeModalError(`A category can have at most ${MAX_ATTRIBUTES_PER_CATEGORY} attributes.`);
+      return;
+    }
     setError(null);
     setSuccessMessage(null);
     setAttributeModalError(null);
@@ -455,7 +482,7 @@ const CategoryManagement: FC = () => {
     //@CATT Reset form ve gia tri mac dinh khi bat dau tao thuoc tinh.
     setAttributeForm(createDefaultAttributeForm());
     //@COPT Khoi tao danh sach tuy chon mac dinh khi mo modal tao thuoc tinh.
-    setAttributeOptions(createAttributeOptionDrafts('radio'));
+    setAttributeOptions(createAttributeOptionDrafts(ATTRIBUTE_INPUT_TYPE));
     setIsAttributeModalOpen(true);
   };
 
@@ -466,16 +493,15 @@ const CategoryManagement: FC = () => {
     setAttributeModalError(null);
     //@PATT Dat editingAttribute de form biet dang o che do edit.
     setEditingAttribute(attribute);
-    const normalizedInputType = normalizeAttributeInputType(attribute.input_type);
     //@PATT Copy name, input_type, required va sort_order hien tai vao attributeForm.
     setAttributeForm({
       name: attribute.name,
-      input_type: normalizedInputType,
+      input_type: ATTRIBUTE_INPUT_TYPE,
       is_required: attribute.is_required,
       sort_order: attribute.sort_order !== undefined ? String(attribute.sort_order) : '',
     });
     //@POPT Nap cac tuy chon hien co cua attribute vao form de admin sua value_name.
-    setAttributeOptions(createAttributeOptionDrafts(normalizedInputType, attribute.options));
+    setAttributeOptions(createAttributeOptionDrafts(ATTRIBUTE_INPUT_TYPE, attribute.options));
     setIsAttributeModalOpen(true);
   };
 
@@ -486,20 +512,7 @@ const CategoryManagement: FC = () => {
     setAttributeModalError(null);
     setEditingAttribute(null);
     setAttributeForm(createDefaultAttributeForm());
-    setAttributeOptions(createAttributeOptionDrafts('radio'));
-  };
-
-  //@CATT Khi doi input_type, cap nhat form tao thuoc tinh.
-  const handleAttributeTypeChange = (inputType: string) => {
-    const normalizedInputType = normalizeAttributeInputType(inputType);
-    setAttributeModalError(null);
-    setAttributeForm((prev) => ({ ...prev, input_type: normalizedInputType }));
-    //@COPT Khi input_type can tuy chon, tao draft option neu hien tai chua co.
-    setAttributeOptions((prev) =>
-      supportsAttributeOptions(normalizedInputType, prev) && prev.length > 0
-        ? prev
-        : createAttributeOptionDrafts(normalizedInputType),
-    );
+    setAttributeOptions(createAttributeOptionDrafts(ATTRIBUTE_INPUT_TYPE));
   };
 
   //@COPT Cap nhat gia tri cua mot tuy chon trong form tao thuoc tinh.
@@ -691,6 +704,11 @@ const CategoryManagement: FC = () => {
       return;
     }
 
+    if (!editingAttribute && attributes.length >= MAX_ATTRIBUTES_PER_CATEGORY) {
+      setAttributeModalError(`A category can have at most ${MAX_ATTRIBUTES_PER_CATEGORY} attributes.`);
+      return;
+    }
+
     //@CATT Chuan hoa input_type truoc khi submit.
     const normalizedInputType = normalizeAttributeInputType(attributeForm.input_type);
     //@COPT Chuan hoa danh sach tuy chon: trim value va bo cac dong rong.
@@ -837,7 +855,7 @@ const CategoryManagement: FC = () => {
       setEditingAttribute(null);
       //@CATT Reset form sau khi tao thuoc tinh thanh cong.
       setAttributeForm(createDefaultAttributeForm());
-      setAttributeOptions(createAttributeOptionDrafts('radio'));
+      setAttributeOptions(createAttributeOptionDrafts(ATTRIBUTE_INPUT_TYPE));
     } catch (submitError) {
       console.error('Error creating attribute:', submitError);
       setAttributeModalError(
@@ -959,6 +977,45 @@ const CategoryManagement: FC = () => {
   //@PATT Boolean dung de doi title, message va nut submit cua modal attribute sang che do edit.
   const isEditingAttribute = Boolean(editingAttribute);
   const showOptionSection = supportsAttributeOptions(attributeForm.input_type, attributeOptions);
+  const hasReachedAttributeLimit = Boolean(selectedCategory) && attributes.length >= MAX_ATTRIBUTES_PER_CATEGORY;
+  const categoryStatCards = useMemo(() => {
+    const totalCategories = stats?.totalCategories ?? 0;
+    const activeCategories = stats?.activeCategories ?? 0;
+    const rootCategories = stats?.rootCategories ?? 0;
+    const childCategories = Math.max(totalCategories - rootCategories, 0);
+    const maxAttributes = stats?.maxAttributes ?? MAX_ATTRIBUTES_PER_CATEGORY;
+
+    return [
+      {
+        label: 'Tổng danh mục',
+        value: totalCategories,
+        icon: 'category',
+        sub: `${activeCategories} đang hoạt động`,
+        color: 'bg-blue-500',
+      },
+      {
+        label: 'Danh mục chính',
+        value: rootCategories,
+        icon: 'account_tree',
+        sub: `${childCategories} danh mục con`,
+        color: 'bg-indigo-500',
+      },
+      {
+        label: 'Thuộc tính tối đa',
+        value: maxAttributes,
+        icon: 'rule',
+        sub: 'Trong một danh mục',
+        color: 'bg-purple-500',
+      },
+      {
+        label: 'Cập nhật cuối',
+        value: statsUpdatedAt ? timeFormatter.format(statsUpdatedAt) : '--:--',
+        icon: 'update',
+        sub: statsUpdatedAt ? dateFormatter.format(statsUpdatedAt) : 'Chưa tải dữ liệu',
+        color: 'bg-emerald-500',
+      },
+    ];
+  }, [stats, statsUpdatedAt]);
 
   /*                               HTML CHINH                               */
 
@@ -982,12 +1039,7 @@ const CategoryManagement: FC = () => {
         {/*                            HTML: THONG KE DAU TRANG                            */}
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          {[
-            { label: 'Tổng danh mục', value: stats?.totalCategories || 0, icon: 'category', sub: '+5 tháng này', color: 'bg-blue-500' },
-            { label: 'Danh mục chính', value: stats?.rootCategories || 0, icon: 'account_tree', sub: 'Phân khúc cao nhất', color: 'bg-indigo-500' },
-            { label: 'Thuộc tính tối đa', value: stats?.maxAttributes || 0, icon: 'rule', sub: 'Danh mục: Điện tử', color: 'bg-purple-500' },
-            { label: 'Cập nhật cuối', value: '14:20', icon: 'update', sub: 'Bởi Admin-02', color: 'bg-emerald-500' },
-          ].map((stat, i) => (
+          {categoryStatCards.map((stat, i) => (
             <div key={i} className="bg-white p-6 rounded-[24px] border border-[#e1f0fb] shadow-sm flex items-center gap-4">
               <div className={`w-12 h-12 rounded-2xl ${stat.color} bg-opacity-10 flex items-center justify-center`}>
                 <span className={`material-symbols-outlined ${stat.color.replace('bg-', 'text-')}`}>
@@ -1050,8 +1102,13 @@ const CategoryManagement: FC = () => {
                     {selectedCategory.name}
                   </span>
                 )}
+                {selectedCategory && (
+                  <span className={`px-3 py-1 text-[10px] font-bold rounded-full uppercase tracking-widest ${hasReachedAttributeLimit ? 'bg-[#fff0ef] text-[#ba1a1a]' : 'bg-[#e9f5ff] text-[#00629d]'}`}>
+                    {attributes.length}/{MAX_ATTRIBUTES_PER_CATEGORY} attributes
+                  </span>
+                )}
               </div>
-              <button type="button" className="flex items-center gap-2 text-[#00629d] text-sm font-bold bg-[#e9f5ff] px-4 py-2 rounded-xl hover:bg-[#d0e9ff] transition-all disabled:cursor-not-allowed disabled:opacity-50" onClick={openAttributeModal} disabled={!selectedCategory}>
+              <button type="button" className="flex items-center gap-2 text-[#00629d] text-sm font-bold bg-[#e9f5ff] px-4 py-2 rounded-xl hover:bg-[#d0e9ff] transition-all disabled:cursor-not-allowed disabled:opacity-50" onClick={openAttributeModal} disabled={!selectedCategory || hasReachedAttributeLimit}>
                 <span className="material-symbols-outlined text-sm">add</span> Thêm quy tắc
               </button>
             </div>
@@ -1065,6 +1122,11 @@ const CategoryManagement: FC = () => {
                 </div>
               ) : (
                 <div className="space-y-6">
+                  {hasReachedAttributeLimit && (
+                    <div className="rounded-2xl border border-[#ffd9d6] bg-[#fff8f7] px-4 py-3 text-sm font-semibold text-[#ba1a1a]">
+                      Danh mục này đã đạt giới hạn {MAX_ATTRIBUTES_PER_CATEGORY} thuộc tính.
+                    </div>
+                  )}
                   <div className="flex items-center justify-between rounded-2xl border border-[#e1f0fb] bg-[#f8fbff] px-4 py-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wider text-[#707882]">Danh mục được chọn</p>
@@ -1169,8 +1231,9 @@ const CategoryManagement: FC = () => {
                   {/* //@CATT Nut mo modal tao thuoc tinh moi cho danh muc dang chon. */}
                   <button
                     type="button"
-                    className="w-full border-2 border-dashed border-[#e1f0fb] rounded-[24px] p-6 flex flex-col items-center justify-center text-[#707882] hover:border-[#00629d] hover:bg-[#e9f5ff]/20 transition-all cursor-pointer group"
+                    className="w-full border-2 border-dashed border-[#e1f0fb] rounded-[24px] p-6 flex flex-col items-center justify-center text-[#707882] hover:border-[#00629d] hover:bg-[#e9f5ff]/20 transition-all cursor-pointer group disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-[#e1f0fb] disabled:hover:bg-transparent"
                     onClick={openAttributeModal}
+                    disabled={hasReachedAttributeLimit}
                   >
                     <span className="material-symbols-outlined text-3xl mb-2 group-hover:scale-110 transition-transform">post_add</span>
                     <p className="text-sm font-semibold">Thêm thuộc tính mới cho {selectedCategory.name}</p>
@@ -1547,21 +1610,10 @@ const CategoryManagement: FC = () => {
 
                 <label className="space-y-2">
                   <span className="text-sm font-semibold text-[#0f1d25]">Loại nhập</span>
-                  {/* //@CATT Select input_type cho thuoc tinh moi. */}
-                  {/* //@PATT Select cap nhat input_type cua thuoc tinh dang sua. */}
-                  <select
-                    className="w-full rounded-2xl border border-[#d6e7f6] px-4 py-3 outline-none transition focus:border-[#00629d]"
-                    value={attributeForm.input_type}
-                    onChange={(event) => handleAttributeTypeChange(event.target.value)}
-                  >
-                    <option value="radio">radio</option>
-                    <option value="text">text</option>
-                    <option value="textarea">textarea</option>
-                    <option value="number">number</option>
-                    <option value="select">select</option>
-                    <option value="checkbox">checkbox</option>
-                    <option value="multiselect">multiselect</option>
-                  </select>
+                  {/* //@CATT Input type hien duoc co dinh la dropdown cho thuoc tinh danh muc. */}
+                  <div className="rounded-2xl border border-[#d6e7f6] bg-[#f8fbff] px-4 py-3 text-sm font-semibold text-[#00629d]">
+                    {ATTRIBUTE_INPUT_TYPE}
+                  </div>
                 </label>
 
                 <label className="space-y-2">
@@ -1631,7 +1683,7 @@ const CategoryManagement: FC = () => {
                             disabled={attributeOptions.length === 1}
                             title={attributeOptions.length === 1 ? 'At least one value is required' : 'Remove value'}
                           >
-                            <span className="material-symbols-outlined text-sm">Xóa</span>
+                            <span className="material-symbols-outlined text-sm">delete</span>
                           </button>
                         </div>
                       ))}
