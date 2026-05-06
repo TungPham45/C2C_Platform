@@ -176,8 +176,32 @@ export class AuthService {
     return { totalUsers, activeUsers, suspendedUsers };
   }
 
-  async getAllUsers() {
+  async getAllUsers(search?: string, status?: string, sortBy?: string) {
+    const where: any = {};
+
+    if (search) {
+      where.OR = [
+        { full_name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search } },
+      ];
+    }
+
+    if (status && status !== 'all') {
+      where.status = status;
+    }
+
+    let orderBy: any = { created_at: 'desc' };
+    if (sortBy === 'oldest') {
+      orderBy = { created_at: 'asc' };
+    } else if (sortBy === 'name_asc') {
+      orderBy = { full_name: 'asc' };
+    } else if (sortBy === 'name_desc') {
+      orderBy = { full_name: 'desc' };
+    }
+
     return this.prisma.user.findMany({
+      where,
       select: {
         id: true,
         email: true,
@@ -188,7 +212,7 @@ export class AuthService {
         status: true,
         created_at: true,
       },
-      orderBy: { created_at: 'desc' },
+      orderBy,
     });
   }
 
