@@ -36,7 +36,9 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children, pageTitle = 'Seren
           <p className="text-[10px] text-[#707882] font-bold uppercase tracking-[0.2em] ml-10">Trung tâm điều khiển</p>
         </div>
 
-        <nav className="flex-1 space-y-2 text-sm">
+        <nav className="flex-1 space-y-2 text-sm overflow-y-auto pr-2 pb-4 
+          [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent 
+          [&::-webkit-scrollbar-thumb]:bg-[#00629d]/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-[#00629d]/40">
           <NavLink to="/admin" end className={getNavLinkClass}>
             <span className="material-symbols-outlined">dashboard</span> Tổng quan
           </NavLink>
@@ -74,6 +76,10 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children, pageTitle = 'Seren
 
           <NavLink to="/admin/reports" className={getNavLinkClass}>
             <span className="material-symbols-outlined">flag</span> Quản lý Tố Cáo
+          </NavLink>
+
+          <NavLink to="/admin/wallets" className={getNavLinkClass}>
+            <span className="material-symbols-outlined">account_balance_wallet</span> Ví & Giao dịch
           </NavLink>
 
           <div className="pt-4 pb-2 px-4 text-[10px] font-bold text-[#707882] uppercase tracking-widest opacity-50">Hệ thống</div>
@@ -143,6 +149,8 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children, pageTitle = 'Seren
 
 const getAdminPageSubtitle = (pathname: string) => {
   if (pathname.startsWith('/admin/applications')) return 'Xem xét và duyệt đăng ký mở shop';
+  if (pathname.startsWith('/admin/reports')) return 'Xem xét và xử lý báo cáo vi phạm';
+  if (pathname.startsWith('/admin/wallets')) return 'Giám sát ví người dùng và kiểm duyệt giao dịch';
   if (pathname.startsWith('/admin/shops')) return 'Theo dõi và quản lý trạng thái gian hàng';
   if (pathname.startsWith('/admin/categories')) return 'Quản lý cây danh mục và bộ thuộc tính sản phẩm';
   if (pathname.startsWith('/admin/banners')) return 'Quản lý banner hiển thị trên marketplace';

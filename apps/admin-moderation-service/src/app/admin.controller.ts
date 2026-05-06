@@ -177,4 +177,59 @@ export class AdminController {
   deleteVoucher(@Param('id') id: string) {
     return this.adminService.deleteVoucher(+id);
   }
+
+  // --- WALLETS & TRANSACTIONS ---
+
+  @Get('wallets/stats')
+  getWalletStats() {
+    return this.adminService.getWalletStats();
+  }
+
+  @Get('wallets')
+  getAllWallets(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.adminService.getAllWallets(page, limit);
+  }
+
+  @Get('wallets/:userId')
+  getWalletByUserId(@Param('userId') userId: string) {
+    return this.adminService.getWalletByUserId(+userId);
+  }
+
+  @Get('transactions')
+  getAllTransactions(
+    @Query('type') type?: string,
+    @Query('status') status?: string,
+    @Query('userId') userId?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.adminService.getAllTransactions(type, status, userId, page, limit);
+  }
+
+  @Get('transactions/:id')
+  getTransactionById(@Param('id') id: string) {
+    return this.adminService.getTransactionById(+id);
+  }
+
+  @Put('transactions/:id/status')
+  updateTransactionStatus(@Param('id') id: string, @Body('status') status: string) {
+    return this.adminService.updateTransactionStatus(+id, status);
+  }
+
+  // --- SELLER PAYOUTS ---
+
+  @Get('payouts')
+  getPayouts(@Query('status') status?: string, @Query('shopId') shopId?: string) {
+    return this.adminService.getPayouts(status, shopId);
+  }
+
+  @Post('payouts/process-eligible')
+  processEligiblePayouts() {
+    return this.adminService.processEligiblePayouts();
+  }
+
+  @Post('payouts/:id/release')
+  releasePayout(@Param('id') id: string) {
+    return this.adminService.releasePayout(+id);
+  }
 }

@@ -219,6 +219,7 @@ export const ProfilePage: FC = () => {
               <div className="p-4 space-y-1">
                 {[
                   { to: '/orders', icon: 'receipt_long', label: 'Đơn mua của tôi', sub: 'Xem tất cả đơn đặt hàng' },
+                  { to: '/wallet', icon: 'account_balance_wallet', label: 'Ví của tôi', sub: 'Nạp tiền, rút tiền và lịch sử giao dịch' },
                   { to: '/cart', icon: 'shopping_bag', label: 'Giỏ hàng', sub: 'Sản phẩm đang chờ thanh toán' },
                   { to: '/messages', icon: 'chat', label: 'Tin nhắn', sub: 'Hộp thư với người bán' },
                 ].map(({ to, icon, label, sub }) => (

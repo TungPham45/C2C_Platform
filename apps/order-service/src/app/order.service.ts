@@ -4,6 +4,8 @@ import { ProductPrismaService } from './product-prisma.service';
 import { AuthPrismaService } from './auth-prisma.service';
 import { VoucherService } from './voucher.service';
 import { NotificationClientService } from './notification-client.service';
+import { WalletClientService } from './wallet-client.service';
+import { Prisma } from '@prisma/client/order';
 
 @Injectable()
 export class OrderService {
@@ -13,6 +15,7 @@ export class OrderService {
     private authPrisma: AuthPrismaService,
     private voucherService: VoucherService,
     private notificationClient: NotificationClientService,
+    private walletClient: WalletClientService,
   ) {}
 
   async getCheckoutVouchers(userId: number, data: any) {
@@ -49,14 +52,35 @@ export class OrderService {
     const draft = await this.buildOrderDraft(data, userId);
     const voucherSelection = await this.validateSelectedVoucherClaims(userId, draft, data);
     const now = new Date();
+    const paymentMethod = data.payment_method || 'cod';
+    const totalPayment = this.roundCurrency(voucherSelection.final_total);
+    const isWalletPayment = paymentMethod === 'e_wallet';
+    let platformUserId: number | null = null;
+
+    if (isWalletPayment) {
+      platformUserId = await this.walletClient.getPlatformUserId();
+      const paymentResult = await this.walletClient.transfer(
+        userId,
+        platformUserId,
+        totalPayment,
+        'Thanh toan online cho don hang moi',
+        undefined,
+        'checkout_session',
+        { from: 'payment', to: 'transfer_in' },
+      );
+
+      if (!paymentResult) {
+        throw new BadRequestException('So du vi khong du hoac khong the xu ly thanh toan online');
+      }
+    }
 
     const orderResult = await this.prisma.$transaction(async (tx) => {
       const checkoutSession = await tx.checkoutSession.create({
         data: {
           user_id: userId,
-          total_payment: voucherSelection.final_total,
-          payment_method: data.payment_method || 'cod',
-          payment_status: 'unpaid',
+          total_payment: totalPayment,
+          payment_method: paymentMethod,
+          payment_status: isWalletPayment ? 'paid' : 'unpaid',
           platform_voucher_id: voucherSelection.platform_claim?.voucher.id ?? null,
         },
       });
@@ -367,6 +391,12 @@ export class OrderService {
     });
 
     try {
+      const buyerId = order.checkout_session?.user_id;
+      const paymentMethod = order.checkout_session?.payment_method;
+      const paymentStatus = order.checkout_session?.payment_status;
+      const platformUserId = await this.walletClient.getPlatformUserId();
+      const orderAmount = Number(order.subtotal) + Number(order.shipping_fee) - Number(order.platform_discount_amount || 0);
+
       if (prevStatus !== 'confirmed' && nextStatus === 'confirmed') {
         console.log(`[STOCKS] Decreasing stock for order #${orderId}`);
         for (const item of order.items) {
@@ -375,13 +405,81 @@ export class OrderService {
             data: { stock_quantity: { decrement: item.quantity } }
           });
         }
-      } else if ((prevStatus === 'confirmed' || prevStatus === 'shipped') && nextStatus === 'cancelled') {
+      } else if (prevStatus !== 'cancelled' && nextStatus === 'cancelled') {
         console.log(`[STOCKS] Restocking for order #${orderId}`);
         for (const item of order.items) {
           await this.productPrisma.productVariant.update({
             where: { id: item.product_variant_id },
             data: { stock_quantity: { increment: item.quantity } }
           });
+        }
+
+        // --- E-Wallet Refund on Cancel ---
+        if (paymentMethod === 'e_wallet' && paymentStatus === 'paid' && buyerId) {
+          console.log(`[WALLET] Processing e_wallet refund for cancelled order #${orderId}`);
+          await this.walletClient.transfer(
+            platformUserId,
+            buyerId,
+            orderAmount,
+            `Hoàn tiền đơn hàng #${orderId} do bị hủy`,
+            orderId.toString(),
+            'shop_order',
+            { from: 'transfer_out', to: 'refund' }
+          );
+        }
+      } else if (prevStatus !== 'delivered' && nextStatus === 'delivered') {
+        console.log(`[PAYOUT] Processing delivery for order #${orderId}`);
+        
+        // 1. Update delivered_at
+        await this.prisma.shopOrder.update({
+          where: { id: orderId },
+          data: { delivered_at: new Date() }
+        });
+
+        // 2. Process COD Credit if applicable
+        if (paymentMethod === 'cod') {
+          console.log(`[WALLET] Crediting platform wallet for COD order #${orderId}`);
+          await this.walletClient.credit(
+            platformUserId,
+            orderAmount,
+            `Thu hộ COD đơn hàng #${orderId}`,
+            orderId.toString(),
+            'shop_order',
+            'transfer_in'
+          );
+          await this.prisma.checkoutSession.update({
+            where: { id: order.checkout_session_id },
+            data: { payment_status: 'paid' }
+          });
+        }
+
+        // 3. Create SellerPayout with 15% fee
+        const shop = await this.productPrisma.shop.findUnique({
+          where: { id: order.shop_id },
+          select: { owner_id: true }
+        });
+
+        if (shop?.owner_id) {
+          const eligibleAt = new Date();
+          eligibleAt.setDate(eligibleAt.getDate() + 7); // 7-day hold
+
+          const platformFee = Math.round(orderAmount * 0.15); // 15% fee
+          const sellerAmount = orderAmount - platformFee;
+
+          await this.prisma.sellerPayout.create({
+            data: {
+              shop_order_id: orderId,
+              checkout_session_id: order.checkout_session_id,
+              shop_id: order.shop_id,
+              seller_user_id: shop.owner_id,
+              order_amount: orderAmount,
+              platform_fee: platformFee,
+              seller_amount: sellerAmount,
+              status: 'holding',
+              eligible_at: eligibleAt
+            }
+          });
+          console.log(`[PAYOUT] Created SellerPayout for order #${orderId}, eligible on ${eligibleAt.toISOString()}`);
         }
       }
     } catch (stockError: any) {
@@ -426,6 +524,147 @@ export class OrderService {
     }
 
     return updatedOrder;
+  }
+
+  // ───────── PAYOUT METHODS ─────────
+
+  async getPayouts(filters: { status?: string; shopId?: number }) {
+    const where: any = {};
+    if (filters.status) where.status = filters.status;
+    if (filters.shopId) where.shop_id = filters.shopId;
+
+    const payouts = await this.prisma.sellerPayout.findMany({
+      where,
+      include: {
+        shop_order: {
+          select: { id: true, created_at: true, delivered_at: true }
+        }
+      },
+      orderBy: { created_at: 'desc' }
+    });
+
+    // Enrich with shop names
+    const enriched = await Promise.all(payouts.map(async (p) => {
+      const shop = await this.productPrisma.shop.findUnique({
+        where: { id: p.shop_id },
+        select: { name: true }
+      });
+      return {
+        ...p,
+        shop_name: shop?.name || `Shop #${p.shop_id}`,
+        order_amount: Number(p.order_amount),
+        platform_fee: Number(p.platform_fee),
+        seller_amount: Number(p.seller_amount),
+      };
+    }));
+
+    return enriched;
+  }
+
+  async getMyPayouts(userId: number) {
+    const payouts = await this.prisma.sellerPayout.findMany({
+      where: { seller_user_id: userId },
+      include: {
+        shop_order: {
+          select: { id: true, created_at: true, delivered_at: true }
+        }
+      },
+      orderBy: { created_at: 'desc' },
+      take: 50
+    });
+
+    return payouts.map(p => ({
+      ...p,
+      order_amount: Number(p.order_amount),
+      platform_fee: Number(p.platform_fee),
+      seller_amount: Number(p.seller_amount),
+    }));
+  }
+
+  async manualPayout(shopOrderId: number) {
+    const payout = await this.prisma.sellerPayout.findUnique({
+      where: { shop_order_id: shopOrderId }
+    });
+
+    if (!payout) {
+      throw new NotFoundException(`Payout for order ${shopOrderId} not found`);
+    }
+
+    if (payout.status === 'paid') {
+      throw new BadRequestException('Khoản tiền này đã được thanh toán');
+    }
+
+    const platformUserId = await this.walletClient.getPlatformUserId();
+
+    // Perform wallet transfer from platform to seller
+    const transferResult = await this.walletClient.transfer(
+      platformUserId,
+      payout.seller_user_id,
+      Number(payout.seller_amount),
+      `Thanh toán doanh thu đơn hàng #${shopOrderId} (Đã trừ phí nền tảng)`,
+      shopOrderId.toString(),
+      'seller_payout',
+      { from: 'payout', to: 'transfer_in' }
+    );
+
+    if (!transferResult) {
+      throw new BadRequestException('Không thể thực hiện chuyển tiền ví');
+    }
+
+    // Update status
+    const updated = await this.prisma.sellerPayout.update({
+      where: { id: payout.id },
+      data: {
+        status: 'paid',
+        paid_at: new Date()
+      }
+    });
+
+    // Send notification to seller
+    try {
+      await this.notificationClient.sendNotification({
+        user_id: payout.seller_user_id,
+        title: 'Nhận tiền doanh thu',
+        message: `Doanh thu ${Number(payout.seller_amount).toLocaleString('vi-VN')}₫ từ đơn hàng #${shopOrderId} đã được cộng vào ví của bạn.`,
+        type: 'wallet',
+        link: '/seller/wallet',
+      });
+    } catch (e) {}
+
+    return {
+      ...updated,
+      order_amount: Number(updated.order_amount),
+      platform_fee: Number(updated.platform_fee),
+      seller_amount: Number(updated.seller_amount),
+    };
+  }
+
+  async processEligiblePayouts() {
+    const eligiblePayouts = await this.prisma.sellerPayout.findMany({
+      where: {
+        status: { in: ['holding', 'ready'] },
+        eligible_at: { lte: new Date() }
+      }
+    });
+
+    const results = {
+      processed: 0,
+      failed: 0,
+      details: [] as any[]
+    };
+
+    for (const payout of eligiblePayouts) {
+      try {
+        await this.manualPayout(payout.shop_order_id);
+        results.processed++;
+        results.details.push({ id: payout.id, status: 'success' });
+      } catch (err: any) {
+        results.failed++;
+        results.details.push({ id: payout.id, status: 'failed', error: err.message });
+      }
+    }
+
+    return results;
   }
 
   async getShopSalesAnalytics(timeframe: string) {

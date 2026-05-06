@@ -14,6 +14,7 @@ import { SellerVoucherManagementPage } from '../pages/seller/VoucherManagement';
 import { SellerCreateVoucherPage } from '../pages/seller/CreateVoucher';
 import { SellerEditVoucherPage } from '../pages/seller/EditVoucher';
 import { ShopCategoriesPage } from '../pages/seller/ShopCategories';
+import { SellerWalletPage } from '../pages/seller/SellerWallet';
 import { CheckoutPage } from '../pages/CheckoutPage';
 import { OrderSuccess } from '../pages/OrderSuccess';
 import { MyPurchasesPage } from '../pages/MyPurchases';
@@ -24,6 +25,7 @@ import { ProductDetailPage } from '../pages/ProductDetail';
 import { ShopPage } from '../pages/ShopPage';
 import { CartPage } from '../pages/CartPage';
 import { ProfilePage } from '../pages/ProfilePage';
+import { WalletPage } from '../pages/WalletPage';
 import { AuthPage } from '../pages/auth/AuthPage';
 import { MessagesPage } from '../pages/MessagesPage';
 import { VoucherHub } from '../pages/VoucherHub';
@@ -35,6 +37,7 @@ import AccountManagement from '../pages/admin/AccountManagement';
 import UserAnalytics from '../pages/admin/UserAnalytics';
 import ShopSalesAnalytics from '../pages/admin/ShopSalesAnalytics';
 import CategoryManagement from '../pages/admin/CategoryManagement';
+import WalletManagement from '../pages/admin/WalletManagement';
 import { BannersAdminPage } from '../pages/admin/BannersAdminPage';
 import { VoucherList } from '../pages/admin/VoucherManagement/VoucherList';
 import { ReportModeration } from '../pages/admin/ReportModeration';
@@ -76,6 +79,7 @@ export function App() {
         <Route path="/seller/analytics" element={<AnalyticsPage />} />
         <Route path="/seller/reviews" element={<ReviewsPage />} />
         <Route path="/seller/inventory" element={<InventoryPage />} />
+        <Route path="/seller/wallet" element={<SellerWalletPage />} />
         <Route path="/seller/settings" element={<SettingsPage />} />
       </Route>
       
@@ -87,6 +91,7 @@ export function App() {
         <Route path="/order-success" element={<OrderSuccess />} />
         <Route path="/orders" element={<MyPurchasesPage />} />
         <Route path="/orders/:id" element={<BuyerOrderDetail />} />
+        <Route path="/wallet" element={<WalletPage />} />
         <Route path="/messages" element={<MessagesPage />} />
       </Route>
       <Route element={<BuyerProtectedRoute />}>
@@ -106,6 +111,7 @@ export function App() {
         <Route path="/admin/analytics/shop-sales" element={<ShopSalesAnalytics />} />
         <Route path="/admin/categories" element={<CategoryManagement />} />
         <Route path="/admin/reports" element={<ReportModeration />} />
+        <Route path="/admin/wallets" element={<WalletManagement />} />
       </Route>
 
     </Routes>

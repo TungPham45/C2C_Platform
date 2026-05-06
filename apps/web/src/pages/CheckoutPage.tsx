@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useOrders } from '../hooks/useOrders';
+import { useWallet } from '../hooks/useWallet';
 
 interface CheckoutVoucher {
   id: number;
@@ -68,6 +69,7 @@ const calculateVoucherDiscount = (voucher: CheckoutVoucher, amount: number) => {
 
 export const CheckoutPage = () => {
   const { createOrder, fetchCheckoutVouchers, loading, error } = useOrders();
+  const { wallet, fetchWallet } = useWallet();
   const navigate = useNavigate();
   const location = useLocation();
   const stateData = location.state as any;
@@ -78,10 +80,14 @@ export const CheckoutPage = () => {
     city: '',
     phone: '',
   });
-  const [paymentMethod, setPaymentMethod] = useState('credit_card');
+  const [paymentMethod, setPaymentMethod] = useState('e_wallet');
   const [voucherData, setVoucherData] = useState<CheckoutVoucherResponse | null>(null);
   const [voucherLoading, setVoucherLoading] = useState(false);
   const [selectedShopVoucherClaimIds, setSelectedShopVoucherClaimIds] = useState<Record<number, number | null>>({});
+
+  useEffect(() => {
+    fetchWallet();
+  }, [fetchWallet]);
 
   const getSinglePrice = () => {
     if (!stateData?.product) return 450000;
@@ -96,7 +102,7 @@ export const CheckoutPage = () => {
     {
       shop: {
         id: stateData?.product?.shop_id || 101,
-        name: stateData?.product?.shop?.name || 'Cua hang',
+        name: stateData?.product?.shop?.name || 'Cửa hàng',
       },
       items: [
         {
@@ -240,7 +246,7 @@ export const CheckoutPage = () => {
       <div className="max-w-[1200px] mx-auto px-6 py-12">
         <h1 className="text-4xl font-black font-['Plus_Jakarta_Sans'] mb-12 flex items-center gap-4 text-[#0f1d25]">
           <span className="material-symbols-outlined text-4xl text-[#00629d]">shopping_cart_checkout</span>
-          Thanh toan
+          Thanh toán
         </h1>
 
         {error && (
@@ -255,42 +261,42 @@ export const CheckoutPage = () => {
             <section className="bg-white border border-[#e4e9f0] rounded-[2rem] p-8 lg:p-10 shadow-sm">
               <h2 className="text-xl font-bold mb-8 flex items-center gap-3 text-[#0f1d25]">
                 <span className="w-8 h-8 rounded-lg bg-[#e1f0fb] text-[#00629d] flex items-center justify-center text-sm">1</span>
-                Thong tin giao hang
+                Thông tin giao hàng
               </h2>
 
               <div className="grid grid-cols-2 gap-6 text-[#0f1d25]">
                 <div className="col-span-2 space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-[#707882] ml-1">Ho va ten</label>
+                  <label className="text-xs font-bold uppercase tracking-widest text-[#707882] ml-1">Họ và tên</label>
                   <input
                     type="text"
                     value={shippingAddress.fullName}
                     onChange={(e) => setShippingAddress({ ...shippingAddress, fullName: e.target.value })}
-                    placeholder="Nhap ho va ten"
+                    placeholder="Nhập họ và tên"
                     className="w-full h-14 px-6 bg-[#f5faff] border border-transparent focus:bg-white focus:border-[#00629d]/50 rounded-2xl outline-none transition-all placeholder-[#a0aab5]"
                   />
                 </div>
                 <div className="col-span-2 space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-[#707882] ml-1">Dia chi</label>
+                  <label className="text-xs font-bold uppercase tracking-widest text-[#707882] ml-1">Địa chỉ</label>
                   <input
                     type="text"
                     value={shippingAddress.address}
                     onChange={(e) => setShippingAddress({ ...shippingAddress, address: e.target.value })}
-                    placeholder="So nha, ten duong, phuong xa"
+                    placeholder="Số nhà, tên đường, phường xã"
                     className="w-full h-14 px-6 bg-[#f5faff] border border-transparent focus:bg-white focus:border-[#00629d]/50 rounded-2xl outline-none transition-all placeholder-[#a0aab5]"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-[#707882] ml-1">Thanh pho</label>
+                  <label className="text-xs font-bold uppercase tracking-widest text-[#707882] ml-1">Thành phố</label>
                   <input
                     type="text"
                     value={shippingAddress.city}
                     onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })}
-                    placeholder="Thanh pho"
+                    placeholder="Thành phố"
                     className="w-full h-14 px-6 bg-[#f5faff] border border-transparent focus:bg-white focus:border-[#00629d]/50 rounded-2xl outline-none transition-all placeholder-[#a0aab5]"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-[#707882] ml-1">So dien thoai</label>
+                  <label className="text-xs font-bold uppercase tracking-widest text-[#707882] ml-1">Số điện thoại</label>
                   <input
                     type="text"
                     value={shippingAddress.phone}
@@ -305,15 +311,13 @@ export const CheckoutPage = () => {
             <section className="bg-white border border-[#e4e9f0] rounded-[2rem] p-8 lg:p-10 shadow-sm">
               <h2 className="text-xl font-bold mb-8 flex items-center gap-3 text-[#0f1d25]">
                 <span className="w-8 h-8 rounded-lg bg-[#e1f0fb] text-[#00629d] flex items-center justify-center text-sm">2</span>
-                Phuong thuc thanh toan
+                Phương thức thanh toán
               </h2>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
-                  { id: 'credit_card', label: 'The tin dung', icon: 'credit_card' },
-                  { id: 'bank_transfer', label: 'Chuyen khoan', icon: 'account_balance' },
-                  { id: 'vnpay', label: 'VN Pay', icon: 'qr_code' },
-                  { id: 'cod', label: 'Khi nhan hang', icon: 'payments' },
+                  { id: 'e_wallet', label: 'Thanh toán online', icon: 'account_balance_wallet' },
+                  { id: 'cod', label: 'Thanh toán sau khi nhận hàng (COD)', icon: 'payments' },
                 ].map((method) => (
                   <button
                     key={method.id}
@@ -329,6 +333,39 @@ export const CheckoutPage = () => {
                   </button>
                 ))}
               </div>
+
+              {paymentMethod === 'e_wallet' && wallet ? (
+                <div className={`mt-6 p-5 rounded-2xl border ${wallet.balance < totalPayment ? 'bg-[#fff0f0] border-[#ffdad6] text-[#ba1a1a]' : 'bg-[#f5faff] border-[#cfe4f6] text-[#00629d]'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-bold text-sm">Số dư ví của bạn:</span>
+                    <span className="font-black font-['Plus_Jakarta_Sans']">{formatCurrency(wallet.balance)}</span>
+                  </div>
+                  <p className="text-sm text-[#3b5568]">
+                    Thanh toán online sẽ trừ tiền ngay trong ví của bạn và chuyển vào ví hệ thống.
+                  </p>
+                  {wallet.balance < totalPayment && (
+                    <div className="flex items-center justify-between mt-4 text-sm font-semibold">
+                      <span className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px]">error</span>
+                        Số dư không đủ để thanh toán
+                      </span>
+                      <a href="/wallet" target="_blank" rel="opener" className="underline hover:text-[#93000a]">Nạp thêm tiền</a>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-6 p-5 rounded-2xl border bg-[#fff8e8] border-[#f7d88a] text-[#9a6700]">
+                  <div className="flex items-start gap-3">
+                    <span className="material-symbols-outlined">local_shipping</span>
+                    <div>
+                      <p className="font-bold text-sm">Thanh toán khi nhận hàng</p>
+                      <p className="mt-1 text-sm text-[#7a5a17]">
+                        Bạn thanh toán cho đơn vị giao hàng khi nhận được sản phẩm.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </section>
 
             <section className="bg-white border border-[#e4e9f0] rounded-[2rem] p-8 lg:p-10 shadow-sm">
@@ -406,7 +443,7 @@ export const CheckoutPage = () => {
           <div className="col-span-12 lg:col-span-5">
             <div className="sticky top-32 space-y-8">
               <section className="bg-white border border-[#e4e9f0] rounded-[2rem] p-8 lg:p-10 shadow-sm">
-                <h2 className="text-xl font-black mb-6 text-[#0f1d25] font-['Plus_Jakarta_Sans']">San pham thanh toan</h2>
+                <h2 className="text-xl font-black mb-6 text-[#0f1d25] font-['Plus_Jakarta_Sans']">Sản phẩm thanh toán</h2>
 
                 <div className="max-h-[300px] overflow-y-auto pr-2 space-y-6 scrollbar-thin scrollbar-thumb-[#dbeaf5] scrollbar-track-transparent">
                   {groups.map((group: any, index: number) => (
@@ -457,21 +494,21 @@ export const CheckoutPage = () => {
 
                 <div className="space-y-4 text-sm font-medium border-b border-[#f0f3f8] pb-6 mb-6">
                   <div className="flex justify-between text-[#707882]">
-                    <span>Tong phu</span>
+                    <span>Tổng phụ</span>
                     <span className="font-bold text-[#0f1d25]">{formatCurrency(subTotal)}</span>
                   </div>
                   <div className="flex justify-between text-[#707882]">
-                    <span>Phi van chuyen ({groups.length} kien)</span>
+                    <span>Phí vận chuyển ({groups.length} kiện)</span>
                     <span className="font-bold text-[#0f1d25]">{formatCurrency(totalShippingFee)}</span>
                   </div>
                   <div className="flex justify-between text-[#707882]">
-                    <span>Giam gia shop</span>
+                    <span>Giảm giá shop</span>
                     <span className="font-bold text-[#0f1d25]">- {formatCurrency(shopDiscountTotal)}</span>
                   </div>
                 </div>
 
                 <div className="flex justify-between items-end">
-                  <span className="text-[#0f1d25] font-bold">Tong thanh toan</span>
+                  <span className="text-[#0f1d25] font-bold">Tổng thanh toán</span>
                   <div className="text-2xl font-black text-[#00629d] font-['Plus_Jakarta_Sans']">
                     {formatCurrency(totalPayment)}
                   </div>
@@ -479,14 +516,14 @@ export const CheckoutPage = () => {
 
                 <button
                   onClick={handleCheckout}
-                  disabled={loading || voucherLoading}
-                  className="w-full mt-8 h-14 bg-[#0f1d25] text-white rounded-2xl font-bold text-base transition-all hover:bg-[#00629d] shadow-lg shadow-blue-500/10 flex items-center justify-center gap-2 disabled:opacity-50"
+                  disabled={loading || voucherLoading || (paymentMethod === 'e_wallet' && (wallet?.balance || 0) < totalPayment)}
+                  className="w-full mt-8 h-14 bg-[#0f1d25] text-white rounded-2xl font-bold text-base transition-all hover:bg-[#00629d] shadow-lg shadow-blue-500/10 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <div className="w-6 h-6 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
                   ) : (
                     <>
-                      Xac nhan dat hang
+                      Xác nhận đặt hàng
                       <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
                     </>
                   )}

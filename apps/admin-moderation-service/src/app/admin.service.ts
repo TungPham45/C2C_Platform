@@ -482,5 +482,71 @@ export class AdminService {
       };
     });
   }
-}
 
+  // --- WALLETS & TRANSACTIONS ---
+
+  private readonly walletInternalBaseUrl = `${this.authBaseUrl}/wallet/internal/admin`;
+
+  async getWalletStats() {
+    return this.requestJson<any>(`${this.walletInternalBaseUrl}/stats`);
+  }
+
+  async getAllWallets(page?: string, limit?: string) {
+    const params = new URLSearchParams();
+    if (page) params.set('page', page);
+    if (limit) params.set('limit', limit);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return this.requestJson<any>(`${this.walletInternalBaseUrl}/wallets${query}`);
+  }
+
+  async getWalletByUserId(userId: number) {
+    return this.requestJson<any>(`${this.walletInternalBaseUrl}/wallets/${userId}`);
+  }
+
+  async getAllTransactions(type?: string, status?: string, userId?: string, page?: string, limit?: string) {
+    const params = new URLSearchParams();
+    if (type) params.set('type', type);
+    if (status) params.set('status', status);
+    if (userId) params.set('userId', userId);
+    if (page) params.set('page', page);
+    if (limit) params.set('limit', limit);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return this.requestJson<any>(`${this.walletInternalBaseUrl}/transactions${query}`);
+  }
+
+  async getTransactionById(id: number) {
+    return this.requestJson<any>(`${this.walletInternalBaseUrl}/transactions/${id}`);
+  }
+
+  async updateTransactionStatus(id: number, status: string) {
+    return this.requestJson<any>(`${this.walletInternalBaseUrl}/transactions/${id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  // --- SELLER PAYOUTS ---
+
+  private readonly orderPayoutAdminBaseUrl = `${this.orderBaseUrl}/internal/admin/payouts`;
+
+  async getPayouts(status?: string, shopId?: string) {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (shopId) params.set('shopId', shopId);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return this.requestJson<any>(`${this.orderPayoutAdminBaseUrl}${query}`);
+  }
+
+  async processEligiblePayouts() {
+    return this.requestJson<any>(`${this.orderPayoutAdminBaseUrl}/process-eligible`, {
+      method: 'POST',
+    });
+  }
+
+  async releasePayout(shopOrderId: number) {
+    return this.requestJson<any>(`${this.orderPayoutAdminBaseUrl}/${shopOrderId}/release`, {
+      method: 'POST',
+    });
+  }
+}

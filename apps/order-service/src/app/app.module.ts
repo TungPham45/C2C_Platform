@@ -9,10 +9,11 @@ import { VoucherController } from './voucher.controller';
 import { VoucherService } from './voucher.service';
 import { AuthPrismaService } from './auth-prisma.service';
 import { NotificationClientService } from './notification-client.service';
+import { WalletClientService } from './wallet-client.service';
 
 @Module({
   imports: [],
   controllers: [OrderController, CartController, VoucherController],
-  providers: [OrderService, CartService, PrismaService, ProductPrismaService, VoucherService, AuthPrismaService, NotificationClientService],
+  providers: [OrderService, CartService, PrismaService, ProductPrismaService, VoucherService, AuthPrismaService, NotificationClientService, WalletClientService],
 })
 export class AppModule { }

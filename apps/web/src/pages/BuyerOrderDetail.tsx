@@ -175,6 +175,8 @@ export const BuyerOrderDetail: FC = () => {
 
   const paymentLabel = order.checkout_session?.payment_method === 'cod'
     ? 'Thanh toán khi nhận hàng'
+    : order.checkout_session?.payment_method === 'e_wallet'
+    ? 'Thanh toan online'
     : order.checkout_session?.payment_method === 'bank_transfer'
     ? 'Chuyển khoản ngân hàng'
     : order.checkout_session?.payment_method === 'credit_card'

@@ -42,6 +42,13 @@ export class OrderController {
     return this.orderService.getSellerOrders(parseInt(userId));
   }
 
+  @Get('seller-payouts')
+  async getSellerPayouts(@Req() req: any) {
+    const userId = req.headers['x-user-id'];
+    if (!userId) throw new UnauthorizedException('User not authenticated');
+    return this.orderService.getMyPayouts(parseInt(userId));
+  }
+
   // Internal routes — MUST be before :id to avoid being caught by the wildcard
   @Get('internal/admin/analytics/shop-sales')
   getShopSalesAnalytics(
@@ -61,6 +68,36 @@ export class OrderController {
     this.requireInternalAccess(headers);
     if (!shopId) throw new BadRequestException('shopId is required');
     return this.orderService.getSingleShopAnalytics(+shopId, days ? +days : 10);
+  }
+
+  @Get('internal/admin/payouts')
+  getPayouts(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query('status') status?: string,
+    @Query('shopId') shopId?: string,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.orderService.getPayouts({
+      status,
+      shopId: shopId ? +shopId : undefined,
+    });
+  }
+
+  @Post('internal/admin/payouts/process-eligible')
+  processEligiblePayouts(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.orderService.processEligiblePayouts();
+  }
+
+  @Post('internal/admin/payouts/:shopOrderId/release')
+  manualPayout(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Param('shopOrderId') shopOrderId: string,
+  ) {
+    this.requireInternalAccess(headers);
+    return this.orderService.manualPayout(+shopOrderId);
   }
 
   // Wildcard :id routes — MUST be last to avoid catching named routes above

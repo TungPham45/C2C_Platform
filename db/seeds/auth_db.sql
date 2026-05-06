@@ -129,7 +129,7 @@ SET
   updated_at = NOW();
 
 INSERT INTO wallets (user_id, balance)
-SELECT u.id, 850000.00
+SELECT u.id, 651000.00
 FROM users u
 WHERE u.email = 'buyer@gmail.com'
 ON CONFLICT (user_id) DO UPDATE
@@ -146,8 +146,32 @@ SET
   balance = EXCLUDED.balance,
   updated_at = NOW();
 
-INSERT INTO wallet_transactions (wallet_id, amount, transaction_type, description)
-SELECT w.id, 1250000.00, 'credit', 'Nạp số dư mẫu cho người bán.'
+INSERT INTO wallet_transactions (
+  wallet_id,
+  user_id,
+  transaction_type,
+  amount,
+  balance_before,
+  balance_after,
+  status,
+  reference_id,
+  reference_type,
+  payment_method,
+  description,
+  completed_at
+)
+SELECT w.id,
+       u.id,
+       'topup',
+       1250000.00,
+       0.00,
+       1250000.00,
+       'completed',
+       'TOPUP-SELLER1-001',
+       'topup',
+       'internal',
+       'Nạp số dư mẫu cho người bán.',
+       NOW()
 FROM wallets w
 JOIN users u ON u.id = w.user_id
 WHERE u.email = 'seller1@gmail.com'
@@ -155,13 +179,35 @@ WHERE u.email = 'seller1@gmail.com'
     SELECT 1
     FROM wallet_transactions wt
     WHERE wt.wallet_id = w.id
-      AND wt.amount = 1250000.00
-      AND wt.transaction_type = 'credit'
-      AND wt.description = 'Nạp số dư mẫu cho người bán.'
+      AND wt.reference_id = 'TOPUP-SELLER1-001'
   );
 
-INSERT INTO wallet_transactions (wallet_id, amount, transaction_type, description)
-SELECT w.id, 850000.00, 'credit', 'Nạp tiền ban đầu.'
+INSERT INTO wallet_transactions (
+  wallet_id,
+  user_id,
+  transaction_type,
+  amount,
+  balance_before,
+  balance_after,
+  status,
+  reference_id,
+  reference_type,
+  payment_method,
+  description,
+  completed_at
+)
+SELECT w.id,
+       u.id,
+       'topup',
+       850000.00,
+       0.00,
+       850000.00,
+       'completed',
+       'TOPUP-BUYER-001',
+       'topup',
+       'momo',
+       'Nạp tiền ban đầu.',
+       NOW()
 FROM wallets w
 JOIN users u ON u.id = w.user_id
 WHERE u.email = 'buyer@gmail.com'
@@ -169,13 +215,35 @@ WHERE u.email = 'buyer@gmail.com'
     SELECT 1
     FROM wallet_transactions wt
     WHERE wt.wallet_id = w.id
-      AND wt.amount = 850000.00
-      AND wt.transaction_type = 'credit'
-      AND wt.description = 'Nạp tiền ban đầu.'
+      AND wt.reference_id = 'TOPUP-BUYER-001'
   );
 
-INSERT INTO wallet_transactions (wallet_id, amount, transaction_type, description)
-SELECT w.id, 650000.00, 'credit', 'Nạp số dư mẫu cho người bán.'
+INSERT INTO wallet_transactions (
+  wallet_id,
+  user_id,
+  transaction_type,
+  amount,
+  balance_before,
+  balance_after,
+  status,
+  reference_id,
+  reference_type,
+  payment_method,
+  description,
+  completed_at
+)
+SELECT w.id,
+       u.id,
+       'topup',
+       650000.00,
+       0.00,
+       650000.00,
+       'completed',
+       'TOPUP-SELLER2-001',
+       'topup',
+       'internal',
+       'Nạp số dư mẫu cho người bán.',
+       NOW()
 FROM wallets w
 JOIN users u ON u.id = w.user_id
 WHERE u.email = 'seller2@gmail.com'
@@ -183,13 +251,35 @@ WHERE u.email = 'seller2@gmail.com'
     SELECT 1
     FROM wallet_transactions wt
     WHERE wt.wallet_id = w.id
-      AND wt.amount = 650000.00
-      AND wt.transaction_type = 'credit'
-      AND wt.description = 'Nạp số dư mẫu cho người bán.'
+      AND wt.reference_id = 'TOPUP-SELLER2-001'
   );
 
-INSERT INTO wallet_transactions (wallet_id, amount, transaction_type, description)
-SELECT w.id, -199000.00, 'debit', 'Tạm giữ tiền cho thanh toán mẫu.'
+INSERT INTO wallet_transactions (
+  wallet_id,
+  user_id,
+  transaction_type,
+  amount,
+  balance_before,
+  balance_after,
+  status,
+  reference_id,
+  reference_type,
+  payment_method,
+  description,
+  completed_at
+)
+SELECT w.id,
+       u.id,
+       'payment',
+       199000.00,
+       850000.00,
+       651000.00,
+       'completed',
+       'ORD-DEMO-9001',
+       'order',
+       'wallet',
+       'Tạm giữ tiền cho thanh toán mẫu.',
+       NOW()
 FROM wallets w
 JOIN users u ON u.id = w.user_id
 WHERE u.email = 'buyer@gmail.com'
@@ -197,9 +287,43 @@ WHERE u.email = 'buyer@gmail.com'
     SELECT 1
     FROM wallet_transactions wt
     WHERE wt.wallet_id = w.id
-      AND wt.amount = -199000.00
-      AND wt.transaction_type = 'debit'
-      AND wt.description = 'Tạm giữ tiền cho thanh toán mẫu.'
+      AND wt.reference_id = 'ORD-DEMO-9001'
+  );
+
+INSERT INTO wallet_transactions (
+  wallet_id,
+  user_id,
+  transaction_type,
+  amount,
+  balance_before,
+  balance_after,
+  status,
+  reference_id,
+  reference_type,
+  payment_method,
+  description,
+  completed_at
+)
+SELECT w.id,
+       u.id,
+       'topup',
+       300000.00,
+       0.00,
+       300000.00,
+       'completed',
+       'TOPUP-ADMIN-001',
+       'topup',
+       'internal',
+       'Nạp số dư mẫu cho tài khoản admin.',
+       NOW()
+FROM wallets w
+JOIN users u ON u.id = w.user_id
+WHERE u.email = 'admin@gmail.com'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM wallet_transactions wt
+    WHERE wt.wallet_id = w.id
+      AND wt.reference_id = 'TOPUP-ADMIN-001'
   );
 
 INSERT INTO carts (user_id)

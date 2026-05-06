@@ -20,11 +20,17 @@ export const NotificationBell: React.FC = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   const NOTIFICATIONS_API_URL = `${API_BASE_URL}/notifications`;
+  const isLikelyJwt = (token: string) => token.split('.').length === 3;
 
   const fetchNotifications = async () => {
     if (!notificationsEnabled) return;
     const token = localStorage.getItem('c2c_token');
-    if (!token) return;
+    if (!token || !isLikelyJwt(token)) {
+      setUnreadCount(0);
+      setNotifications([]);
+      setNotificationsEnabled(false);
+      return;
+    }
     try {
       const res = await fetch(NOTIFICATIONS_API_URL, {
         headers: { Authorization: `Bearer ${token}` }
@@ -33,6 +39,12 @@ export const NotificationBell: React.FC = () => {
         const data = await res.json();
         setUnreadCount(data.unreadCount || 0);
         setNotifications(data.notifications || []);
+        return;
+      }
+      if (res.status === 401) {
+        setUnreadCount(0);
+        setNotifications([]);
+        setNotificationsEnabled(false);
       }
     } catch {
       // Avoid spamming requests/logs when notification service is unavailable.
@@ -49,24 +61,36 @@ export const NotificationBell: React.FC = () => {
 
   const markAsRead = async (id: number) => {
     const token = localStorage.getItem('c2c_token');
-    if (!token) return;
+    if (!token || !isLikelyJwt(token)) return;
     try {
-      await fetch(`${NOTIFICATIONS_API_URL}/${id}/read`, {
+      const res = await fetch(`${NOTIFICATIONS_API_URL}/${id}/read`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}` }
       });
+      if (res.status === 401) {
+        setUnreadCount(0);
+        setNotifications([]);
+        setNotificationsEnabled(false);
+        return;
+      }
       fetchNotifications();
     } catch {}
   };
 
   const markAllAsRead = async () => {
     const token = localStorage.getItem('c2c_token');
-    if (!token) return;
+    if (!token || !isLikelyJwt(token)) return;
     try {
-      await fetch(`${NOTIFICATIONS_API_URL}/read-all`, {
+      const res = await fetch(`${NOTIFICATIONS_API_URL}/read-all`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}` }
       });
+      if (res.status === 401) {
+        setUnreadCount(0);
+        setNotifications([]);
+        setNotificationsEnabled(false);
+        return;
+      }
       fetchNotifications();
       setIsOpen(false);
     } catch {}

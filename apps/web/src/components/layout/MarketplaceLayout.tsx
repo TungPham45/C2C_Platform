@@ -199,6 +199,13 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({
                               <span className="material-symbols-outlined text-[#2b82c9] text-lg">receipt_long</span>
                               Đơn mua
                             </Link>
+                            <Link
+                              to="/wallet"
+                              className="flex items-center gap-3 px-5 py-3 hover:bg-[#EBF4FF] transition-colors text-sm font-bold text-[#0f1d25]"
+                            >
+                              <span className="material-symbols-outlined text-[#2b82c9] text-lg">account_balance_wallet</span>
+                              Ví của tôi
+                            </Link>
                             <Link to="/vouchers" className="flex items-center gap-3 px-5 py-3 hover:bg-[#EBF4FF] transition-colors text-sm font-bold text-[#0f1d25]">
                               <span className="material-symbols-outlined text-[#2b82c9] text-lg">confirmation_number</span>
                               Mã giảm giá
@@ -257,6 +264,13 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({
                             >
                               <span className="material-symbols-outlined text-[#00629d] text-lg">receipt_long</span>
                               Đơn mua
+                            </Link>
+                            <Link
+                              to="/wallet"
+                              className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]"
+                            >
+                              <span className="material-symbols-outlined text-[#00629d] text-lg">account_balance_wallet</span>
+                              Ví của tôi
                             </Link>
                             <Link to="/vouchers" className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]">
                               <span className="material-symbols-outlined text-[#00629d] text-lg">confirmation_number</span>

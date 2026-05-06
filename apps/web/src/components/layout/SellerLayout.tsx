@@ -149,6 +149,15 @@ export const SellerLayout: FC<SellerLayoutProps> = ({ children }) => {
             <span className="material-symbols-outlined text-[20px]">layers</span>
             Kho hàng
           </NavLink>
+
+          <NavLink
+            to="/seller/wallet"
+            className={({ isActive }) => `${navBase} ${isActive ? '' : navInactive}`}
+            style={({ isActive }) => (isActive ? navActiveStyle : undefined)}
+          >
+            <span className="material-symbols-outlined text-[20px]">account_balance_wallet</span>
+            Ví & Giao dịch
+          </NavLink>
         </nav>
 
         <Link

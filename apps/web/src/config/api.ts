@@ -6,6 +6,8 @@ export const AUTH_API_URL = `${API_BASE_URL}/auth`;
 export const PRODUCT_API_URL = `${API_BASE_URL}/products`;
 export const ORDER_API_URL = `${API_BASE_URL}/orders`;
 export const CART_API_URL = `${API_BASE_URL}/cart`;
+export const WALLET_API_URL = `${AUTH_API_URL}/wallet`;
+export const ADMIN_API_URL = `${API_BASE_URL}/admin`;
 
 const LOCAL_ASSET_HOSTS = new Set(['localhost', '127.0.0.1']);
 
