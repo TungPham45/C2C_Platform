@@ -1,0 +1,327 @@
+import { Injectable, Inject, BadRequestException, NotFoundException } from '@nestjs/common';
+import { PrismaService } from './prisma.service';
+import { JwtService } from '@nestjs/jwt';
+import { EmailService } from './email.service';
+import { NotificationsService } from './notifications.service';
+import * as bcrypt from 'bcryptjs';
+
+@Injectable()
+export class AuthService {
+  constructor(
+    @Inject(PrismaService) private prisma: PrismaService,
+    @Inject(JwtService) private jwtService: JwtService,
+    @Inject(EmailService) private emailService: EmailService,
+    @Inject(NotificationsService) private notificationsService: NotificationsService
+  ) {}
+
+  async validateUser(email: string, pass: string): Promise<any> {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+    
+    if (user && await bcrypt.compare(pass, user.password)) {
+      const { password, ...result } = user;
+      return result;
+    }
+    return null;
+  }
+
+  async login(user: any) {
+    const payload = { 
+      sub: user.id, 
+      email: user.email,
+      role: user.role, // 'user' | 'admin'
+    };
+
+    return {
+      access_token: await this.jwtService.signAsync(payload),
+      user: {
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name,
+        role: user.role,
+        shop: null
+      }
+    };
+  }
+
+  async register(data: any) {
+    const { password, ...rest } = data;
+    const existingUser = await this.prisma.user.findUnique({ where: { email: data.email } });
+    if (existingUser) throw new BadRequestException('Email đã được đăng ký');
+
+    if (data.phone) {
+      const existingPhone = await this.prisma.user.findUnique({ where: { phone: data.phone } });
+      if (existingPhone) throw new BadRequestException('Số điện thoại đã được sử dụng');
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await this.prisma.user.create({
+      data: {
+        ...rest,
+        password: hashedPassword,
+        role: 'user', 
+        status: 'pending' // Đã khôi phục bước chờ OTP
+      },
+    });
+
+    await this.generateAndSendOtp(user.id, user.email, 'REGISTER');
+
+    const { password: _, ...result } = user;
+    return result;
+  }
+
+  // --- OTP & FORGOT PASSWORD LOGIC ---
+
+  async resendOtp(email: string, purpose: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) throw new NotFoundException('Không tìm thấy tài khoản');
+
+    await this.generateAndSendOtp(user.id, email, purpose);
+    return { message: 'Mã OTP mới đã được gửi' };
+  }
+
+  async requestForgotPassword(email: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) throw new NotFoundException('User not found');
+
+    await this.generateAndSendOtp(user.id, email, 'RESET_PASSWORD');
+    return { message: 'OTP sent to email' };
+  }
+
+  async verifyOtp(email: string, code: string, purpose: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const verification = await this.prisma.verificationCode.findFirst({
+      where: {
+        user_id: user.id,
+        code,
+        purpose,
+        is_used: false,
+        expires_at: { gt: new Date() }
+      },
+      orderBy: { created_at: 'desc' }
+    });
+
+    if (!verification) {
+      throw new BadRequestException('Invalid or expired OTP');
+    }
+
+    // Mark as used
+    await this.prisma.verificationCode.update({
+      where: { id: verification.id },
+      data: { is_used: true }
+    });
+
+    // If it was for registration, activate the user
+    if (purpose === 'REGISTER') {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { status: 'active' }
+      });
+    }
+
+    return { success: true, message: 'OTP verified successfully' };
+  }
+
+  async resetPassword(data: any) {
+    const { email, code, newPassword } = data;
+    
+    // We verify the OTP right before resetting
+    await this.verifyOtp(email, code, 'RESET_PASSWORD');
+
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword }
+    });
+
+    return { message: 'Password reset successfully' };
+  }
+
+  private async generateAndSendOtp(userId: number, email: string, purpose: string) {
+    // Generate 6-digit random code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = new Date();
+    expiry.setMinutes(expiry.getMinutes() + 10); // 10 min expiry
+
+    // Save to DB
+    await this.prisma.verificationCode.create({
+      data: {
+        user_id: userId,
+        code,
+        purpose,
+        expires_at: expiry
+      }
+    });
+
+    // "Send" Email
+    await this.emailService.sendOtpEmail(email, code, purpose);
+  }
+
+  async getAdminStats() {
+    const [totalUsers, activeUsers, suspendedUsers] = await Promise.all([
+      this.prisma.user.count(),
+      this.prisma.user.count({
+        where: { status: 'active' },
+      }),
+      this.prisma.user.count({
+        where: { status: { not: 'active' } },
+      }),
+    ]);
+
+    return { totalUsers, activeUsers, suspendedUsers };
+  }
+
+  async getAllUsers(search?: string, status?: string, sortBy?: string) {
+    const where: any = {};
+
+    if (search) {
+      where.OR = [
+        { full_name: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search } },
+      ];
+    }
+
+    if (status && status !== 'all') {
+      where.status = status;
+    }
+
+    let orderBy: any = { created_at: 'desc' };
+    if (sortBy === 'oldest') {
+      orderBy = { created_at: 'asc' };
+    } else if (sortBy === 'name_asc') {
+      orderBy = { full_name: 'asc' };
+    } else if (sortBy === 'name_desc') {
+      orderBy = { full_name: 'desc' };
+    }
+
+    return this.prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        email: true,
+        full_name: true,
+        phone: true,
+        avatar_url: true,
+        role: true,
+        status: true,
+        created_at: true,
+      },
+      orderBy,
+    });
+  }
+
+  async updateUserStatus(id: number, status: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true }
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    await this.prisma.user.update({
+      where: { id },
+      data: { status },
+      select: { id: true, status: true },
+    });
+
+    if (status === 'suspended') {
+      await this.notificationsService.createNotification({
+        user_id: id,
+        title: 'Tài khoản đã bị đình chỉ',
+        message: 'Tài khoản của bạn đã bị quản trị viên đình chỉ hoạt động do vi phạm quy tắc cộng đồng hoặc có hành vi gian lận.',
+        type: 'SYSTEM'
+      });
+    } else if (status === 'active') {
+      await this.notificationsService.createNotification({
+        user_id: id,
+        title: 'Tài khoản đã được khôi phục',
+        message: 'Chào mừng trở lại! Tài khoản của bạn đã được kích hoạt lại.',
+        type: 'SYSTEM'
+      });
+    }
+
+    return { id, status };
+  }
+
+  async getUserGrowthAnalytics(timeframe?: string) {
+    const whereClause: any = { created_at: { not: null } };
+    
+    if (timeframe === 'week') {
+      const dt = new Date();
+      dt.setDate(dt.getDate() - 7);
+      whereClause.created_at = { gte: dt, not: null };
+    } else if (timeframe === 'month') {
+      const dt = new Date();
+      dt.setMonth(dt.getMonth() - 1);
+      whereClause.created_at = { gte: dt, not: null };
+    }
+
+    const users = await this.prisma.user.findMany({
+      select: { created_at: true },
+      where: whereClause,
+      orderBy: { created_at: 'asc' }
+    });
+
+    const growth: Record<string, number> = {};
+    
+    users.forEach(user => {
+      if (user.created_at) {
+        // format YYYY-MM-DD
+        const date = user.created_at.toISOString().split('T')[0];
+        growth[date] = (growth[date] || 0) + 1;
+      }
+    });
+
+    return Object.entries(growth).map(([date, newUsers]) => ({
+      date,
+      newUsers
+    }));
+  }
+
+  async getUsersByIds(ids: number[]) {
+    if (!ids.length) return [];
+    return this.prisma.user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, full_name: true, email: true, avatar_url: true, status: true },
+    });
+  }
+
+
+  async updateProfile(userId: number, data: { full_name?: string; phone?: string }) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Không tìm thấy tài khoản');
+
+    // Check phone uniqueness if phone is being updated
+    if (data.phone && data.phone !== user.phone) {
+      const existingPhone = await this.prisma.user.findUnique({ where: { phone: data.phone } });
+      if (existingPhone) throw new BadRequestException('Số điện thoại đã được sử dụng bởi tài khoản khác');
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(data.full_name !== undefined && { full_name: data.full_name }),
+        ...(data.phone !== undefined && { phone: data.phone }),
+      },
+      select: {
+        id: true,
+        email: true,
+        full_name: true,
+        phone: true,
+        role: true,
+        avatar_url: true,
+        status: true,
+      },
+    });
+
+    return updated;
+  }
+}
