@@ -464,41 +464,7 @@ export const ShopPage: FC = () => {
             )}
           </div>
         )}
-        {false && activeTab === 'home' && (
-          <div className="max-w-[1200px] mx-auto px-4 sm:px-8 mt-8">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg sm:text-xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">
-                Mã giảm giá của Shop
-              </h2>
-              <button className="text-sm font-bold text-[#00629d] hover:underline">Xem tất cả</button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {vouchers.map((v, i) => (
-                <div
-                  key={i}
-                  className="bg-white border border-[#e4e9f0] rounded-2xl p-5 flex items-center justify-between hover:shadow-md hover:border-[#00629d]/20 transition-all group relative overflow-hidden"
-                >
-                  {/* Left dashed border decoration */}
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#00629d] to-[#42a5f5] rounded-l-2xl"></div>
 
-                  <div className="pl-3 flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="text-lg font-black text-[#00629d] font-['Plus_Jakarta_Sans']">{v.discount}</span>
-                      <button className="px-3 py-1 bg-[#00629d] text-white text-xs font-bold rounded-full hover:bg-[#004e7c] transition-colors shadow-sm">
-                        Lưu
-                      </button>
-                    </div>
-                    <p className="text-xs text-[#707882]">{v.condition}</p>
-                    <div className="flex items-center justify-between mt-3">
-                      <span className="text-[10px] font-bold text-[#a0aab5] uppercase tracking-wider">{v.expires}</span>
-                      <span className="text-[11px] font-black text-[#00629d] tracking-wider">{v.code}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* ==================== PRODUCTS SECTION ==================== */}
         <div className="max-w-[1200px] mx-auto px-4 sm:px-8 mt-10">
