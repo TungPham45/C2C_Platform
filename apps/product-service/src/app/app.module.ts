@@ -24,14 +24,7 @@ if (!existsSync(uploadsDir)) {
           cb(null, uniqueName);
         },
       }),
-      limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
-      fileFilter: (_req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
-          cb(null, true);
-        } else {
-          cb(new Error('Only image files are allowed'), false);
-        }
-      },
+      limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
     }),
   ],
   controllers: [ProductController],

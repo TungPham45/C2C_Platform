@@ -1,8 +1,6 @@
 import { FC, useEffect, useState, useCallback } from 'react';
 import { SellerLayout } from '../../components/layout/SellerLayout';
 import { WALLET_API_URL, ORDER_API_URL } from '../../config/api';
-import { TransactionDetailModal } from '../../components/shared/TransactionDetailModal';
-import { PayoutDetailModal } from '../../components/shared/PayoutDetailModal';
 
 const formatVND = (n: number) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
@@ -43,12 +41,10 @@ export const SellerWalletPage: FC = () => {
   const [withdrawAmount, setWithdrawAmount] = useState(0);
   const [actionLoading, setActionLoading] = useState(false);
   const [toast, setToast] = useState('');
-  const [selectedTx, setSelectedTx] = useState<any>(null);
 
   const [activeTab, setActiveTab] = useState<'transactions' | 'payouts'>('transactions');
   const [payouts, setPayouts] = useState<any[]>([]);
   const [payoutsLoading, setPayoutsLoading] = useState(false);
-  const [selectedPayout, setSelectedPayout] = useState<any>(null);
 
   const fetchWallet = useCallback(async () => {
     setLoading(true);
@@ -242,7 +238,6 @@ export const SellerWalletPage: FC = () => {
                   <th className="px-4 py-3">Loại</th>
                   <th className="px-4 py-3">Trạng thái</th>
                   <th className="px-4 py-3 text-right">Số tiền</th>
-                  <th className="px-4 py-3 text-center">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -254,12 +249,11 @@ export const SellerWalletPage: FC = () => {
                       <td className="px-4 py-4"><div className="h-5 w-20 bg-slate-50 rounded-full animate-pulse" /></td>
                       <td className="px-4 py-4"><div className="h-4 w-16 bg-slate-50 rounded animate-pulse" /></td>
                       <td className="px-4 py-4"><div className="h-4 w-20 bg-slate-50 rounded animate-pulse ml-auto" /></td>
-                      <td className="px-4 py-4 text-center"><div className="h-8 w-8 bg-slate-50 rounded-lg animate-pulse mx-auto" /></td>
                     </tr>
                   ))
                 ) : transactions.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-7 py-14 text-center">
+                    <td colSpan={5} className="px-7 py-14 text-center">
                       <span className="material-symbols-outlined text-5xl text-slate-200 mb-3 block">receipt_long</span>
                       <p className="font-bold text-slate-500">Chưa có giao dịch</p>
                       <p className="text-xs text-slate-400 mt-1">Khi có đơn hàng mới, giao dịch sẽ hiển thị tại đây</p>
@@ -269,7 +263,7 @@ export const SellerWalletPage: FC = () => {
                   transactions.map((tx) => {
                     const cfg = TYPE_LABELS[tx.transaction_type] || { label: tx.transaction_type, color: '#6b7280', bg: '#f3f4f6', icon: 'receipt' };
                     const st = STATUS_COLORS[tx.status] || STATUS_COLORS.completed;
-                    const isCredit = ['topup', 'refund', 'transfer_in'].includes(tx.transaction_type);
+                    const isCredit = ['topup', 'payout', 'refund', 'transfer_in'].includes(tx.transaction_type);
                     return (
                       <tr key={tx.id} className="border-t border-slate-50 hover:bg-slate-50/50 transition-colors">
                         <td className="px-7 py-4">
@@ -306,11 +300,6 @@ export const SellerWalletPage: FC = () => {
                           <span className={`text-sm font-bold ${isCredit ? 'text-emerald-600' : 'text-slate-900'}`}>
                             {isCredit ? '+' : '-'}{formatVND(tx.amount)}
                           </span>
-                        </td>
-                        <td className="px-4 py-4 text-center">
-                          <button onClick={() => setSelectedTx(tx)} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-[#1d4ed8] hover:text-white hover:border-[#1d4ed8] transition-all mx-auto" title="Xem chi tiết">
-                            <span className="material-symbols-outlined text-[18px]">visibility</span>
-                          </button>
                         </td>
                       </tr>
                     );
@@ -358,7 +347,6 @@ export const SellerWalletPage: FC = () => {
                   <th className="px-4 py-3">Chi tiết tiền hàng</th>
                   <th className="px-4 py-3">Thời gian</th>
                   <th className="px-4 py-3">Trạng thái đối soát</th>
-                  <th className="px-4 py-3 text-center">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -369,12 +357,11 @@ export const SellerWalletPage: FC = () => {
                       <td className="px-4 py-4"><div className="h-4 w-36 bg-slate-50 rounded animate-pulse" /></td>
                       <td className="px-4 py-4"><div className="h-4 w-32 bg-slate-50 rounded animate-pulse" /></td>
                       <td className="px-4 py-4"><div className="h-5 w-20 bg-slate-50 rounded-full animate-pulse" /></td>
-                      <td className="px-4 py-4 text-center"><div className="h-8 w-8 bg-slate-50 rounded-lg animate-pulse mx-auto" /></td>
                     </tr>
                   ))
                 ) : payouts.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-7 py-14 text-center">
+                    <td colSpan={4} className="px-7 py-14 text-center">
                       <span className="material-symbols-outlined text-5xl text-slate-200 mb-3 block">storefront</span>
                       <p className="font-bold text-slate-500">Chưa có khoản doanh thu chờ đối soát nào</p>
                     </td>
@@ -409,11 +396,6 @@ export const SellerWalletPage: FC = () => {
                               <span className="material-symbols-outlined text-[14px]">lock_clock</span> Đang giữ (7 ngày)
                             </span>
                           )}
-                        </td>
-                        <td className="px-4 py-4 text-center">
-                          <button onClick={() => setSelectedPayout(p)} className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-[#1d4ed8] hover:text-white hover:border-[#1d4ed8] transition-all mx-auto" title="Xem chi tiết">
-                            <span className="material-symbols-outlined text-[18px]">visibility</span>
-                          </button>
                         </td>
                       </tr>
                     );
@@ -456,14 +438,6 @@ export const SellerWalletPage: FC = () => {
             </div>
           </div>
         </div>
-      )}
-
-      {selectedTx && (
-        <TransactionDetailModal transaction={selectedTx} allTransactions={transactions} onClose={() => setSelectedTx(null)} />
-      )}
-
-      {selectedPayout && (
-        <PayoutDetailModal payout={selectedPayout} onClose={() => setSelectedPayout(null)} />
       )}
     </SellerLayout>
   );

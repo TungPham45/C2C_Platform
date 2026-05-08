@@ -88,6 +88,18 @@ export const SettingsPage: FC = () => {
       }
     }
 
+    const nameRegex = /^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂÊÔƠỨỪỮỮỰẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăâêôơứừữữựấầẩẫậắằẳẵặẹẻẽềềể\s]+$/;
+    if (fullName && !nameRegex.test(fullName)) {
+      setError('Họ và tên người nhận chỉ được chứa chữ cái.');
+      return;
+    }
+
+    const phoneRegex = /^0\d{9}$/;
+    if (phone && !phoneRegex.test(phone)) {
+      setError('Số điện thoại phải có đúng 10 chữ số và bắt đầu bằng số 0.');
+      return;
+    }
+
     setSaving(true);
     setError('');
     try {
@@ -98,7 +110,7 @@ export const SettingsPage: FC = () => {
       if (logoFile) {
         const formData = new FormData();
         formData.append('file', logoFile);
-        const uploadRes = await fetch(`${PRODUCT_API_URL}/seller/upload`, {
+        const uploadRes = await fetch(`${PRODUCT_API_URL}/upload`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
           body: formData,
@@ -323,7 +335,7 @@ export const SettingsPage: FC = () => {
                   <input
                     type="text"
                     value={fullName}
-                    onChange={e => setFullName(e.target.value)}
+                    onChange={e => setFullName(e.target.value.replace(/[^a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂÊÔƠỨỪỮỮỰẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăâêôơứừữữựấầẩẫậắằẳẵặẹẻẽềềể\s]/g, ''))}
                     className="w-full px-4 py-3 rounded-xl border border-[#bfc7d3]/30 bg-white/80 text-[#0f1d25] font-medium focus:outline-none focus:ring-2 focus:ring-[#00629d]/30 focus:border-[#00629d] transition-all"
                     placeholder="Nhập họ và tên..."
                   />
@@ -341,7 +353,7 @@ export const SettingsPage: FC = () => {
                   <input
                     type="tel"
                     value={phone}
-                    onChange={e => setPhone(e.target.value)}
+                    onChange={e => setPhone(e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
                     className="w-full px-4 py-3 rounded-xl border border-[#bfc7d3]/30 bg-white/80 text-[#0f1d25] font-medium focus:outline-none focus:ring-2 focus:ring-[#00629d]/30 focus:border-[#00629d] transition-all"
                     placeholder="Nhập số điện thoại..."
                   />

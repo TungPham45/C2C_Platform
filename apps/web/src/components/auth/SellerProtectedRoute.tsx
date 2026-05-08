@@ -13,13 +13,6 @@ export const SellerProtectedRoute: FC<SellerProtectedRouteProps> = ({ children }
 
   useEffect(() => {
     let mounted = true;
-    const clearSession = () => {
-      localStorage.removeItem('c2c_token');
-      localStorage.removeItem('c2c_user');
-      localStorage.removeItem('c2c_user_id');
-      localStorage.removeItem('c2c_shop_id');
-    };
-
     const checkSeller = async () => {
       const token = localStorage.getItem('c2c_token');
       if (!token) {
@@ -29,15 +22,11 @@ export const SellerProtectedRoute: FC<SellerProtectedRouteProps> = ({ children }
       
       let isShopFound = false;
       let apiStatus = null;
-      let authFailed = false;
 
       try {
         const res = await fetch(`${PRODUCT_API_URL}/seller/context`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        if (res.status === 401 || res.status === 403) {
-          authFailed = true;
-        }
         if (res.ok) {
           const data = await res.json();
           if (data.shop) {
@@ -50,12 +39,6 @@ export const SellerProtectedRoute: FC<SellerProtectedRouteProps> = ({ children }
       }
 
       if (!mounted) return;
-
-      if (authFailed) {
-        clearSession();
-        setLoading(false);
-        return;
-      }
 
       const suspendedStatuses = ['suspended', 'banned', 'locked', 'rejected'];
 

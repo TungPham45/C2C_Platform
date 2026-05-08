@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UnauthorizedException, Inject, Get, Headers, ForbiddenException, Put, Param, Query } from '@nestjs/common';
+import { Controller, Post, Body, UnauthorizedException, Inject, Get, Headers, ForbiddenException, Put, Param, Query, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
 @Controller('auth')
@@ -100,5 +100,19 @@ export class AuthController {
     if (!ids) return [];
     const idArray = ids.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
     return this.authService.getUsersByIds(idArray);
+  }
+
+  @Put('profile')
+  async updateProfile(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Body() body: { full_name?: string; phone?: string },
+  ) {
+    const rawUserId = headers['x-user-id'];
+    const userIdStr = Array.isArray(rawUserId) ? rawUserId[0] : rawUserId;
+    const userId = parseInt(userIdStr ?? '', 10);
+    if (!userId || isNaN(userId)) {
+      throw new BadRequestException('Không xác định được người dùng. Vui lòng đăng nhập lại.');
+    }
+    return this.authService.updateProfile(userId, body);
   }
 }

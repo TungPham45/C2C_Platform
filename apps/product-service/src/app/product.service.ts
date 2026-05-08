@@ -124,6 +124,12 @@ export class ProductService {
         rating: true,
         status: true,
         created_at: true,
+        _count: {
+          select: {
+            followers: true,
+            products: true
+          }
+        }
       },
     });
   }
@@ -591,7 +597,7 @@ export class ProductService {
         shop_categories: true,
         _count: { select: { reviews: true } }
       },
-      orderBy: { created_at: 'desc' }
+      orderBy: { created_at: 'desc' },
     });
   }
 
@@ -1843,6 +1849,46 @@ export class ProductService {
       orderBy: { created_at: 'desc' },
       take: 60,
     });
+  }
+
+  async getShopFollowers(shopId: number) {
+    const shop = await this.prisma.shop.findUnique({
+      where: { id: shopId },
+      select: { id: true, status: true },
+    });
+
+    if (!shop) {
+      throw new NotFoundException('Shop not found');
+    }
+
+    const followers = await this.prisma.shopFollow.findMany({
+      where: { shop_id: shopId },
+      select: { user_id: true, created_at: true },
+      orderBy: { created_at: 'desc' }
+    });
+
+    if (followers.length === 0) return [];
+
+    const userIds = followers.map(f => f.user_id);
+    const authUrl = process.env.AUTH_SERVICE_URL ?? 'http://localhost:3002/api/auth';
+    try {
+      const res = await fetch(`${authUrl}/internal/admin/users-by-ids?ids=${userIds.join(',')}`, {
+        headers: { 'x-internal-token': process.env.INTERNAL_SERVICE_TOKEN ?? 'internal-dev-token' }
+      });
+      if (res.ok) {
+        const users = await res.json();
+        const userMap = new Map(users.map((u: any) => [u.id, u]));
+        return followers.map(f => ({
+          user_id: f.user_id,
+          created_at: f.created_at,
+          user: userMap.get(f.user_id) || null
+        }));
+      }
+    } catch (e) {
+      console.error('Failed to fetch followers user details:', e);
+    }
+    
+    return followers;
   }
 
   // =====================

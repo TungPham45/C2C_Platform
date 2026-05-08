@@ -1,8 +1,6 @@
 import { FC, useEffect, useState, useCallback } from 'react';
 import { AdminLayout } from '../../components/layout/AdminLayout';
 import { ADMIN_API_URL } from '../../config/api';
-import { TransactionDetailModal } from '../../components/shared/TransactionDetailModal';
-import { PayoutDetailModal } from '../../components/shared/PayoutDetailModal';
 
 const formatVND = (n: number) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
@@ -48,14 +46,12 @@ const WalletManagement: FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [toast, setToast] = useState('');
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
-  const [selectedTx, setSelectedTx] = useState<any>(null);
 
   // --- PAYOUTS STATE ---
   const [activeTab, setActiveTab] = useState<'ledger' | 'payouts'>('ledger');
   const [payouts, setPayouts] = useState<any[]>([]);
   const [payoutsLoading, setPayoutsLoading] = useState(false);
   const [payoutFilterStatus, setPayoutFilterStatus] = useState('all');
-  const [selectedPayout, setSelectedPayout] = useState<any>(null);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -295,7 +291,7 @@ const WalletManagement: FC = () => {
                 transactions.map((tx) => {
                   const typeCfg = TYPE_CONFIG[tx.transaction_type] || { label: tx.transaction_type.toUpperCase(), color: '#6b7280', bg: '#f3f4f6' };
                   const statusCfg = STATUS_CONFIG[tx.status] || STATUS_CONFIG.completed;
-                  const isCredit = ['topup', 'refund', 'transfer_in'].includes(tx.transaction_type);
+                  const isCredit = ['topup', 'payout', 'refund', 'transfer_in'].includes(tx.transaction_type);
 
                   return (
                     <tr key={tx.id} className="border-t border-[#f5faff] hover:bg-[#fbfdff] transition-colors">
@@ -341,39 +337,36 @@ const WalletManagement: FC = () => {
                         </div>
                       </td>
                       <td className="px-4 py-4 text-center relative">
-                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => setSelectedTx(tx)} className="w-8 h-8 rounded-lg hover:bg-[#f5faff] flex items-center justify-center transition-colors text-[#707882]" title="Xem chi tiết">
-                            <span className="material-symbols-outlined text-[18px]">visibility</span>
-                          </button>
-                          {tx.status === 'pending' ? (
-                            <div className="relative inline-block">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setActionMenuId(actionMenuId === tx.id ? null : tx.id); }}
-                                className="w-8 h-8 rounded-lg hover:bg-[#f5faff] flex items-center justify-center transition-colors"
-                              >
-                                <span className="material-symbols-outlined text-lg text-[#707882]">more_vert</span>
-                              </button>
-                              {actionMenuId === tx.id && (
-                                <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-[#e9f5ff] rounded-xl shadow-xl z-50 overflow-hidden">
-                                  <button
-                                    onClick={() => handleStatusUpdate(tx.id, 'completed')}
-                                    className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-emerald-600 hover:bg-emerald-50 transition-colors"
-                                  >
-                                    <span className="material-symbols-outlined text-base">check_circle</span>
-                                    Phê duyệt
-                                  </button>
-                                  <button
-                                    onClick={() => handleStatusUpdate(tx.id, 'failed')}
-                                    className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors"
-                                  >
-                                    <span className="material-symbols-outlined text-base">cancel</span>
-                                    Từ chối
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          ) : null}
-                        </div>
+                        {tx.status === 'pending' ? (
+                          <div className="relative inline-block">
+                            <button
+                              onClick={() => setActionMenuId(actionMenuId === tx.id ? null : tx.id)}
+                              className="w-8 h-8 rounded-lg hover:bg-[#f5faff] flex items-center justify-center transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-lg text-[#707882]">more_vert</span>
+                            </button>
+                            {actionMenuId === tx.id && (
+                              <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-[#e9f5ff] rounded-xl shadow-xl z-50 overflow-hidden">
+                                <button
+                                  onClick={() => handleStatusUpdate(tx.id, 'completed')}
+                                  className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                >
+                                  <span className="material-symbols-outlined text-base">check_circle</span>
+                                  Phê duyệt
+                                </button>
+                                <button
+                                  onClick={() => handleStatusUpdate(tx.id, 'failed')}
+                                  className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors"
+                                >
+                                  <span className="material-symbols-outlined text-base">cancel</span>
+                                  Từ chối
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[#bfc7d3] text-xs">—</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -519,19 +512,14 @@ const WalletManagement: FC = () => {
                         )}
                       </td>
                       <td className="px-4 py-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button onClick={() => setSelectedPayout(p)} className="w-8 h-8 rounded-lg hover:bg-[#f5faff] flex items-center justify-center transition-colors text-[#707882]" title="Xem chi tiết">
-                            <span className="material-symbols-outlined text-[18px]">visibility</span>
+                        {p.status !== 'paid' && (
+                          <button
+                            onClick={() => handleReleasePayout(p.shop_order_id)}
+                            className="bg-[#e9f5ff] hover:bg-[#00629d] hover:text-white text-[#00629d] px-4 py-2 rounded-xl text-xs font-bold transition-all"
+                          >
+                            Chi Trả Ngay
                           </button>
-                          {p.status !== 'paid' && (
-                            <button
-                              onClick={() => handleReleasePayout(p.shop_order_id)}
-                              className="bg-[#e9f5ff] hover:bg-[#00629d] hover:text-white text-[#00629d] px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
-                            >
-                              Chi Trả Ngay
-                            </button>
-                          )}
-                        </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -541,14 +529,6 @@ const WalletManagement: FC = () => {
           </table>
         </div>
       </div>
-      )}
-
-      {selectedTx && (
-        <TransactionDetailModal transaction={selectedTx} allTransactions={transactions} onClose={() => setSelectedTx(null)} />
-      )}
-
-      {selectedPayout && (
-        <PayoutDetailModal payout={selectedPayout} onClose={() => setSelectedPayout(null)} />
       )}
     </AdminLayout>
   );

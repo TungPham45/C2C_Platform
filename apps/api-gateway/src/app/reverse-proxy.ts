@@ -151,6 +151,11 @@ function getRequestBody(req: Request): Buffer | null | undefined {
     return null;
   }
 
+  const contentTypeHeader = normalizeHeaderValue(req.headers['content-type']);
+  if (contentTypeHeader.includes('multipart/form-data')) {
+    return undefined;
+  }
+
   if (typeof req.body === 'undefined') {
     return undefined;
   }

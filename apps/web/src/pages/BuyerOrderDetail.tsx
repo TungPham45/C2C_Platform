@@ -1,11 +1,11 @@
 import { FC, useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useOrders } from '../hooks/useOrders';
 import { useReviews } from '../hooks/useReviews';
 import { formatVnd } from '../utils/currency';
 import { getOrderPricing } from '../utils/orderPricing';
-import { resolveAssetUrl, PRODUCT_API_URL } from '../config/api';
+import { resolveAssetUrl, PRODUCT_API_URL, ORDER_API_URL } from '../config/api';
 
 const ORDER_STEPS = [
   { key: 'pending',   label: 'Đã đặt hàng',  icon: 'receipt_long' },
@@ -15,11 +15,11 @@ const ORDER_STEPS = [
 ];
 
 const statusIndex: Record<string, number> = {
-  pending: 0, confirmed: 1, shipped: 2, delivered: 3, cancelled: -1,
+  pending: 0, confirmed: 1, shipped: 2, delivered: 3, cancelled: -1, return_requested: 3, returned: 3,
 };
 
 const statusLabel: Record<string, string> = {
-  pending: 'Chờ xử lý', confirmed: 'Đã xác nhận', shipped: 'Đang giao hàng', delivered: 'Đã giao hàng', cancelled: 'Đã hủy',
+  pending: 'Chờ xử lý', confirmed: 'Đã xác nhận', shipped: 'Đang giao hàng', delivered: 'Đã giao hàng', cancelled: 'Đã hủy', return_requested: 'Yêu cầu trả hàng', returned: 'Đã hoàn trả',
 };
 
 export const BuyerOrderDetail: FC = () => {
@@ -35,6 +35,40 @@ export const BuyerOrderDetail: FC = () => {
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewedItems, setReviewedItems] = useState<Map<number, any>>(new Map());
   const [reviewSuccess, setReviewSuccess] = useState(false);
+
+  // Return Modal State
+  const [returnModal, setReturnModal] = useState(false);
+  const [returnReason, setReturnReason] = useState('');
+  const [returnImages, setReturnImages] = useState<string[]>([]);
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
+  const [uploadingCount, setUploadingCount] = useState(0);
+
+  const navigate = useNavigate();
+
+  const handleContactSeller = async () => {
+    const token = localStorage.getItem('c2c_token');
+    if (!token) { navigate('/login'); return; }
+    if (!order?.shop_id) { alert('Không tìm thấy thông tin cửa hàng.'); return; }
+
+    try {
+      // Get shop info to get owner_id
+      const shopRes = await fetch(`/api/products/shop/${order.shop_id}`);
+      const shop = shopRes.ok ? await shopRes.json() : null;
+      const sellerId = shop?.owner_id || order?.seller_id;
+      if (!sellerId) { alert('Không tìm thấy người bán.'); return; }
+
+      const res = await fetch('/api/chat/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ shop_id: order.shop_id, seller_id: sellerId })
+      });
+      if (!res.ok) throw new Error();
+      const conv = await res.json();
+      navigate(`/messages?convId=${conv.id}`);
+    } catch (e) {
+      alert('Không thể mở chat lúc này. Vui lòng thử lại.');
+    }
+  };
 
   useEffect(() => {
     const loadOrder = async () => {
@@ -77,6 +111,21 @@ export const BuyerOrderDetail: FC = () => {
     const success = await updateOrderStatus(parseInt(id), 'delivered');
     if (success) {
       setOrder({ ...order, status: 'delivered' });
+    }
+    setIsUpdating(false);
+  };
+
+  const handleCancelOrder = async () => {
+    if (!id || !order) return;
+    if (!window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này không?')) return;
+    
+    setIsUpdating(true);
+    const success = await updateOrderStatus(parseInt(id), 'cancelled');
+    if (success) {
+      alert('Đã hủy đơn hàng thành công');
+      setOrder({ ...order, status: 'cancelled' });
+    } else {
+      alert('Lỗi khi hủy đơn hàng. Vui lòng thử lại.');
     }
     setIsUpdating(false);
   };
@@ -136,6 +185,104 @@ export const BuyerOrderDetail: FC = () => {
     setReviewSubmitting(false);
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    // Check file size (10MB limit)
+    const validFiles = Array.from(files).filter(file => {
+      if (file.size > 10 * 1024 * 1024) {
+        alert(`File ${file.name} vượt quá dung lượng 10MB. Vui lòng chọn ảnh nhỏ hơn.`);
+        return false;
+      }
+      return true;
+    });
+
+    if (validFiles.length === 0) return;
+
+    setUploadingCount(prev => prev + validFiles.length);
+
+    try {
+      const uploadPromises = validFiles.map(async (file) => {
+        const fd = new FormData();
+        fd.append('file', file);
+        const token = localStorage.getItem('c2c_token');
+        const res = await fetch(`${PRODUCT_API_URL}/upload`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: fd
+        });
+        if (!res.ok) throw new Error('Upload failed');
+        const data = await res.json();
+        return data.url;
+      });
+
+      const urls = await Promise.all(uploadPromises);
+      setReturnImages(prev => [...prev, ...urls].slice(0, 5));
+    } catch (err) {
+      alert('Lỗi tải file lên. Vui lòng thử lại.');
+    } finally {
+      setUploadingCount(prev => Math.max(0, prev - validFiles.length));
+    }
+  };
+
+  const handleSubmitReturn = async () => {
+    if (!returnReason.trim() || returnImages.length === 0) {
+      return alert('Vui lòng nhập lý do và cung cấp ít nhất 1 hình ảnh chứng minh.');
+    }
+
+    setReturnSubmitting(true);
+    try {
+      const token = localStorage.getItem('c2c_token');
+      const res = await fetch(`${ORDER_API_URL}/${id}/return`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          reason: returnReason,
+          images: returnImages
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Lỗi khi gửi yêu cầu hoàn trả');
+      }
+
+      alert('Yêu cầu hoàn trả đã được gửi thành công!');
+      setReturnModal(false);
+      setOrder({ ...order, status: 'return_requested' });
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setReturnSubmitting(false);
+    }
+  };
+
+  const handleCancelReturn = async () => {
+    if (!window.confirm('Bạn có chắc muốn hủy yêu cầu đổi/trả hàng này không?')) return;
+    setIsUpdating(true);
+    try {
+      const token = localStorage.getItem('c2c_token');
+      const res = await fetch(`${ORDER_API_URL}/${id}/return`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Lỗi khi hủy yêu cầu');
+      }
+      alert('Đã hủy yêu cầu hoàn trả thành công!');
+      setOrder({ ...order, status: 'delivered' });
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   if (loading && !order) {
     return (
       <MarketplaceLayout>
@@ -183,6 +330,10 @@ export const BuyerOrderDetail: FC = () => {
     ? 'Thẻ tín dụng'
     : order.checkout_session?.payment_method || 'N/A';
 
+  const isPastReturnWindow = order.delivered_at 
+    ? (Date.now() - new Date(order.delivered_at).getTime()) > 7 * 24 * 60 * 60 * 1000
+    : false;
+
   return (
     <MarketplaceLayout>
       <div className="max-w-[1280px] mx-auto px-8 py-4 font-['Inter']">
@@ -204,10 +355,20 @@ export const BuyerOrderDetail: FC = () => {
             </p>
           </div>
           <div className="flex gap-3">
-            <button className="flex items-center gap-2 px-6 py-3 bg-white border border-[#e4e9f0] text-[#0f1d25] rounded-full text-sm font-bold hover:bg-[#f5faff] transition-all shadow-sm">
+            <button onClick={handleContactSeller} className="flex items-center gap-2 px-6 py-3 bg-white border border-[#e4e9f0] text-[#0f1d25] rounded-full text-sm font-bold hover:bg-[#f5faff] transition-all shadow-sm">
               <span className="material-symbols-outlined text-lg">chat</span>
               Liên hệ người bán
             </button>
+            {order.status?.toLowerCase() === 'pending' && (
+              <button 
+                onClick={handleCancelOrder}
+                disabled={isUpdating}
+                className="flex items-center gap-2 px-6 py-3 bg-white border border-red-200 text-red-600 rounded-full text-sm font-bold hover:bg-red-50 transition-all shadow-sm disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-lg">cancel</span>
+                Hủy đơn hàng
+              </button>
+            )}
             {order.status?.toLowerCase() === 'shipped' && (
               <button 
                 onClick={handleConfirmReceipt}
@@ -215,6 +376,35 @@ export const BuyerOrderDetail: FC = () => {
                 className="flex items-center gap-2 px-6 py-3 bg-[#00629d] text-white rounded-full text-sm font-bold hover:bg-[#004e7c] transition-all shadow-md shadow-blue-400/20 disabled:opacity-50"
               >
                 {isUpdating ? 'Đang xử lý...' : 'Xác nhận đã nhận'}
+              </button>
+            )}
+            {order.status?.toLowerCase() === 'delivered' && (
+              <button 
+                onClick={() => {
+                  if (isPastReturnWindow) {
+                    alert('Đã quá thời hạn 7 ngày để yêu cầu đổi/trả hàng kể từ khi nhận hàng.');
+                  } else {
+                    setReturnModal(true);
+                  }
+                }}
+                className={`flex items-center gap-2 px-6 py-3 rounded-full text-sm font-bold transition-all shadow-sm ${
+                  isPastReturnWindow 
+                    ? 'bg-[#f0f3f8] text-[#a0aab5] border border-[#e4e9f0] cursor-not-allowed'
+                    : 'bg-white border border-[#00629d] text-[#00629d] hover:bg-[#f5faff]'
+                }`}
+              >
+                <span className="material-symbols-outlined text-lg">assignment_return</span>
+                Yêu cầu hoàn trả
+              </button>
+            )}
+            {order.status?.toLowerCase() === 'return_requested' && (
+              <button
+                onClick={handleCancelReturn}
+                disabled={isUpdating}
+                className="flex items-center gap-2 px-6 py-3 bg-white border border-orange-300 text-orange-600 rounded-full text-sm font-bold hover:bg-orange-50 transition-all shadow-sm disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-lg">undo</span>
+                {isUpdating ? 'Đang xử lý...' : 'Hủy yêu cầu hoàn trả'}
               </button>
             )}
           </div>
@@ -556,6 +746,87 @@ export const BuyerOrderDetail: FC = () => {
             </div>
           </div>
         )}
+
+        {/* Return Modal */}
+        {returnModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-[fadeIn_0.2s_ease-out]">
+            <div className="bg-white rounded-[2rem] w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl relative">
+              <div className="px-8 py-5 border-b border-[#e4e9f0] flex items-center justify-between shrink-0">
+                <h3 className="font-black text-[#0f1d25] text-xl font-['Plus_Jakarta_Sans'] flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#00629d]">assignment_return</span>
+                  Yêu cầu Hoàn/Trả Hàng
+                </h3>
+                <button
+                  onClick={() => !returnSubmitting && setReturnModal(false)}
+                  className="w-8 h-8 rounded-full bg-[#f0f3f8] flex items-center justify-center hover:bg-[#e4e9f0] transition-colors"
+                >
+                  <span className="material-symbols-outlined text-lg text-[#707882]">close</span>
+                </button>
+              </div>
+
+              <div className="p-8 overflow-y-auto space-y-6">
+                <div className="bg-amber-50 text-amber-800 p-4 rounded-xl border border-amber-200 text-sm">
+                  <strong>Lưu ý:</strong> Để yêu cầu hoàn trả được duyệt nhanh chóng, bạn vui lòng cung cấp rõ hình ảnh tình trạng sản phẩm (tối đa 10MB/ảnh).
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[#707882] mb-2">Lý do trả hàng <span className="text-red-500">*</span></label>
+                  <textarea
+                    value={returnReason}
+                    onChange={e => setReturnReason(e.target.value)}
+                    placeholder="Vui lòng mô tả chi tiết vấn đề bạn gặp phải với sản phẩm..."
+                    rows={4}
+                    className="w-full px-4 py-3 rounded-xl border border-[#e4e9f0] bg-[#f9fafc] text-sm text-[#0f1d25] resize-none focus:outline-none focus:ring-2 focus:ring-[#00629d]/20 focus:border-[#00629d] transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-[#707882] mb-2">
+                    Hình ảnh chứng minh <span className="text-red-500">*</span> ({returnImages.length}/5)
+                  </label>
+                  <div className="flex flex-wrap gap-4">
+                    {returnImages.map((url, idx) => (
+                      <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border border-[#e4e9f0]">
+                        <img src={resolveAssetUrl(url)} alt="proof" className="w-full h-full object-cover" />
+                        <button onClick={() => setReturnImages(prev => prev.filter((_, i) => i !== idx))} className="absolute top-1 right-1 w-5 h-5 bg-black/50 text-white rounded-full flex items-center justify-center hover:bg-black/80">
+                          <span className="material-symbols-outlined text-[12px]">close</span>
+                        </button>
+                      </div>
+                    ))}
+                    {returnImages.length < 5 && (
+                      <label className={`w-20 h-20 rounded-xl border-2 border-dashed border-[#00629d]/30 bg-[#00629d]/5 flex flex-col items-center justify-center cursor-pointer hover:bg-[#00629d]/10 transition-colors ${uploadingCount > 0 ? 'opacity-50 cursor-wait' : ''}`}>
+                        <span className="material-symbols-outlined text-[#00629d]">add_photo_alternate</span>
+                        <input type="file" capture="environment" multiple className="hidden" onChange={handleFileUpload} disabled={uploadingCount > 0} />
+                      </label>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-8 py-5 border-t border-[#e4e9f0] bg-[#f9fafc] flex justify-end gap-3 shrink-0 rounded-b-[2rem]">
+                <button
+                  onClick={() => setReturnModal(false)}
+                  disabled={returnSubmitting}
+                  className="px-6 py-2.5 rounded-xl font-bold text-sm text-[#707882] hover:bg-[#e4e9f0] transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleSubmitReturn}
+                  disabled={returnSubmitting || uploadingCount > 0}
+                  className={`px-6 py-2.5 rounded-xl font-bold text-sm text-white transition-all ${
+                    returnSubmitting || uploadingCount > 0
+                      ? 'bg-[#00629d]/60 cursor-wait'
+                      : 'bg-[#00629d] hover:bg-[#004e7c] shadow-md shadow-blue-500/20'
+                  }`}
+                >
+                  {returnSubmitting ? 'Đang gửi...' : 'Gửi yêu cầu'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     </MarketplaceLayout>
   );
