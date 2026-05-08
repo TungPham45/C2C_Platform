@@ -98,7 +98,7 @@ export const SettingsPage: FC = () => {
       if (logoFile) {
         const formData = new FormData();
         formData.append('file', logoFile);
-        const uploadRes = await fetch(`${PRODUCT_API_URL}/upload`, {
+        const uploadRes = await fetch(`${PRODUCT_API_URL}/seller/upload`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
           body: formData,

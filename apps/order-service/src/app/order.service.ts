@@ -59,12 +59,15 @@ export class OrderService {
 
     if (isWalletPayment) {
       platformUserId = await this.walletClient.getPlatformUserId();
+      // Generate a unique reference ID for this payment to link the sender/receiver transactions
+      const paymentRef = `ORDER_PAY_${userId}_${Date.now()}`;
+      
       const paymentResult = await this.walletClient.transfer(
         userId,
         platformUserId,
         totalPayment,
         'Thanh toan online cho don hang moi',
-        undefined,
+        paymentRef,
         'checkout_session',
         { from: 'payment', to: 'transfer_in' },
       );

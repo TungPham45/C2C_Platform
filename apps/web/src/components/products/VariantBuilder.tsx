@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { PRODUCT_API_URL, resolveAssetUrl } from '../../config/api';
+import { resolveAssetUrl } from '../../config/api';
+import { uploadProductImage, validateProductImageFile } from '../../utils/productUpload';
 
 export interface GeneratedVariant {
   id: string; // e.g. "Màu:Đỏ|Kích cỡ:200GB"
@@ -196,26 +197,21 @@ export const VariantBuilder: React.FC<VariantBuilderProps> = ({
     if (e.target.files && e.target.files[0] && activeUploadKey) {
       const file = e.target.files[0];
       const token = localStorage.getItem('c2c_token');
-      
-      const fd = new FormData();
-      fd.append('file', file);
+      const validationError = validateProductImageFile(file);
+      if (validationError) {
+        alert(validationError);
+        if (variantImageInputRef.current) variantImageInputRef.current.value = '';
+        return;
+      }
+
       setIsUploadingVariantImage(true);
       
       try {
-        const res = await fetch(`${PRODUCT_API_URL}/upload`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-          body: fd,
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setGroupImages(prev => ({ ...prev, [activeUploadKey]: resolveAssetUrl(data.url) }));
-        } else {
-          alert('Failed to upload variant image');
-        }
+        const imageUrl = await uploadProductImage(file, token);
+        setGroupImages(prev => ({ ...prev, [activeUploadKey]: resolveAssetUrl(imageUrl) }));
       } catch (err) {
         console.error('Variant image upload error:', err);
-        alert('Network error during image upload');
+        alert(err instanceof Error ? err.message : 'Network error during image upload');
       } finally {
         setIsUploadingVariantImage(false);
       }

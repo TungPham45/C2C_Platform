@@ -4,7 +4,8 @@ import { SellerLayout } from '../../components/layout/SellerLayout';
 import { VariantBuilder, GeneratedVariant } from '../../components/products/VariantBuilder';
 import { CategorySelector } from '../../components/products/CategorySelector';
 import { DynamicAttributes } from '../../components/products/DynamicAttributes';
-import { PRODUCT_API_URL, resolveAssetUrl } from '../../config/api';
+import { PRODUCT_API_URL } from '../../config/api';
+import { uploadProductImage, validateProductImageFile } from '../../utils/productUpload';
 
 export const AddProductPage: FC = () => {
   const navigate = useNavigate();
@@ -63,30 +64,52 @@ export const AddProductPage: FC = () => {
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-    const files = Array.from(e.target.files);
+    const availableSlots = Math.max(0, 9 - formData.images.length);
+    if (availableSlots === 0) {
+      alert('You can upload up to 9 images only.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const selectedFiles = Array.from(e.target.files);
+    const files = selectedFiles.slice(0, availableSlots);
     const token = localStorage.getItem('c2c_token');
-    
+
+    const validationError = files.map(validateProductImageFile).find(Boolean);
+    if (validationError) {
+      alert(validationError);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const skippedCount = selectedFiles.length - files.length;
     setUploadingCount(files.length);
     
     try {
-      const uploadPromises = files.map(async (file) => {
-        const fd = new FormData();
-        fd.append('file', file);
-        const res = await fetch(`${PRODUCT_API_URL}/upload`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-          body: fd,
-        });
-        if (!res.ok) throw new Error('Upload failed');
-        const data = await res.json();
-        return resolveAssetUrl(data.url as string);
-      });
-      
-      const urls = await Promise.all(uploadPromises);
-      setFormData(prev => ({
-        ...prev,
-        images: [...prev.images, ...urls].slice(0, 9)
-      }));
+      const uploadResults = await Promise.allSettled(files.map(file => uploadProductImage(file, token)));
+      const uploadedUrls = uploadResults.flatMap(result =>
+        result.status === 'fulfilled' ? [result.value] : []
+      );
+      const failedMessages = uploadResults.flatMap(result =>
+        result.status === 'rejected'
+          ? [result.reason instanceof Error ? result.reason.message : 'Upload failed']
+          : []
+      );
+
+      if (uploadedUrls.length > 0) {
+        setFormData(prev => ({
+          ...prev,
+          images: [...prev.images, ...uploadedUrls].slice(0, 9)
+        }));
+      }
+
+      if (failedMessages.length > 0 || skippedCount > 0) {
+        const notices = [
+          ...failedMessages,
+          skippedCount > 0 ? `Only ${availableSlots} more image(s) could be added.` : '',
+        ].filter(Boolean);
+        alert(notices.join('\n'));
+      }
     } catch (err) {
       console.error('Image upload error:', err);
       alert('Lỗi khi tải hình ảnh lên. Vui lòng thử lại.');

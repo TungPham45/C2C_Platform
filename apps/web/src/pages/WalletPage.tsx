@@ -1,6 +1,7 @@
 import { FC, useEffect, useState } from 'react';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useWallet } from '../hooks/useWallet';
+import { TransactionDetailModal } from '../components/shared/TransactionDetailModal';
 
 /* ──────────── helpers ──────────── */
 const formatVND = (n: number) =>
@@ -46,6 +47,7 @@ export const WalletPage: FC = () => {
   const [withdrawAmount, setWithdrawAmount] = useState<number>(0);
   const [actionLoading, setActionLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [selectedTx, setSelectedTx] = useState<any>(null);
 
   useEffect(() => { fetchWallet(); }, [fetchWallet]);
   useEffect(() => { fetchTransactions({ type: activeTab === 'all' ? undefined : activeTab, page: 1, limit: 10 }); }, [activeTab, fetchTransactions]);
@@ -178,6 +180,7 @@ export const WalletPage: FC = () => {
                   <th className="px-4 py-4">Loại</th>
                   <th className="px-4 py-4">Trạng thái</th>
                   <th className="px-4 py-4 text-right">Số tiền</th>
+                  <th className="px-4 py-4 text-center">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
@@ -189,11 +192,12 @@ export const WalletPage: FC = () => {
                       <td className="px-4 py-5"><div className="h-6 w-20 bg-[#f5faff] rounded-full animate-pulse" /></td>
                       <td className="px-4 py-5"><div className="h-4 w-20 bg-[#f5faff] rounded-lg animate-pulse" /></td>
                       <td className="px-4 py-5 text-right"><div className="h-4 w-24 bg-[#f5faff] rounded-lg animate-pulse ml-auto" /></td>
+                      <td className="px-4 py-5 text-center"><div className="h-8 w-8 bg-[#f5faff] rounded-full animate-pulse mx-auto" /></td>
                     </tr>
                   ))
                 ) : transactions.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-8 py-16 text-center">
+                    <td colSpan={6} className="px-8 py-16 text-center">
                       <span className="material-symbols-outlined text-5xl text-[#dbeaf5] mb-4 block">receipt_long</span>
                       <p className="font-bold text-[#707882]">Chưa có giao dịch nào</p>
                       <p className="text-xs text-[#bfc7d3] mt-1">Nạp tiền vào ví để bắt đầu sử dụng</p>
@@ -202,7 +206,7 @@ export const WalletPage: FC = () => {
                 ) : (
                   transactions.map((tx) => {
                     const typeCfg = TYPE_LABELS[tx.transaction_type] || { label: tx.transaction_type, color: '#6b7280', bg: '#f3f4f6' };
-                    const isCredit = ['topup', 'payout', 'refund', 'transfer_in'].includes(tx.transaction_type);
+                    const isCredit = ['topup', 'refund', 'transfer_in'].includes(tx.transaction_type);
                     return (
                       <tr key={tx.id} className="border-t border-[#f5faff] hover:bg-[#fbfdff] transition-colors">
                         <td className="px-8 py-5">
@@ -242,6 +246,11 @@ export const WalletPage: FC = () => {
                           <span className={`text-sm font-bold ${isCredit ? 'text-emerald-600' : 'text-[#0f1d25]'}`}>
                             {isCredit ? '+' : '-'}{formatVND(tx.amount)}
                           </span>
+                        </td>
+                        <td className="px-4 py-5 text-center">
+                          <button onClick={() => setSelectedTx(tx)} className="w-8 h-8 rounded-full border border-[#e9f5ff] flex items-center justify-center text-[#707882] hover:bg-[#f5faff] hover:text-[#00629d] transition-all mx-auto" title="Xem chi tiết">
+                            <span className="material-symbols-outlined text-[18px]">visibility</span>
+                          </button>
                         </td>
                       </tr>
                     );
@@ -452,6 +461,10 @@ export const WalletPage: FC = () => {
           to { opacity: 1; transform: translateX(0); }
         }
       `}</style>
+      
+      {selectedTx && (
+        <TransactionDetailModal transaction={selectedTx} allTransactions={transactions} onClose={() => setSelectedTx(null)} />
+      )}
     </MarketplaceLayout>
   );
 };
