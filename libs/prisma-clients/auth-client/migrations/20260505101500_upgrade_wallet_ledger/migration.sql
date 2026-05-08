@@ -69,6 +69,7 @@ WITH normalized AS (
     wt."id",
     wt."wallet_id",
     w."user_id",
+    wt."created_at",
     CASE
       WHEN wt."transaction_type" IN ('payment', 'payout', 'withdraw', 'transfer_out', 'fee') THEN -wt."amount"
       ELSE wt."amount"

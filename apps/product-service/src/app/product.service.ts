@@ -868,14 +868,34 @@ export class ProductService {
     const name = this.getValidCategoryName(data.name);
     await this.ensureCategoryNameIsUnique(name, null);
 
+    let level = 1;
+    const parentId = data.parent_id ? Number(data.parent_id) : null;
+
+    if (parentId) {
+      const parent = await this.prisma.category.findUnique({
+        where: { id: parentId },
+        select: { level: true },
+      });
+
+      if (!parent) {
+        throw new BadRequestException('Parent category not found');
+      }
+
+      if (parent.level >= 3) {
+        throw new BadRequestException('Danh mục chỉ hỗ trợ tối đa 3 cấp. Không thể tạo thêm cấp con cho danh mục này.');
+      }
+
+      level = parent.level + 1;
+    }
+
     const slug = data.slug || this.generateSlug(name);
     return this.prisma.category.create({
       data: {
         name,
         slug: slug,
-        parent_id: data.parent_id ? Number(data.parent_id) : null,
+        parent_id: parentId,
         icon_url: data.icon_url || null,
-        level: data.level ? Number(data.level) : 1,
+        level,
         sort_order: data.sort_order ? Number(data.sort_order) : 0,
         is_active: data.is_active !== undefined ? Boolean(data.is_active) : true,
       },
