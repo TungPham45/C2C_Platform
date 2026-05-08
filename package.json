@@ -6,6 +6,7 @@
     "setup": "node scripts/setup.mjs",
     "local:up": "powershell.exe -ExecutionPolicy Bypass -File scripts/run-local-stack.ps1",
     "db:sync": "node scripts/sync-db-schema.mjs",
+    "db:seed": "node scripts/seed-all-dbs.mjs",
     "prisma:generate": "nx run prisma-clients:generate",
     "prepare": "npm run prisma:generate"
   },
@@ -62,6 +63,7 @@
     "http-proxy-middleware": "^3.0.5",
     "jsonwebtoken": "^9.0.3",
     "nodemailer": "^8.0.5",
+    "pg": "^8.20.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-icons": "^5.6.0",
