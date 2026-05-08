@@ -362,7 +362,7 @@ const CategoryManagement: FC = () => {
     let currentLevelCategories = categories;
     let depth = 0;
 
-    while (currentLevelCategories.length > 0) {
+    while (currentLevelCategories.length > 0 && depth < 2) {
       levels.push(currentLevelCategories);
 
       const selectedId = parentSelectionPath[depth];
@@ -391,8 +391,12 @@ const CategoryManagement: FC = () => {
     setSuccessMessage(null);
     setCategoryModalError(null);
     setEditingCategory(null);
-    setCategoryForm(createDefaultCategoryForm(selectedCategory));
-    setParentSelectionPath(buildParentSelectionPath(selectedCategory?.id ?? null));
+
+    // If selected category is level 3, it cannot be a parent.
+    const effectiveParent = selectedCategory && selectedCategory.level < 3 ? selectedCategory : null;
+
+    setCategoryForm(createDefaultCategoryForm(effectiveParent));
+    setParentSelectionPath(buildParentSelectionPath(effectiveParent?.id ?? null));
     setIsCategoryModalOpen(true);
   };
 
@@ -1374,12 +1378,12 @@ const CategoryManagement: FC = () => {
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
                 {/* //@Put Tieu de doi sang Edit category khi dang sua danh muc. */}
-                <h3 className="text-xl font-bold text-[#0f1d25]">{editingCategory ? 'Edit category' : 'Create category'}</h3>
+                <h3 className="text-xl font-bold text-[#0f1d25]">{editingCategory ? 'Chỉnh sửa danh mục' : 'Tạo danh mục'}</h3>
                 <p className="mt-1 text-sm text-[#707882]">
                   {/* //@Put Mo ta cho biet che do edit khong cho doi danh muc cha. */}
                   {editingCategory
-                    ? 'Update the category name and settings here. Parent stays unchanged in edit mode.'
-                    : 'This posts to the admin category endpoint and refreshes the tree after save.'}
+                    ? 'Cập nhật tên và cài đặt danh mục tại đây. Danh mục cha không thay đổi trong chế độ chỉnh sửa.'
+                    : 'Tạo danh mục mới cho sản phẩm trên nền tảng.'}
                 </p>
               </div>
               <button
@@ -1489,6 +1493,11 @@ const CategoryManagement: FC = () => {
                         {selectedParentCategories.length > 0
                           ? selectedParentCategories.map((category) => category.name).join(' / ')
                           : 'Root level'}
+                        {selectedParentCategories.length >= 2 && (
+                          <p className="mt-1 text-[10px] text-[#ba1a1a] font-semibold italic">
+                            * Cấp cha này ở cấp 2. Danh mục mới sẽ ở cấp 3 (Giới hạn tối đa).
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
