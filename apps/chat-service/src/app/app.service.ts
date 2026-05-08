@@ -29,12 +29,12 @@ export class AppService {
     if (!userIds.length) return map;
     try {
       const ids = [...new Set(userIds)].join(',');
-      const res = await fetch(`${this.authServiceUrl}/internal/users-by-ids?ids=${ids}`, {
+      const res = await fetch(`${this.authServiceUrl}/internal/admin/users-by-ids?ids=${ids}`, {
         headers: { 'x-internal-token': this.internalToken }
       });
       if (res.ok) {
         const users: any[] = await res.json();
-        users.forEach(u => { map[u.id] = u.full_name || `User ${u.id}`; });
+        users.forEach(u => { map[u.id] = u.full_name || u.email || `User ${u.id}`; });
       }
     } catch (e) {
       this.logger.warn('Failed to fetch user names', e);

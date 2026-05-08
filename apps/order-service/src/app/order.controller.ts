@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Query, Req, UnauthorizedException, Headers, ForbiddenException, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, Put, Query, Req, UnauthorizedException, Headers, ForbiddenException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { OrderService } from './order.service';
 
 @Controller('orders')
@@ -100,6 +100,29 @@ export class OrderController {
     return this.orderService.manualPayout(+shopOrderId);
   }
 
+  @Get('internal/admin/returns')
+  getAdminReturns(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query('status') status?: string,
+  ) {
+    if (headers['x-role'] !== 'admin' && headers['x-internal-token'] !== process.env.INTERNAL_SERVICE_TOKEN) {
+      throw new UnauthorizedException('Admin access denied');
+    }
+    return this.orderService.getAdminReturns(status);
+  }
+
+  @Put('internal/admin/returns/:returnId/status')
+  updateReturnStatus(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Param('returnId') returnId: string,
+    @Body() body: { status: string; admin_note?: string },
+  ) {
+    if (headers['x-role'] !== 'admin' && headers['x-internal-token'] !== process.env.INTERNAL_SERVICE_TOKEN) {
+      throw new UnauthorizedException('Admin access denied');
+    }
+    return this.orderService.updateReturnStatus(+returnId, body.status, body.admin_note);
+  }
+
   // Wildcard :id routes — MUST be last to avoid catching named routes above
   @Get(':id')
   async getOrderDetail(@Param('id') id: string) {
@@ -119,6 +142,27 @@ export class OrderController {
       tracking_number,
       carrier_name,
     });
+  }
+
+  @Post(':id/return')
+  async requestReturn(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: { reason: string; images: string[]; video_url?: string }
+  ) {
+    const userId = req.headers['x-user-id'];
+    if (!userId) throw new UnauthorizedException('User not authenticated');
+    return this.orderService.requestReturn(parseInt(userId), parseInt(id), body);
+  }
+
+  @Delete(':id/return')
+  async cancelReturn(
+    @Req() req: any,
+    @Param('id') id: string,
+  ) {
+    const userId = req.headers['x-user-id'];
+    if (!userId) throw new UnauthorizedException('User not authenticated');
+    return this.orderService.cancelReturn(parseInt(userId), parseInt(id));
   }
 
   @Get('internal/admin/stats')

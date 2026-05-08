@@ -41,6 +41,7 @@ import WalletManagement from '../pages/admin/WalletManagement';
 import { BannersAdminPage } from '../pages/admin/BannersAdminPage';
 import { VoucherList } from '../pages/admin/VoucherManagement/VoucherList';
 import { ReportModeration } from '../pages/admin/ReportModeration';
+import { ReturnManagement } from '../pages/admin/ReturnManagement';
 import { SellerProtectedRoute } from '../components/auth/SellerProtectedRoute';
 import { BuyerProtectedRoute } from '../components/auth/BuyerProtectedRoute';
 import { AdminProtectedRoute } from '../components/auth/AdminProtectedRoute';
@@ -111,6 +112,7 @@ export function App() {
         <Route path="/admin/analytics/shop-sales" element={<ShopSalesAnalytics />} />
         <Route path="/admin/categories" element={<CategoryManagement />} />
         <Route path="/admin/reports" element={<ReportModeration />} />
+        <Route path="/admin/returns" element={<ReturnManagement />} />
         <Route path="/admin/wallets" element={<WalletManagement />} />
       </Route>
 

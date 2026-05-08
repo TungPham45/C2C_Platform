@@ -67,6 +67,17 @@ export const AuthPage: FC = () => {
         if (password !== confirmPassword) {
           throw new Error('Mật khẩu nhập lại không khớp');
         }
+
+        const nameRegex = /^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂÊÔƠỨỪỮỮỰẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăâêôơứừữữựấầẩẫậắằẳẵặẹẻẽềềể\s]+$/;
+        if (!nameRegex.test(fullName)) {
+          throw new Error('Họ và tên người nhận chỉ được chứa chữ cái.');
+        }
+
+        const phoneRegex = /^0\d{9}$/;
+        if (!phoneRegex.test(phone)) {
+          throw new Error('Số điện thoại phải có đúng 10 chữ số và bắt đầu bằng số 0.');
+        }
+
         const res = await fetch(`${AUTH_API_URL}/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -279,7 +290,7 @@ export const AuthPage: FC = () => {
                         <input
                           type="text"
                           value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
+                          onChange={(e) => setFullName(e.target.value.replace(/[^a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂÊÔƠỨỪỮỮỰẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăâêôơứừữữựấầẩẫậắằẳẵặẹẻẽềềể\s]/g, ''))}
                           required
                           placeholder="Nguyễn Văn A"
                           className="w-full h-14 pl-14 pr-5 bg-[#f5faff] border border-[#dbeaf5] rounded-[1.25rem] text-sm font-medium focus:bg-white focus:border-[#00629d] focus:ring-4 focus:ring-[#00629d]/5 outline-none transition-all"
@@ -293,7 +304,7 @@ export const AuthPage: FC = () => {
                         <input
                           type="tel"
                           value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
+                          onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
                           required
                           placeholder="0123456789"
                           className="w-full h-14 pl-14 pr-5 bg-[#f5faff] border border-[#dbeaf5] rounded-[1.25rem] text-sm font-medium focus:bg-white focus:border-[#00629d] focus:ring-4 focus:ring-[#00629d]/5 outline-none transition-all"

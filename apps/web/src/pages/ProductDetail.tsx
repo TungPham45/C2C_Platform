@@ -190,7 +190,7 @@ export const ProductDetailPage: FC = () => {
   };
 
   const getPrice = () => {
-    let rawPrice = selectedVariant?.price_override || selectedVariant?.price;
+    let rawPrice = selectedVariant?.price;
     if (rawPrice === undefined || rawPrice === null) {
        rawPrice = product?.base_price;
     }
@@ -348,6 +348,10 @@ export const ProductDetailPage: FC = () => {
                  <span className="text-4xl font-black text-[#00629d] font-['Plus_Jakarta_Sans']">
                    {selectedVariant ? formatVnd(getPrice()) : formatPriceRange(product.base_price, product.variants)}
                  </span>
+                 <span className="text-lg font-semibold text-[#707882] line-through">
+                   {formatVnd(getPrice() * 1.4)}
+                 </span>
+                 <span className="text-xs font-bold text-[#d32f2f] uppercase tracking-wider">GIẢM 30%</span>
               </div>
 
               {/* Variant Selections */}
@@ -381,36 +385,30 @@ export const ProductDetailPage: FC = () => {
                     </div>
                   ))}
                 </div>
-              ) : product?.variants?.length > 1 && (
+              ) : product?.variants?.length > 0 && (
                 <div className="space-y-6 mb-8">
                   <div>
                     <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#707882] mb-3">Chọn phiên bản</h3>
                     <div className="flex flex-wrap gap-3">
-                      {product.variants.map((v: any, idx: number) => {
-                        // Show a friendly label instead of raw SKU codes
-                        const label = (v.attributes && Object.keys(v.attributes).length > 0)
-                          ? Object.values(v.attributes).join(' / ')
-                          : `Phiên bản ${idx + 1}`;
-                        return (
-                          <button 
-                            key={v.id} 
-                            disabled={(v.stock_quantity || 0) <= 0}
-                            onClick={() => {
-                                setSelectedVariant(v);
-                                if (v.image_url) setSelectedImage(v.image_url);
-                            }}
-                            className={`px-6 py-2.5 rounded-full border text-sm font-semibold transition-colors ${
-                              selectedVariant?.id === v.id 
-                                ? 'border-[#00629d] bg-[#f0f7ff] text-[#00629d]' 
-                                : (v.stock_quantity || 0) > 0
-                                  ? 'border-transparent bg-[#f0f3f8] text-[#404751] hover:bg-[#e4e9f0]'
-                                  : 'border-transparent bg-[#f0f3f8]/50 text-[#bfc7d3] cursor-not-allowed opacity-50'
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
+                      {product.variants.map((v: any) => (
+                        <button 
+                          key={v.id} 
+                          disabled={(v.stock_quantity || 0) <= 0}
+                          onClick={() => {
+                              setSelectedVariant(v);
+                              if (v.image_url) setSelectedImage(v.image_url);
+                          }}
+                          className={`px-6 py-2.5 rounded-full border text-sm font-semibold transition-colors ${
+                            selectedVariant?.id === v.id 
+                              ? 'border-[#00629d] bg-[#f0f7ff] text-[#00629d]' 
+                              : (v.stock_quantity || 0) > 0
+                                ? 'border-transparent bg-[#f0f3f8] text-[#404751] hover:bg-[#e4e9f0]'
+                                : 'border-transparent bg-[#f0f3f8]/50 text-[#bfc7d3] cursor-not-allowed opacity-50'
+                          }`}
+                        >
+                          {v.sku}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>

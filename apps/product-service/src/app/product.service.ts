@@ -124,6 +124,12 @@ export class ProductService {
         rating: true,
         status: true,
         created_at: true,
+        _count: {
+          select: {
+            followers: true,
+            products: true
+          }
+        }
       },
     });
   }
@@ -475,7 +481,7 @@ export class ProductService {
       const shop = await this.requireActiveSellerShop(userId);
       console.log('[CREATE] Incoming data:', JSON.stringify(data, null, 2));
       const slug = this.generateSlug(data.name || 'product');
-      const defaultSku = `SKU-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      const defaultSku = `DEFAULT-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
 
       // Step 1: Create the base product
       console.log('[CREATE] Step 1: Creating product...');
@@ -511,7 +517,7 @@ export class ProductService {
       const variantData = data.has_variants && data.variants && data.variants.length > 0
         ? data.variants.map((v: any, idx: number) => ({
           product_id: product.id,
-          sku: v.sku ? `${String(v.sku).substring(0, 90)}-v${idx}` : `SKU-${Date.now()}-v${idx}`,
+          sku: v.sku ? `${v.sku}-v${idx}` : `${slug}-v${idx}`,
           stock_quantity: Number(v.stock) || 0,
           price_override: Number(v.price) || Number(data.base_price),
           attributes: v.attributes || {}
@@ -591,7 +597,7 @@ export class ProductService {
         shop_categories: true,
         _count: { select: { reviews: true } }
       },
-      orderBy: { created_at: 'desc' }
+      orderBy: { created_at: 'desc' },
     });
   }
 
@@ -605,7 +611,7 @@ export class ProductService {
       if (product.shop_id !== shop.id) throw new UnauthorizedException('Not the owner of this product');
 
       const slug = this.generateSlug(data.name || 'product');
-      const defaultSku = `SKU-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      const defaultSku = `DEFAULT-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
 
       // Step 1: Clean up all old relations
       console.log('[UPDATE] Step 1: Cleaning old relations...');
@@ -645,7 +651,7 @@ export class ProductService {
       const variantData = data.has_variants && data.variants && data.variants.length > 0
         ? data.variants.map((v: any, idx: number) => ({
           product_id: productId,
-          sku: v.sku ? `${String(v.sku).substring(0, 90)}-v${idx}` : `SKU-${Date.now()}-v${idx}`,
+          sku: v.sku ? `${v.sku}-v${idx}` : `${slug}-v${idx}`,
           stock_quantity: Number(v.stock) || 0,
           price_override: Number(v.price) || Number(data.base_price),
           attributes: v.attributes || {}
@@ -868,34 +874,14 @@ export class ProductService {
     const name = this.getValidCategoryName(data.name);
     await this.ensureCategoryNameIsUnique(name, null);
 
-    let level = 1;
-    const parentId = data.parent_id ? Number(data.parent_id) : null;
-
-    if (parentId) {
-      const parent = await this.prisma.category.findUnique({
-        where: { id: parentId },
-        select: { level: true },
-      });
-
-      if (!parent) {
-        throw new BadRequestException('Parent category not found');
-      }
-
-      if (parent.level >= 3) {
-        throw new BadRequestException('Danh mục chỉ hỗ trợ tối đa 3 cấp. Không thể tạo thêm cấp con cho danh mục này.');
-      }
-
-      level = parent.level + 1;
-    }
-
     const slug = data.slug || this.generateSlug(name);
     return this.prisma.category.create({
       data: {
         name,
         slug: slug,
-        parent_id: parentId,
+        parent_id: data.parent_id ? Number(data.parent_id) : null,
         icon_url: data.icon_url || null,
-        level,
+        level: data.level ? Number(data.level) : 1,
         sort_order: data.sort_order ? Number(data.sort_order) : 0,
         is_active: data.is_active !== undefined ? Boolean(data.is_active) : true,
       },
@@ -1843,6 +1829,46 @@ export class ProductService {
       orderBy: { created_at: 'desc' },
       take: 60,
     });
+  }
+
+  async getShopFollowers(shopId: number) {
+    const shop = await this.prisma.shop.findUnique({
+      where: { id: shopId },
+      select: { id: true, status: true },
+    });
+
+    if (!shop) {
+      throw new NotFoundException('Shop not found');
+    }
+
+    const followers = await this.prisma.shopFollow.findMany({
+      where: { shop_id: shopId },
+      select: { user_id: true, created_at: true },
+      orderBy: { created_at: 'desc' }
+    });
+
+    if (followers.length === 0) return [];
+
+    const userIds = followers.map(f => f.user_id);
+    const authUrl = process.env.AUTH_SERVICE_URL ?? 'http://localhost:3002/api/auth';
+    try {
+      const res = await fetch(`${authUrl}/internal/admin/users-by-ids?ids=${userIds.join(',')}`, {
+        headers: { 'x-internal-token': process.env.INTERNAL_SERVICE_TOKEN ?? 'internal-dev-token' }
+      });
+      if (res.ok) {
+        const users = await res.json();
+        const userMap = new Map(users.map((u: any) => [u.id, u]));
+        return followers.map(f => ({
+          user_id: f.user_id,
+          created_at: f.created_at,
+          user: userMap.get(f.user_id) || null
+        }));
+      }
+    } catch (e) {
+      console.error('Failed to fetch followers user details:', e);
+    }
+    
+    return followers;
   }
 
   // =====================

@@ -290,7 +290,38 @@ export class AuthService {
     if (!ids.length) return [];
     return this.prisma.user.findMany({
       where: { id: { in: ids } },
-      select: { id: true, full_name: true, avatar_url: true, status: true },
+      select: { id: true, full_name: true, email: true, avatar_url: true, status: true },
     });
+  }
+
+
+  async updateProfile(userId: number, data: { full_name?: string; phone?: string }) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Không tìm thấy tài khoản');
+
+    // Check phone uniqueness if phone is being updated
+    if (data.phone && data.phone !== user.phone) {
+      const existingPhone = await this.prisma.user.findUnique({ where: { phone: data.phone } });
+      if (existingPhone) throw new BadRequestException('Số điện thoại đã được sử dụng bởi tài khoản khác');
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(data.full_name !== undefined && { full_name: data.full_name }),
+        ...(data.phone !== undefined && { phone: data.phone }),
+      },
+      select: {
+        id: true,
+        email: true,
+        full_name: true,
+        phone: true,
+        role: true,
+        avatar_url: true,
+        status: true,
+      },
+    });
+
+    return updated;
   }
 }

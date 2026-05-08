@@ -21,7 +21,7 @@ const sidebarItems = [
 ];
 
 export const MyPurchasesPage: FC = () => {
-  const { orders, fetchBuyerOrders, loading } = useOrders();
+  const { orders, fetchBuyerOrders, loading, updateOrderStatus } = useOrders();
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<string>('all');
@@ -83,6 +83,18 @@ export const MyPurchasesPage: FC = () => {
       alert(e.message);
     } finally {
       setSubmittingReview(false);
+    }
+  };
+
+  const handleCancelOrder = async (orderId: number) => {
+    if (!window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này không?')) return;
+    
+    const success = await updateOrderStatus(orderId, 'cancelled');
+    if (success) {
+      alert('Đã hủy đơn hàng thành công');
+      fetchBuyerOrders();
+    } else {
+      alert('Lỗi khi hủy đơn hàng. Vui lòng thử lại.');
     }
   };
 
@@ -271,6 +283,15 @@ export const MyPurchasesPage: FC = () => {
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
+                          {order.status?.toLowerCase() === 'pending' && (
+                            <button 
+                              onClick={() => handleCancelOrder(order.id)}
+                              className="flex items-center gap-2 px-5 py-2.5 bg-white border border-red-200 text-red-600 rounded-full text-xs font-bold hover:bg-red-50 transition-all"
+                            >
+                              <span className="material-symbols-outlined text-base">cancel</span>
+                              Hủy đơn hàng
+                            </button>
+                          )}
                           {order.status?.toLowerCase() === 'shipped' && (
                             <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-[#e4e9f0] text-[#0f1d25] rounded-full text-xs font-bold hover:bg-[#f5faff] transition-all">
                               <span className="material-symbols-outlined text-base">local_shipping</span>

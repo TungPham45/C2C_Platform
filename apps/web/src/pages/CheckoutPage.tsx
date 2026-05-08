@@ -91,10 +91,10 @@ export const CheckoutPage = () => {
 
   const getSinglePrice = () => {
     if (!stateData?.product) return 450000;
-    return parsePrice((stateData.variant?.price_override || stateData.variant?.price) ?? stateData.product.base_price);
+    return parsePrice(stateData.variant?.price ?? stateData.product.base_price);
   };
 
-  const getCartItemPrice = (item: any) => parsePrice((item.variant?.price_override || item.variant?.price) ?? item.product?.base_price);
+  const getCartItemPrice = (item: any) => parsePrice(item.variant?.price ?? item.product?.base_price);
 
   const isMultiItem = stateData?.fromCart === true;
 
@@ -211,6 +211,24 @@ export const CheckoutPage = () => {
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!shippingAddress.fullName.trim() || !shippingAddress.address.trim() || !shippingAddress.city.trim() || !shippingAddress.phone.trim()) {
+      return alert('Vui lòng điền đầy đủ thông tin giao hàng (Họ tên, Địa chỉ, Thành phố, Số điện thoại)');
+    }
+
+    const nameRegex = /^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂÊÔƠỨỪỮỮỰẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăâêôơứừữữựấầẩẫậắằẳẵặẹẻẽềềể\s]+$/;
+    if (!nameRegex.test(shippingAddress.fullName)) {
+      return alert('Họ và tên người nhận chỉ được chứa chữ cái.');
+    }
+
+    const phoneRegex = /^0\d{9}$/;
+    if (!phoneRegex.test(shippingAddress.phone)) {
+      return alert('Số điện thoại phải có đúng 10 chữ số, bắt đầu bằng số 0 và không chứa ký tự khác.');
+    }
+
+    if (paymentMethod === 'e_wallet' && (wallet?.balance || 0) < totalPayment) {
+      return alert('Số dư ví không đủ để thanh toán. Vui lòng nạp thêm tiền hoặc chọn phương thức Thanh toán khi nhận hàng (COD).');
+    }
+
     const orderData: any = {
       total_payment: totalPayment,
       payment_method: paymentMethod,
@@ -270,7 +288,7 @@ export const CheckoutPage = () => {
                   <input
                     type="text"
                     value={shippingAddress.fullName}
-                    onChange={(e) => setShippingAddress({ ...shippingAddress, fullName: e.target.value })}
+                    onChange={(e) => setShippingAddress({ ...shippingAddress, fullName: e.target.value.replace(/[^a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂÊÔƠỨỪỮỮỰẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăâêôơứừữữựấầẩẫậắằẳẵặẹẻẽềềể\s]/g, '') })}
                     placeholder="Nhập họ và tên"
                     className="w-full h-14 px-6 bg-[#f5faff] border border-transparent focus:bg-white focus:border-[#00629d]/50 rounded-2xl outline-none transition-all placeholder-[#a0aab5]"
                   />
@@ -300,7 +318,7 @@ export const CheckoutPage = () => {
                   <input
                     type="text"
                     value={shippingAddress.phone}
-                    onChange={(e) => setShippingAddress({ ...shippingAddress, phone: e.target.value })}
+                    onChange={(e) => setShippingAddress({ ...shippingAddress, phone: e.target.value.replace(/[^0-9]/g, '').slice(0, 10) })}
                     placeholder="0123456789"
                     className="w-full h-14 px-6 bg-[#f5faff] border border-transparent focus:bg-white focus:border-[#00629d]/50 rounded-2xl outline-none transition-all placeholder-[#a0aab5]"
                   />
@@ -516,7 +534,7 @@ export const CheckoutPage = () => {
 
                 <button
                   onClick={handleCheckout}
-                  disabled={loading || voucherLoading || (paymentMethod === 'e_wallet' && (wallet?.balance || 0) < totalPayment)}
+                  disabled={loading || voucherLoading}
                   className="w-full mt-8 h-14 bg-[#0f1d25] text-white rounded-2xl font-bold text-base transition-all hover:bg-[#00629d] shadow-lg shadow-blue-500/10 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
