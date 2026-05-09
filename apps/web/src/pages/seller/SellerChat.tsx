@@ -26,30 +26,42 @@ interface Message {
 }
 
 const SellerChat: FC = () => {
+  // main states
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  // UI states
   const [currentConvId, setCurrentConvId] = useState<number | null>(null);
   const [chatText, setChatText] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // media states
   const [isUploading, setIsUploading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
+  // get user info
   useEffect(() => {
     const userStr = localStorage.getItem('c2c_user');
     if (userStr) setCurrentUser(JSON.parse(userStr));
   }, []);
 
+  // get current convo id from url
   useEffect(() => {
     const convIdStr = searchParams.get('convId');
-    if (convIdStr) setCurrentConvId(parseInt(convIdStr));
-  }, [searchParams]);
+    if (convIdStr) {
+      const id = parseInt(convIdStr);
+      if (id !== currentConvId) {
+        setCurrentConvId(id);
+        setMessages([]);
+      }
+    }
+  }, [searchParams, currentConvId]);
 
   // Polling Conversations
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser) return; // chưa login -> stop polling
     const fetchConvs = async () => {
       try {
         const token = localStorage.getItem('c2c_token');
@@ -57,7 +69,7 @@ const SellerChat: FC = () => {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) setConversations(await res.json());
-      } catch (e) {}
+      } catch (e) { }
     };
     fetchConvs();
     const interval = setInterval(fetchConvs, 1500);
@@ -74,19 +86,25 @@ const SellerChat: FC = () => {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) setMessages(await res.json());
-      } catch (e) {}
+      } catch (e) { }
     };
     fetchMsgs();
     const interval = setInterval(fetchMsgs, 1500);
     return () => clearInterval(interval);
   }, [currentUser, currentConvId]);
 
+  const prevMessagesLengthRef = useRef(0);
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length > prevMessagesLengthRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+    prevMessagesLengthRef.current = messages.length;
   }, [messages]);
 
+  // use optimisitic ui -> update ui before call api
   const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault(); // ngăn trình duyệt load lại trang -> hành độc mặc định thẻ form
     if (!chatText.trim() || !currentConvId) return;
     const token = localStorage.getItem('c2c_token');
     const content = chatText;
@@ -94,7 +112,7 @@ const SellerChat: FC = () => {
 
     // Optimistic
     setMessages(prev => [...prev, {
-      id: Date.now(),
+      id: Date.now(), // id tạm thời để react k bị lỗi key
       sender_id: currentUser.id,
       sender_role: 'seller',
       content,
@@ -109,20 +127,20 @@ const SellerChat: FC = () => {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ content, message_type: 'text' })
       });
-    } catch (err) {}
+    } catch (err) { }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !currentConvId) return;
-    
+
     // reset input
     if (fileInputRef.current) fileInputRef.current.value = '';
 
     setIsUploading(true);
     const formData = new FormData();
     formData.append('file', file);
-    
+
     try {
       const token = localStorage.getItem('c2c_token');
       // Upload file
@@ -131,12 +149,12 @@ const SellerChat: FC = () => {
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       });
-      
+
       if (uploadRes.ok) {
         const uploadData = await uploadRes.json();
         const url = uploadData.url;
         const type = file.type.startsWith('video/') ? 'video' : 'image';
-        
+
         // Optimistic
         setMessages(prev => [...prev, {
           id: Date.now(),
@@ -268,22 +286,21 @@ const SellerChat: FC = () => {
                         const isMine = msg.sender_id === currentUser?.id;
                         // Determine if this is the last message sent by the user
                         const isLastMyMsg = isMine && (
-                          index === messages.length - 1 || 
+                          index === messages.length - 1 ||
                           messages.slice(index + 1).findIndex(m => m.sender_id === currentUser?.id) === -1
                         );
                         return (
                           <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                             <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} max-w-[65%]`}>
-                              <div className={`px-4 py-2.5 text-[14px] leading-relaxed shadow-sm ${
-                                isMine
+                              <div className={`px-4 py-2.5 text-[14px] leading-relaxed shadow-sm ${isMine
                                   ? 'bg-[#00629d] text-white rounded-2xl rounded-br-sm'
                                   : 'bg-white text-[#0f1d25] border border-[#e4e9f0] rounded-2xl rounded-bl-sm'
-                              }`}>
+                                }`}>
                                 {msg.message_type === 'image' ? (
-                                  <img 
-                                    src={msg.content} 
-                                    alt="Đính kèm" 
-                                    className="max-w-[200px] sm:max-w-[250px] rounded-lg cursor-pointer hover:opacity-90 transition-opacity" 
+                                  <img
+                                    src={msg.content}
+                                    alt="Đính kèm"
+                                    className="max-w-[200px] sm:max-w-[250px] rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
                                     onClick={() => setSelectedImage(msg.content)}
                                   />
                                 ) : msg.message_type === 'video' ? (
@@ -322,15 +339,15 @@ const SellerChat: FC = () => {
                           </span>
                         </div>
                       )}
-                      <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        className="hidden" 
-                        accept="image/*,video/*" 
-                        onChange={handleFileUpload} 
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        className="hidden"
+                        accept="image/*,video/*"
+                        onChange={handleFileUpload}
                       />
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         onClick={() => fileInputRef.current?.click()}
                         className="w-12 h-12 rounded-xl text-[#707882] hover:bg-[#f0f3f8] hover:text-[#00629d] transition-colors flex items-center justify-center flex-shrink-0"
                       >
@@ -364,21 +381,21 @@ const SellerChat: FC = () => {
 
       {/* Image Viewer Modal */}
       {selectedImage && (
-        <div 
-          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4" 
+        <div
+          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4"
           onClick={() => setSelectedImage(null)}
         >
-          <button 
+          <button
             className="absolute top-6 right-6 text-white/70 hover:text-white transition-colors"
             onClick={() => setSelectedImage(null)}
           >
             <span className="material-symbols-outlined text-4xl">close</span>
           </button>
-          <img 
-            src={selectedImage} 
-            alt="Phóng to" 
-            className="max-w-full max-h-full object-contain select-none" 
-            onClick={e => e.stopPropagation()} 
+          <img
+            src={selectedImage}
+            alt="Phóng to"
+            className="max-w-full max-h-full object-contain select-none"
+            onClick={e => e.stopPropagation()}
           />
         </div>
       )}

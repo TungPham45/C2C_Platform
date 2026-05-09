@@ -7,6 +7,7 @@ import { ProductController } from './product.controller';
 import { ProductService } from './product.service';
 import { PrismaService } from './prisma.service';
 
+// tạo thư mục public/uploads/products nếu chưa có
 const uploadsDir = join(process.cwd(), 'public', 'uploads', 'products');
 if (!existsSync(uploadsDir)) {
   mkdirSync(uploadsDir, { recursive: true });
@@ -30,4 +31,4 @@ if (!existsSync(uploadsDir)) {
   controllers: [ProductController],
   providers: [ProductService, PrismaService],
 })
-export class AppModule {}
+export class AppModule { }

@@ -8,7 +8,7 @@ export class AppService {
   private readonly productServiceUrl = process.env.PRODUCT_SERVICE_URL ?? 'http://127.0.0.1:3001/api/products';
   private readonly internalToken = process.env.INTERNAL_SERVICE_TOKEN ?? 'internal-dev-token';
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   private async sendNotification(data: { user_id: number; title: string; message: string; type: string; link?: string }) {
     try {
@@ -34,8 +34,8 @@ export class AppService {
       });
       if (res.ok) {
         const users: any[] = await res.json();
-        users.forEach(u => { 
-          map[u.id] = u.full_name || (u.email ? u.email.split('@')[0] : `User ${u.id}`); 
+        users.forEach(u => {
+          map[u.id] = u.full_name || (u.email ? u.email.split('@')[0] : `User ${u.id}`);
         });
       }
     } catch (e) {
@@ -62,6 +62,7 @@ export class AppService {
     return map;
   }
 
+  // -> lấy ra list convo hiển thị
   async getConversations(userId: number) {
     // Find all conversations where user is buyer OR user is seller.
     const convs = await this.prisma.conversations.findMany({
@@ -95,6 +96,7 @@ export class AppService {
     }));
   }
 
+  // -> mở ra 1 conv để bắt đầu chat
   async createOrGetConversation(buyerId: number, shopId: number, sellerId: number) {
     // Check if exists
     let conv = await this.prisma.conversations.findFirst({
@@ -117,6 +119,7 @@ export class AppService {
     return conv;
   }
 
+  // lấy messages trong 1 convo
   async getMessages(conversationId: number, userId: number) {
     // First Validate user is part of the conversation
     const conv = await this.prisma.conversations.findUnique({
@@ -166,7 +169,7 @@ export class AppService {
     }
 
     const senderRole = conv.buyer_id === senderId ? 'buyer' : 'seller';
-    
+
     // Increment unread count for the other party
     let previewText = content.substring(0, 50);
     if (messageType === 'image') previewText = '[Hình ảnh]';

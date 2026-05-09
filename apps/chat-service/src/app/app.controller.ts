@@ -3,14 +3,14 @@ import { AppService } from './app.service';
 
 @Controller('conversations')
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(private readonly appService: AppService) { }
 
   private getUserId(req: any): number {
     const userId = req.headers['x-user-id'];
     if (!userId) {
       throw new UnauthorizedException('User not authenticated');
     }
-    return parseInt(userId, 10);
+    return parseInt(userId, 10); // chuyển string sang number 
   }
 
   @Get()
@@ -25,10 +25,11 @@ export class AppController {
     return this.appService.createOrGetConversation(buyerId, body.shop_id, body.seller_id);
   }
 
+  // lấy dsach message trong 1 convo
   @Get(':id/messages')
   async getMessages(@Req() req: any, @Param('id') id: string) {
     const userId = this.getUserId(req);
-    return this.appService.getMessages(+id, userId);
+    return this.appService.getMessages(+id, userId); // +id -> string to number
   }
 
   @Post(':id/messages')

@@ -36,6 +36,7 @@ export const MessagesPage: FC = () => {
   const navigate = useNavigate();
   const chatBodyRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const prevMessagesLengthRef = useRef(0);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
@@ -51,9 +52,13 @@ export const MessagesPage: FC = () => {
   useEffect(() => {
     const convIdStr = searchParams.get('convId');
     if (convIdStr) {
-      setCurrentConvId(parseInt(convIdStr));
+      const id = parseInt(convIdStr);
+      if (id !== currentConvId) {
+        setCurrentConvId(id);
+        setMessages([]);
+      }
     }
-  }, [searchParams]);
+  }, [searchParams, currentConvId]);
 
   // Polling Conversations
   useEffect(() => {
@@ -95,11 +100,12 @@ export const MessagesPage: FC = () => {
     return () => clearInterval(interval);
   }, [currentUser, currentConvId]);
 
-  // Scroll to bottom when messages update
+  // Scroll to bottom only when new messages arrive
   useEffect(() => {
-    if (chatBodyRef.current) {
+    if (messages.length > prevMessagesLengthRef.current && chatBodyRef.current) {
       chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
     }
+    prevMessagesLengthRef.current = messages.length;
   }, [messages]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
