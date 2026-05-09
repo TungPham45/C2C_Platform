@@ -50,14 +50,8 @@ const SellerChat: FC = () => {
   // get current convo id from url
   useEffect(() => {
     const convIdStr = searchParams.get('convId');
-    if (convIdStr) {
-      const id = parseInt(convIdStr);
-      if (id !== currentConvId) {
-        setCurrentConvId(id);
-        setMessages([]);
-      }
-    }
-  }, [searchParams, currentConvId]);
+    if (convIdStr) setCurrentConvId(parseInt(convIdStr));
+  }, [searchParams]);
 
   // Polling Conversations
   useEffect(() => {
@@ -93,13 +87,8 @@ const SellerChat: FC = () => {
     return () => clearInterval(interval);
   }, [currentUser, currentConvId]);
 
-  const prevMessagesLengthRef = useRef(0);
-
   useEffect(() => {
-    if (messages.length > prevMessagesLengthRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-    prevMessagesLengthRef.current = messages.length;
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   // use optimisitic ui -> update ui before call api
@@ -182,6 +171,7 @@ const SellerChat: FC = () => {
     }
   };
 
+  // -> trong seller chat thì chỉ hiện những cuộc trò chuyện mà ng gửi chính là seller -> những convo trả lời khách hàng
   const shopConversations = conversations.filter(c => c.seller_id === currentUser?.id);
   const totalUnread = shopConversations.reduce((sum, c) => sum + (c.unread_count_seller || 0), 0);
 
@@ -210,17 +200,20 @@ const SellerChat: FC = () => {
                   </div>
                 ) : (
                   shopConversations.map(conv => {
-                    const isActive = currentConvId === conv.id;
+                    const isActive = currentConvId === conv.id; // check xem convo này có phải convo đang dc chọn k
                     const unread = conv.unread_count_seller || 0;
                     return (
                       <div
                         key={conv.id}
                         onClick={() => {
+                          // Đổi URL trên thanh địa chỉ thành ?convId=... để hệ thống biết đang mở đoạn chat nào
                           setSearchParams({ convId: String(conv.id) });
+                          // set unread bằng 0 ngay khi click vào
                           setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, unread_count_seller: 0 } : c));
                         }}
                         className={`px-5 py-4 flex items-center gap-4 cursor-pointer transition-all border-b border-[#f5faff] ${isActive ? 'bg-[#e0efff] border-l-4 border-l-[#00629d]' : 'hover:bg-[#f9fafc]'}`}
                       >
+                        {/* avarta + notice unreadCount */}
                         <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#e0efff] to-[#cfe5ff] text-[#00629d] flex items-center justify-center font-bold text-sm flex-shrink-0 relative">
                           <span className="material-symbols-outlined text-xl">face</span>
                           {unread > 0 && (
@@ -229,6 +222,7 @@ const SellerChat: FC = () => {
                             </div>
                           )}
                         </div>
+                        {/* infomation - name + time + message preview */}
                         <div className="flex-1 overflow-hidden">
                           <div className="flex items-center justify-between mb-0.5">
                             <h4 className={`text-sm truncate ${unread > 0 ? 'font-black text-[#0f1d25]' : 'font-bold text-[#404751]'}`}>
@@ -284,7 +278,7 @@ const SellerChat: FC = () => {
                     ) : (
                       messages.map((msg, index) => {
                         const isMine = msg.sender_id === currentUser?.id;
-                        // Determine if this is the last message sent by the user
+                        // Determine if this is the last message sent by the user -> to mark as seen or not
                         const isLastMyMsg = isMine && (
                           index === messages.length - 1 ||
                           messages.slice(index + 1).findIndex(m => m.sender_id === currentUser?.id) === -1
@@ -293,8 +287,8 @@ const SellerChat: FC = () => {
                           <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                             <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} max-w-[65%]`}>
                               <div className={`px-4 py-2.5 text-[14px] leading-relaxed shadow-sm ${isMine
-                                  ? 'bg-[#00629d] text-white rounded-2xl rounded-br-sm'
-                                  : 'bg-white text-[#0f1d25] border border-[#e4e9f0] rounded-2xl rounded-bl-sm'
+                                ? 'bg-[#00629d] text-white rounded-2xl rounded-br-sm'
+                                : 'bg-white text-[#0f1d25] border border-[#e4e9f0] rounded-2xl rounded-bl-sm'
                                 }`}>
                                 {msg.message_type === 'image' ? (
                                   <img
@@ -309,6 +303,7 @@ const SellerChat: FC = () => {
                                   msg.content
                                 )}
                               </div>
+                              {/* time + seen mark */}
                               <span className="text-[10px] text-[#707882] mt-1 px-1 font-medium flex items-center gap-1">
                                 {new Date(msg.sent_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                                 {isLastMyMsg && (
@@ -325,6 +320,7 @@ const SellerChat: FC = () => {
                         );
                       })
                     )}
+                    {/* Scroll to bottom when messages update */}
                     <div ref={messagesEndRef} />
                   </div>
 
