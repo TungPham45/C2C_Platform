@@ -37,6 +37,7 @@ const SellerChat: FC = () => {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const prevMessagesLengthRef = useRef(0);
   // media states
   const [isUploading, setIsUploading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -50,8 +51,15 @@ const SellerChat: FC = () => {
   // get current convo id from url
   useEffect(() => {
     const convIdStr = searchParams.get('convId');
-    if (convIdStr) setCurrentConvId(parseInt(convIdStr));
-  }, [searchParams]);
+    if (convIdStr) {
+      const newId = parseInt(convIdStr);
+      if (newId !== currentConvId) {
+        setCurrentConvId(newId);
+        setMessages([]);
+        prevMessagesLengthRef.current = 0;
+      }
+    }
+  }, [searchParams, currentConvId]);
 
   // Polling Conversations
   useEffect(() => {
@@ -87,8 +95,12 @@ const SellerChat: FC = () => {
     return () => clearInterval(interval);
   }, [currentUser, currentConvId]);
 
+  // Only scroll to bottom when new messages arrive, not on every poll
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length > prevMessagesLengthRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+    prevMessagesLengthRef.current = messages.length;
   }, [messages]);
 
   // use optimisitic ui -> update ui before call api
