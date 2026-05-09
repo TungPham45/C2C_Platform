@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useOrders } from '../hooks/useOrders';
 import { useWallet } from '../hooks/useWallet';
-import { AUTH_API_URL } from '../config/api';
+import { AUTH_API_URL, resolveAssetUrl } from '../config/api';
 import {
   fetchLocationOptions,
   findProvinceByCode,
@@ -621,12 +621,12 @@ export const CheckoutPage = () => {
                       {group.items.map((item: any, itemIndex: number) => {
                         const price = isMultiItem ? getCartItemPrice(item) : item.price;
                         const image = isMultiItem ? (item.variant?.image_url || item.product?.thumbnail_url) : item.image;
-                        const displayImage = image?.startsWith('http') ? image : `http://localhost:3000${image}`;
+                        const displayImage = resolveAssetUrl(image || '');
 
                         return (
                           <div key={itemIndex} className="flex gap-4">
                             <div className="w-[60px] h-[60px] rounded-xl bg-[#f0f3f8] flex-shrink-0 overflow-hidden">
-                              {image ? (
+                              {displayImage ? (
                                 <img src={displayImage} alt="thumbnail" className="w-full h-full object-cover" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center">

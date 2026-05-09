@@ -1,4 +1,4 @@
-import { FC, useEffect, useState, useMemo } from 'react';
+import { FC, useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useProducts } from '../hooks/useProducts';
@@ -6,6 +6,10 @@ import { useCart } from '../hooks/useCart';
 import { useReviews, ReviewsData } from '../hooks/useReviews';
 import { formatVnd, formatPriceRange } from '../utils/currency';
 import ReportModal from '../components/shared/ReportModal';
+
+// Biến cờ toàn cục để chặn double-fetch trong môi trường Dev (Strict Mode)
+let globalLastFetchedId: string | null = null;
+let lastFetchTimestamp: number = 0;
 
 export const ProductDetailPage: FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -41,7 +45,12 @@ export const ProductDetailPage: FC = () => {
     window.scrollTo(0, 0);
 
     const loadProduct = async () => {
-      if (id) {
+      const now = Date.now();
+      // Nếu cùng 1 ID và gọi quá gần nhau (dưới 1 giây) -> Chặn
+      if (id && (globalLastFetchedId !== id || now - lastFetchTimestamp > 1000)) {
+        globalLastFetchedId = id;
+        lastFetchTimestamp = now;
+        
         const productId = parseInt(id);
         const data = await fetchProductDetail(productId);
         if (data) {

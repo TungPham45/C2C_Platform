@@ -1401,12 +1401,20 @@ export class OrderService {
         subtotal: true,
         shipping_fee: true,
         platform_discount_amount: true,
-        created_at: true
+        created_at: true,
+        items: {
+          select: {
+            product_name: true,
+            quantity: true,
+          },
+        },
       }
     });
 
     let totalOrders = orders.length;
     let totalRevenue = 0;
+
+    const productSalesMap = new Map<string, number>();
 
     // Initialize trend data mapping (last N days) - aligned with query window
     const trendMap = new Map<string, { orders: number; revenue: number }>();
@@ -1432,6 +1440,12 @@ export class OrderService {
           revenue: current.revenue + revenue
         });
       }
+
+      for (const item of o.items) {
+        const productName = String(item.product_name || '').trim() || 'Sản phẩm chưa xác định';
+        const quantity = Number(item.quantity) || 0;
+        productSalesMap.set(productName, (productSalesMap.get(productName) || 0) + quantity);
+      }
     }
 
     const trendData = Array.from(trendMap.entries()).map(([date, data]) => ({
@@ -1440,6 +1454,11 @@ export class OrderService {
       revenue: data.revenue
     }));
 
-    return { totalOrders, totalRevenue, trendData };
+    const topProductsData = Array.from(productSalesMap.entries())
+      .map(([name, sales]) => ({ name, sales }))
+      .sort((a, b) => b.sales - a.sales)
+      .slice(0, 5);
+
+    return { totalOrders, totalRevenue, trendData, topProductsData };
   }
 }

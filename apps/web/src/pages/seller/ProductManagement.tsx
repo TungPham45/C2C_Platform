@@ -315,7 +315,11 @@ export const ProductManagementPage: FC = () => {
               </div>
             )}
 
-            {searchedProducts.map((p) => (
+            {searchedProducts.map((p) => {
+              const totalStock = getTotalStock(p);
+              const isOutOfStock = p.status === 'active' && totalStock === 0;
+
+              return (
               <div key={p.id} className={`grid grid-cols-[auto_1fr_120px_120px_140px_140px_120px] items-center p-4 rounded-3xl transition-all group border ${p.status === 'active' ? 'bg-white hover:bg-[#f5faff] shadow-sm border-[#e1f0fb] hover:scale-[1.005]' : 'bg-[#e9f5ff]/50 hover:bg-[#f5faff] border-dashed border-[#bfc7d3]/30'}`}>
                 <div className="pr-6">
                   <input
@@ -342,6 +346,11 @@ export const ProductManagementPage: FC = () => {
                         {p.status === 'active' ? (p.category?.name || 'Phân loại') : 
                          p.status === 'rejected' ? 'Bị từ chối' : 'Chờ duyệt'}
                       </span>
+                      {isOutOfStock && (
+                        <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-[#ffdad6] text-[#ba1a1a]">
+                          Hết hàng
+                        </span>
+                      )}
                       {p.shop_categories?.map((sc: any) => (
                         <span key={sc.id} className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-[#e9f5ff] text-[#42a5f5] border border-[#42a5f5]/20">
                           {sc.name}
@@ -363,15 +372,17 @@ export const ProductManagementPage: FC = () => {
                   {formatPriceRange(p.base_price, p.variants)}
                 </div>
                 <div className={`text-center ${p.status !== 'active' ? 'opacity-70' : ''}`}>
-                  <span className="text-sm font-medium text-[#0f1d25]">{p.variants?.length ? p.variants.reduce((acc: number, v: any) => acc + (v.stock_quantity || 0), 0) : 0}</span>
+                  <span className={`text-sm font-medium ${isOutOfStock ? 'text-[#ba1a1a]' : 'text-[#0f1d25]'}`}>{totalStock}</span>
                   {p.status === 'active' && (
                     <div className="w-12 h-1 bg-[#e1f0fb] rounded-full mx-auto mt-2 overflow-hidden">
-                      <div className="w-3/4 h-full bg-[#6cbdfe] rounded-full"></div>
+                      <div className={`h-full rounded-full ${isOutOfStock ? 'w-0 bg-[#ba1a1a]' : 'w-3/4 bg-[#6cbdfe]'}`}></div>
                     </div>
                   )}
                 </div>
                 <div className="text-center">
-                  {p.status === 'active' ? (
+                  {p.status === 'active' && isOutOfStock ? (
+                    <div className="text-[#ba1a1a] font-bold text-[10px] uppercase tracking-tighter">Hết hàng</div>
+                  ) : p.status === 'active' ? (
                     <>
                       <div className="flex items-center justify-center gap-1 text-green-600 font-bold text-sm">
                         <span className="material-symbols-outlined text-sm">trending_up</span>
@@ -403,7 +414,8 @@ export const ProductManagementPage: FC = () => {
                   <button onClick={() => handleDelete(p.id)} className="p-2 text-[#707882] hover:text-[#ba1a1a] hover:bg-[#ba1a1a]/10 rounded-lg transition-colors"><span className="material-symbols-outlined text-xl">delete</span></button>
                 </div>
               </div>
-            ))}
+            );
+            })}
 
           </div>
 

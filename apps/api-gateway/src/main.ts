@@ -4,6 +4,7 @@ import { Logger } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 import { createReverseProxy } from './app/reverse-proxy';
 import { json, urlencoded } from 'express';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -34,8 +35,16 @@ async function bootstrap() {
     next();
   });
 
-  // Proxy Auth Service
+  // Proxy Auth Service (HTTP)
   app.use('/api/auth', createReverseProxy(authServiceUrl));
+
+  // WebSocket Proxy cho Notifications (Auth Service)
+  const authBaseUrlForWs = authServiceUrl.replace(/\/api\/auth\/?$/, '');
+  app.use('/socket.io', createProxyMiddleware({
+    target: authBaseUrlForWs,
+    ws: true,
+    changeOrigin: true
+  }));
 
   // Proxy Chat Service
   app.use('/api/chat', createReverseProxy(chatServiceUrl));

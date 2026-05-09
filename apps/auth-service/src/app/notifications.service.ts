@@ -1,12 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
+import { NotificationsGateway } from './notifications.gateway';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private gateway: NotificationsGateway
+  ) {}
 
   async createNotification(data: { user_id: number; title: string; message: string; type?: string; link?: string }) {
-    return this.prisma.notification.create({
+    const notification = await this.prisma.notification.create({
       data: {
         user_id: data.user_id,
         title: data.title,
@@ -15,6 +19,11 @@ export class NotificationsService {
         link: data.link,
       },
     });
+
+    // Phát sự kiện real-time ngay lập tức
+    this.gateway.sendToUser(data.user_id, 'new_notification', notification);
+
+    return notification;
   }
 
   async getUserNotifications(user_id: number) {

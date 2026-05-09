@@ -1,5 +1,6 @@
 import React, { FC, useEffect, useState } from 'react';
 import { ORDER_API_URL, resolveAssetUrl } from '../../config/api';
+import { AdminLayout } from '../../components/layout/AdminLayout';
 
 const statusMap: Record<string, { label: string; color: string }> = {
   pending: { label: 'Chờ duyệt', color: 'bg-amber-100 text-amber-700 border-amber-200' },
@@ -83,6 +84,7 @@ export const ReturnManagement: FC = () => {
   };
 
   return (
+    <AdminLayout>
     <div className="p-8 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -248,5 +250,6 @@ export const ReturnManagement: FC = () => {
         </div>
       )}
     </div>
+    </AdminLayout>
   );
 };
