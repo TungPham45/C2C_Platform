@@ -19,7 +19,8 @@
     "serve": {
       "executor": "@nx/js:node",
       "options": {
-        "buildTarget": "order-service:build"
+        "buildTarget": "order-service:build",
+        "inspect": false
       }
     }
   }

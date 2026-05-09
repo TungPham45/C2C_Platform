@@ -19,7 +19,8 @@
     "serve": {
       "executor": "@nx/js:node",
       "options": {
-        "buildTarget": "api-gateway:build"
+        "buildTarget": "api-gateway:build",
+        "inspect": false
       }
     }
   }

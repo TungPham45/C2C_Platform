@@ -19,7 +19,8 @@
     "serve": {
       "executor": "@nx/js:node",
       "options": {
-        "buildTarget": "auth-service:build"
+        "buildTarget": "auth-service:build",
+        "inspect": false
       }
     }
   }

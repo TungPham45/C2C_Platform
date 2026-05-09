@@ -19,7 +19,8 @@
     "serve": {
       "executor": "@nx/js:node",
       "options": {
-        "buildTarget": "product-service:build"
+        "buildTarget": "product-service:build",
+        "inspect": false
       }
     }
   }

@@ -19,7 +19,8 @@
     "serve": {
       "executor": "@nx/js:node",
       "options": {
-        "buildTarget": "admin-moderation-service:build"
+        "buildTarget": "admin-moderation-service:build",
+        "inspect": false
       }
     }
   }
