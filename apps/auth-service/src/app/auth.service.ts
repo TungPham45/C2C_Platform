@@ -108,14 +108,13 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired OTP');
     }
 
-    // Mark as used
-    await this.prisma.verificationCode.update({
-      where: { id: verification.id },
-      data: { is_used: true }
-    });
-
-    // If it was for registration, activate the user
     if (purpose === 'REGISTER') {
+      // Mark as used
+      await this.prisma.verificationCode.update({
+        where: { id: verification.id },
+        data: { is_used: true }
+      });
+      // Activate the user
       await this.prisma.user.update({
         where: { id: user.id },
         data: { status: 'active' }
@@ -134,10 +133,16 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { email } });
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { password: hashedPassword }
-    });
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: { password: hashedPassword }
+      }),
+      this.prisma.verificationCode.updateMany({
+        where: { user_id: user.id, code, purpose: 'RESET_PASSWORD' },
+        data: { is_used: true }
+      })
+    ]);
 
     return { message: 'Password reset successfully' };
   }

@@ -88,7 +88,7 @@ export const SettingsPage: FC = () => {
       }
     }
 
-    const nameRegex = /^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂÊÔƠỨỪỮỮỰẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăâêôơứừữữựấầẩẫậắằẳẵặẹẻẽềềể\s]+$/;
+    const nameRegex = /^[\p{L}\s]+$/u;
     if (fullName && !nameRegex.test(fullName)) {
       setError('Họ và tên người nhận chỉ được chứa chữ cái.');
       return;
@@ -335,7 +335,7 @@ export const SettingsPage: FC = () => {
                   <input
                     type="text"
                     value={fullName}
-                    onChange={e => setFullName(e.target.value.replace(/[^a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂÊÔƠỨỪỮỮỰẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăâêôơứừữữựấầẩẫậắằẳẵặẹẻẽềềể\s]/g, ''))}
+                    onChange={e => setFullName(e.target.value.replace(/[^\p{L}\s]/gu, ''))}
                     className="w-full px-4 py-3 rounded-xl border border-[#bfc7d3]/30 bg-white/80 text-[#0f1d25] font-medium focus:outline-none focus:ring-2 focus:ring-[#00629d]/30 focus:border-[#00629d] transition-all"
                     placeholder="Nhập họ và tên..."
                   />
