@@ -490,10 +490,10 @@ export const ShopPage: FC = () => {
           <div className="max-w-[1200px] mx-auto px-4 sm:px-8 mt-8">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg sm:text-xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">
-                Eligible Shop Vouchers
+                Voucher của Shop
               </h2>
               <Link to="/vouchers" className="text-sm font-bold text-[#00629d] hover:underline">
-                View all vouchers
+                Xem tất cả voucher
               </Link>
             </div>
             {voucherLoading ? (
@@ -504,7 +504,7 @@ export const ShopPage: FC = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {shopVouchers.map((voucher) => (
+                {shopVouchers.slice(0, 6).map((voucher) => (
                   <VoucherCard
                     key={voucher.id}
                     voucher={voucher}

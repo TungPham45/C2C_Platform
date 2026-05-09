@@ -15,7 +15,7 @@ export const ProductDetailPage: FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { fetchProductDetail, loading } = useProducts();
+  const { fetchProductDetail, loading, error } = useProducts();
   const [product, setProduct] = useState<any>(null);
   const [selectedImage, setSelectedImage] = useState<string>('');
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
@@ -91,11 +91,28 @@ export const ProductDetailPage: FC = () => {
     return result;
   }, [product?.variants]);
 
-  if (loading || !product) {
+  if (loading) {
     return (
       <MarketplaceLayout>
         <div className="flex flex-col items-center justify-center py-40 min-h-screen bg-[#f9fafc]">
           <div className="w-12 h-12 border-4 border-[#00629d]/20 border-t-[#00629d] rounded-full animate-spin"></div>
+        </div>
+      </MarketplaceLayout>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <MarketplaceLayout>
+        <div className="flex flex-col items-center justify-center py-40 min-h-screen bg-[#f9fafc] px-6 text-center">
+          <span className="material-symbols-outlined text-7xl text-red-300 mb-6">block</span>
+          <h2 className="text-3xl font-black text-[#0f1d25] mb-4">Sản phẩm không khả dụng</h2>
+          <p className="text-[#707882] text-lg max-w-md mx-auto mb-8">
+            {error === 'Failed to fetch product details' ? 'Sản phẩm này đã bị khóa do vi phạm chính sách hoặc không tồn tại.' : (error || 'Sản phẩm này đã bị khóa hoặc không tồn tại.')}
+          </p>
+          <button onClick={() => navigate('/')} className="px-8 py-3 bg-[#00629d] text-white rounded-full font-bold">
+            Về Trang Chủ
+          </button>
         </div>
       </MarketplaceLayout>
     );

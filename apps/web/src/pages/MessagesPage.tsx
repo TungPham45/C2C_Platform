@@ -22,6 +22,8 @@ interface Message {
   sender_role: string;
   content: string;
   sent_at: string;
+  is_read?: boolean;
+  message_type?: string;
 }
 
 export const MessagesPage: FC = () => {
@@ -30,10 +32,12 @@ export const MessagesPage: FC = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [currentConvId, setCurrentConvId] = useState<number | null>(null);
   const [chatText, setChatText] = useState('');
-  
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const chatBodyRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
     const userStr = localStorage.getItem('c2c_user');
@@ -67,7 +71,7 @@ export const MessagesPage: FC = () => {
       } catch (e) {}
     };
     fetchConvs();
-    const interval = setInterval(fetchConvs, 5000);
+    const interval = setInterval(fetchConvs, 1500);
     return () => clearInterval(interval);
   }, [currentUser]);
 
@@ -87,7 +91,7 @@ export const MessagesPage: FC = () => {
       } catch (e) {}
     };
     fetchMsgs();
-    const interval = setInterval(fetchMsgs, 3000);
+    const interval = setInterval(fetchMsgs, 1500);
     return () => clearInterval(interval);
   }, [currentUser, currentConvId]);
 
@@ -112,7 +116,9 @@ export const MessagesPage: FC = () => {
       sender_id: currentUser.id,
       sender_role: 'buyer', // doesn't matter much for display since ID matches
       content,
-      sent_at: new Date().toISOString()
+      sent_at: new Date().toISOString(),
+      is_read: false,
+      message_type: 'text'
     };
     setMessages(prev => [...prev, optimisticMsg]);
 
@@ -123,10 +129,58 @@ export const MessagesPage: FC = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ content })
+        body: JSON.stringify({ content, message_type: 'text' })
       });
     } catch (err) {
       alert("Lỗi khi gửi tin nhắn");
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentConvId) return;
+    
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      const token = localStorage.getItem('c2c_token');
+      const uploadRes = await fetch('/api/products/upload', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+      
+      if (uploadRes.ok) {
+        const uploadData = await uploadRes.json();
+        const url = uploadData.url;
+        const type = file.type.startsWith('video/') ? 'video' : 'image';
+        
+        setMessages(prev => [...prev, {
+          id: Date.now(),
+          sender_id: currentUser.id,
+          sender_role: 'buyer',
+          content: url,
+          sent_at: new Date().toISOString(),
+          is_read: false,
+          message_type: type
+        }]);
+
+        await fetch(`/api/chat/conversations/${currentConvId}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ content: url, message_type: type })
+        });
+      } else {
+        alert('Có lỗi xảy ra khi tải file lên.');
+      }
+    } catch (err) {
+      alert('Có lỗi xảy ra khi tải file lên.');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -155,7 +209,14 @@ export const MessagesPage: FC = () => {
                     return (
                       <div 
                         key={conv.id}
-                        onClick={() => navigate(`/messages?convId=${conv.id}`)}
+                        onClick={() => {
+                          navigate(`/messages?convId=${conv.id}`);
+                          setConversations(prev => prev.map(c => c.id === conv.id ? { 
+                            ...c, 
+                            unread_count_buyer: isMyShop ? c.unread_count_buyer : 0,
+                            unread_count_seller: isMyShop ? 0 : c.unread_count_seller
+                          } : c));
+                        }}
                         className={`p-5 flex items-center gap-4 cursor-pointer transition-colors border-b border-[#f5faff] ${isActive ? 'bg-[#e0efff]' : 'hover:bg-[#f9fafc]'}`}
                       >
                         <div className="w-12 h-12 rounded-full bg-[#f0f3f8] text-[#00629d] flex items-center justify-center relative flex-shrink-0 border border-[#e4e9f0]">
@@ -203,11 +264,7 @@ export const MessagesPage: FC = () => {
                           <h3 className="font-black text-lg text-[#0f1d25]">
                               {currentConv?.seller_id === currentUser?.id ? (currentConv?.buyer_name || `Người mua #${currentConv?.buyer_id}`) : (currentConv?.shop_name || `Shop #${currentConv?.shop_id}`)}
                           </h3>
-                          <p className="text-[10px] uppercase font-bold tracking-widest text-[#2e7d32]">Đang hoạt động</p>
                         </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button className="w-10 h-10 rounded-full text-[#707882] hover:bg-[#f0f3f8] hover:text-[#0f1d25] transition-colors flex items-center justify-center"><span className="material-symbols-outlined">more_vert</span></button>
                       </div>
                    </div>
 
@@ -218,19 +275,43 @@ export const MessagesPage: FC = () => {
                            <p className="text-sm font-semibold text-[#707882]">Hãy gửi lời chào đầu tiên!</p>
                         </div>
                       ) : (
-                        messages.map(msg => {
+                        messages.map((msg, index) => {
                           const isMine = msg.sender_id === currentUser?.id;
+                          // Determine if this is the last message sent by the user
+                          const isLastMyMsg = isMine && (
+                            index === messages.length - 1 || 
+                            messages.slice(index + 1).findIndex(m => m.sender_id === currentUser?.id) === -1
+                          );
                           return (
                             <div key={msg.id} className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
-                               <div className={`max-w-[70%] px-5 py-3 text-[15px] leading-relaxed shadow-sm ${
+                                <div className={`max-w-[70%] px-5 py-3 text-[15px] leading-relaxed shadow-sm ${
                                  isMine 
                                    ? 'bg-[#00629d] text-white rounded-2xl rounded-tr-sm' 
                                    : 'bg-white text-[#0f1d25] border border-[#e4e9f0] rounded-2xl rounded-tl-sm'
                                }`}>
-                                 {msg.content}
+                                 {msg.message_type === 'image' ? (
+                                  <img 
+                                    src={msg.content} 
+                                    alt="Đính kèm" 
+                                    className="max-w-[200px] sm:max-w-[300px] rounded-xl cursor-pointer hover:opacity-90 transition-opacity" 
+                                    onClick={() => setSelectedImage(msg.content)}
+                                  />
+                                 ) : msg.message_type === 'video' ? (
+                                  <video src={msg.content} controls className="max-w-[200px] sm:max-w-[300px] rounded-xl" />
+                                 ) : (
+                                  msg.content
+                                 )}
                                </div>
-                               <div className="text-[10px] text-[#707882] mt-1.5 font-medium px-1">
+                               <div className="text-[10px] text-[#707882] mt-1.5 font-medium px-1 flex items-center gap-1">
                                  {new Date(msg.sent_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                 {isLastMyMsg && (
+                                   <>
+                                     <span className="w-1 h-1 bg-[#dbeaf5] rounded-full mx-0.5"></span>
+                                     <span className={msg.is_read ? 'text-[#00629d] font-bold' : 'text-[#707882]'}>
+                                       {msg.is_read ? 'Đã xem' : 'Đã gửi'}
+                                     </span>
+                                   </>
+                                 )}
                                </div>
                             </div>
                           );
@@ -241,16 +322,37 @@ export const MessagesPage: FC = () => {
 
                    {/* Chat Input */}
                    <div className="p-6 bg-white border-t border-[#e4e9f0]">
-                      <form onSubmit={handleSendMessage} className="flex gap-4">
+                      <form onSubmit={handleSendMessage} className="flex items-center gap-4 relative">
+                         {isUploading && (
+                          <div className="absolute -top-12 left-0 right-0 flex justify-center">
+                            <span className="bg-white px-4 py-2 rounded-full text-xs font-bold text-[#00629d] shadow-sm border border-[#e4e9f0] flex items-center gap-2">
+                              <span className="w-4 h-4 border-2 border-[#00629d] border-t-transparent rounded-full animate-spin"></span>
+                              Đang gửi file...
+                            </span>
+                          </div>
+                         )}
+                         <input 
+                          type="file" 
+                          ref={fileInputRef} 
+                          className="hidden" 
+                          accept="image/*,video/*" 
+                          onChange={handleFileUpload} 
+                         />
+                         <button 
+                          type="button" 
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-12 h-12 rounded-full text-[#707882] hover:bg-[#f0f3f8] hover:text-[#00629d] transition-colors flex items-center justify-center flex-shrink-0"
+                         >
+                           <span className="material-symbols-outlined">attach_file</span>
+                         </button>
                          <div className="flex-1 relative">
                             <input 
                               type="text" 
                               value={chatText}
                               onChange={e => setChatText(e.target.value)}
                               placeholder="Nhập tin nhắn..." 
-                              className="w-full h-14 bg-[#f0f3f8] border-none rounded-full px-6 pr-12 text-[#0f1d25] font-medium focus:ring-2 focus:ring-[#00629d] outline-none"
+                              className="w-full h-14 bg-[#f0f3f8] border-none rounded-full px-6 pr-6 text-[#0f1d25] font-medium focus:ring-2 focus:ring-[#00629d] outline-none"
                             />
-                            <button type="button" className="absolute right-4 top-1/2 -translate-y-1/2 text-[#707882] hover:text-[#00629d]"><span className="material-symbols-outlined items-center flex">sentiment_satisfied</span></button>
                          </div>
                          <button 
                            type="submit" 
@@ -268,6 +370,27 @@ export const MessagesPage: FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Image Viewer Modal */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4" 
+          onClick={() => setSelectedImage(null)}
+        >
+          <button 
+            className="absolute top-6 right-6 text-white/70 hover:text-white transition-colors"
+            onClick={() => setSelectedImage(null)}
+          >
+            <span className="material-symbols-outlined text-4xl">close</span>
+          </button>
+          <img 
+            src={selectedImage} 
+            alt="Phóng to" 
+            className="max-w-full max-h-full object-contain select-none" 
+            onClick={e => e.stopPropagation()} 
+          />
+        </div>
+      )}
     </MarketplaceLayout>
   );
 };

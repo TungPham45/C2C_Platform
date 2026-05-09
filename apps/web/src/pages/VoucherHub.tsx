@@ -14,7 +14,7 @@ export const VoucherHub: FC = () => {
     const [availableVouchers, setAvailableVouchers] = useState<any[]>([]);
     const [myVouchers, setMyVouchers] = useState<VoucherClaim[]>([]);
     const [loading, setLoading] = useState(true);
-    const [showAllShops, setShowAllShops] = useState(false);
+    const [visibleCount, setVisibleCount] = useState(8);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -56,9 +56,7 @@ export const VoucherHub: FC = () => {
             });
 
             if (response.ok) {
-                // Move from available to mine or just refresh
                 setAvailableVouchers(prev => prev.map(v => v.id === id ? { ...v, isClaimed: true } : v));
-                // Refresh my vouchers
                 const resMine = await fetch('/api/vouchers/mine', { 
                     headers: { 'x-user-id': user.id.toString() } 
                 });
@@ -96,15 +94,15 @@ export const VoucherHub: FC = () => {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
+    const platformVouchers = sortedAvailable.filter(v => !v.shop_id);
     const allShopVouchers = sortedAvailable.filter(v => v.shop_id);
     
-    // In Voucher Hub, we show ALL vouchers including expired ones, sorted by active status first.
-    // "Voucher Độc Quyền Cho Bạn" - First 6 prominent vouchers (active first)
-    const exclusiveVouchers = allShopVouchers.slice(0, 6);
+    const exclusiveVouchers = [...platformVouchers, ...allShopVouchers].slice(0, 6);
     
-    // "Voucher Từ Shop" - The rest of the shop vouchers
-    const otherShopVouchers = allShopVouchers.slice(6);
-    const displayedOtherVouchers = showAllShops ? otherShopVouchers : otherShopVouchers.slice(0, 8);
+    // Khúc sau exclusiveVouchers sẽ là các voucher từ shop còn lại
+    const usedIdsForExclusive = new Set(exclusiveVouchers.map(v => v.id));
+    const otherShopVouchers = allShopVouchers.filter(v => !usedIdsForExclusive.has(v.id));
+    const displayedOtherVouchers = otherShopVouchers.slice(0, visibleCount);
 
     const activeClaimedVouchers = myVouchers.filter((claim) => !claim.is_used);
     const usedVouchers = myVouchers.filter((claim) => Boolean(claim.is_used));
@@ -112,7 +110,6 @@ export const VoucherHub: FC = () => {
     return (
         <MarketplaceLayout>
             <div className="bg-[#f8fafc] min-h-screen pb-40">
-                {/* Header Section */}
                 <div className="bg-white border-b border-[#e9f5ff] py-16">
                     <div className="max-w-7xl mx-auto px-6">
                         <h1 className="text-5xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25] mb-4">Trung Tâm Voucher</h1>
@@ -124,7 +121,6 @@ export const VoucherHub: FC = () => {
                 </div>
 
                 <div className="max-w-7xl mx-auto px-6 mt-12 space-y-20">
-                    {/* Exclusive Vouchers Section */}
                     {exclusiveVouchers.length > 0 && (
                         <section>
                             <div className="flex items-center justify-between mb-8">
@@ -154,7 +150,6 @@ export const VoucherHub: FC = () => {
                         </section>
                     )}
 
-                    {/* Promo Banner Style Highlight (New User) */}
                     <div className="relative h-80 rounded-[3rem] overflow-hidden group shadow-2xl">
                         <img 
                             src="https://images.unsplash.com/photo-1607082350899-7e105aa886ae?q=80&w=2070&auto=format&fit=crop" 
@@ -169,7 +164,6 @@ export const VoucherHub: FC = () => {
                         </div>
                     </div>
 
-                    {/* Shop Vouchers Section */}
                     {otherShopVouchers.length > 0 && (
                         <section>
                             <div className="flex items-center justify-between mb-8">
@@ -179,12 +173,12 @@ export const VoucherHub: FC = () => {
                                     </div>
                                     <h2 className="text-2xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">Voucher Từ Shop</h2>
                                 </div>
-                                {allShopVouchers.length > 14 && !showAllShops && (
+                                {otherShopVouchers.length > visibleCount && (
                                     <button 
-                                        onClick={() => setShowAllShops(true)}
+                                        onClick={() => setVisibleCount(prev => prev + 12)}
                                         className="text-sm font-bold text-[#00629d] hover:underline hover:text-[#004d7c]"
                                     >
-                                        Xem Thêm Shop ({allShopVouchers.length - 14})
+                                        Xem Thêm ({otherShopVouchers.length - visibleCount})
                                     </button>
                                 )}
                             </div>

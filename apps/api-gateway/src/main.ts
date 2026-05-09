@@ -71,6 +71,10 @@ async function bootstrap() {
   // Proxy product uploads so the browser only needs the gateway's public URL.
   app.use('/uploads', createReverseProxy(productPublicUrl));
 
+  // Proxy Notifications API (part of Auth Service)
+  const authBaseUrl = authServiceUrl.replace(/\/api\/auth\/?$/, '');
+  app.use('/api/notifications', createReverseProxy(`${authBaseUrl}/api/notifications`));
+
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix); // Won't apply to raw .use middlewares above without rewriting. 
   // Wait, if I use raw Express proxy middlewares, the global prefix is skipped for those specific paths!

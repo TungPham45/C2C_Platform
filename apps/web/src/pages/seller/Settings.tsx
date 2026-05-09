@@ -76,7 +76,7 @@ export const SettingsPage: FC = () => {
       setError('Tên shop quá dài (tối đa 255 ký tự)');
       return;
     }
-    
+
     if (logoFile) {
       if (logoFile.size > 5 * 1024 * 1024) {
         setError('Kích thước logo không được vượt quá 5MB');
@@ -88,7 +88,7 @@ export const SettingsPage: FC = () => {
       }
     }
 
-    const nameRegex = /^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂÊÔƠỨỪỮỮỰẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăâêôơứừữữựấầẩẫậắằẳẵặẹẻẽềềể\s]+$/;
+    const nameRegex = /^[\p{L}\s]+$/u;
     if (fullName && !nameRegex.test(fullName)) {
       setError('Họ và tên người nhận chỉ được chứa chữ cái.');
       return;
@@ -169,26 +169,26 @@ export const SettingsPage: FC = () => {
     }
   };
 
-  const handleSuspend = async () => {
-    if (!window.confirm('Bạn có chắc muốn tạm ngưng bán hàng? Cửa hàng sẽ ẩn khỏi marketplace cho đến khi bạn kích hoạt lại.')) return;
-    try {
-      const token = localStorage.getItem('c2c_token');
-      const res = await fetch(`${PRODUCT_API_URL}/seller/shop`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ status: 'suspended' }),
-      });
-      if (!res.ok) throw new Error('Không thể tạm ngưng cửa hàng');
-      alert('Cửa hàng đã được tạm ngưng thành công.');
-      navigate('/');
-    } catch (e: any) {
-      setError(e.message || 'Đã xảy ra lỗi');
-    }
-  };
+  // const handleSuspend = async () => {
+  //   if (!window.confirm('Bạn có chắc muốn tạm ngưng bán hàng? Cửa hàng sẽ ẩn khỏi marketplace cho đến khi bạn kích hoạt lại.')) return;
+  //   try {
+  //     const token = localStorage.getItem('c2c_token');
+  //     const res = await fetch(`${PRODUCT_API_URL}/seller/shop`, {
+  //       method: 'PUT',
+  //       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+  //       body: JSON.stringify({ status: 'suspended' }),
+  //     });
+  //     if (!res.ok) throw new Error('Không thể tạm ngưng cửa hàng');
+  //     alert('Cửa hàng đã được tạm ngưng thành công.');
+  //     navigate('/');
+  //   } catch (e: any) {
+  //     setError(e.message || 'Đã xảy ra lỗi');
+  //   }
+  // };
 
   const handleDeleteShop = async () => {
     if (!window.confirm('CẢNH BÁO: Hành động này sẽ xóa VĨNH VIỄN cửa hàng, bao gồm toàn bộ sản phẩm, danh mục và lượt đánh giá. Bạn sẽ trở về quyền Người dùng bình thường. Bạn có CHẮC CHẮN muốn tiếp tục?')) return;
-    
+
     try {
       const token = localStorage.getItem('c2c_token');
       const res = await fetch(`${PRODUCT_API_URL}/seller/shop`, {
@@ -196,9 +196,9 @@ export const SettingsPage: FC = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) throw new Error('Không thể xóa cửa hàng');
-      
+
       alert('Cửa hàng của bạn đã bị xóa vĩnh viễn. Bạn đã trở lại quyền người dùng bình thường.');
-      
+
       // Update local storage to remove shop and reset role
       const currentUserStr = localStorage.getItem('c2c_user');
       if (currentUserStr) {
@@ -208,7 +208,7 @@ export const SettingsPage: FC = () => {
         localStorage.setItem('c2c_user', JSON.stringify(currentUser));
         setUser(currentUser);
       }
-      
+
       window.dispatchEvent(new Event('user-updated'));
       navigate('/');
     } catch (e: any) {
@@ -335,7 +335,7 @@ export const SettingsPage: FC = () => {
                   <input
                     type="text"
                     value={fullName}
-                    onChange={e => setFullName(e.target.value.replace(/[^a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂÂÊÔƠỨỪỮỮỰẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăâêôơứừữữựấầẩẫậắằẳẵặẹẻẽềềể\s]/g, ''))}
+                    onChange={e => setFullName(e.target.value.replace(/[^\p{L}\s]/gu, ''))}
                     className="w-full px-4 py-3 rounded-xl border border-[#bfc7d3]/30 bg-white/80 text-[#0f1d25] font-medium focus:outline-none focus:ring-2 focus:ring-[#00629d]/30 focus:border-[#00629d] transition-all"
                     placeholder="Nhập họ và tên..."
                   />
@@ -379,13 +379,12 @@ export const SettingsPage: FC = () => {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className={`px-10 py-3.5 rounded-xl font-bold text-sm text-white shadow-lg transition-all duration-300 ${
-                  saved
+                className={`px-10 py-3.5 rounded-xl font-bold text-sm text-white shadow-lg transition-all duration-300 ${saved
                     ? 'bg-emerald-500 shadow-emerald-200'
                     : saving
-                    ? 'bg-[#00629d]/70 cursor-wait'
-                    : 'bg-[#00629d] hover:bg-[#004f80] shadow-blue-200 hover:shadow-blue-300'
-                }`}
+                      ? 'bg-[#00629d]/70 cursor-wait'
+                      : 'bg-[#00629d] hover:bg-[#004f80] shadow-blue-200 hover:shadow-blue-300'
+                  }`}
               >
                 {saved ? '✓ Đã lưu thành công' : saving ? 'Đang lưu...' : 'Lưu tất cả thay đổi'}
               </button>
@@ -396,12 +395,12 @@ export const SettingsPage: FC = () => {
               <h3 className="text-xl font-extrabold text-rose-700 mb-2">Vùng nguy hiểm</h3>
               <p className="text-sm text-[#707882] mb-6">Các hành động dưới đây không thể hoàn tác. Hãy suy nghĩ kỹ trước khi thực hiện.</p>
               <div className="flex gap-4">
-                <button
+                {/* <button
                   onClick={handleSuspend}
                   className="px-6 py-3 rounded-xl border-2 border-rose-300 text-rose-700 font-bold text-sm hover:bg-rose-50 transition-colors"
                 >
                   Tạm ngưng bán hàng
-                </button>
+                </button> */}
                 <button
                   onClick={handleDeleteShop}
                   className="px-6 py-3 rounded-xl border-2 border-rose-500 text-rose-500 font-bold text-sm hover:bg-rose-500 hover:text-white transition-colors"
