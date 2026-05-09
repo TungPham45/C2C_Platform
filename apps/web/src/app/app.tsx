@@ -48,11 +48,13 @@ import { SellerProtectedRoute } from '../components/auth/SellerProtectedRoute';
 import { BuyerProtectedRoute } from '../components/auth/BuyerProtectedRoute';
 import { AdminProtectedRoute } from '../components/auth/AdminProtectedRoute';
 import { SellerRegistration } from '../pages/seller/SellerRegistration';
+import { AccountStatusGuard } from '../components/auth/AccountStatusGuard';
 
 export function App() {
   return (
-    <Routes>
-      <Route path="/" element={<MarketplaceHomePage />} />
+    <AccountStatusGuard>
+      <Routes>
+        <Route path="/" element={<MarketplaceHomePage />} />
       <Route path="/products" element={<ProductsPage />} />
       <Route path="/category/:slug" element={<ProductsPage />} />
       <Route path="/product/:id" element={<ProductDetailPage />} />
@@ -121,6 +123,7 @@ export function App() {
       </Route>
 
     </Routes>
+    </AccountStatusGuard>
   );
 }
 
