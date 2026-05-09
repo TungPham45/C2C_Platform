@@ -4,6 +4,7 @@ import { Logger } from '@nestjs/common';
 import * as jwt from 'jsonwebtoken';
 import { createReverseProxy } from './app/reverse-proxy';
 import { json, urlencoded } from 'express';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -34,8 +35,16 @@ async function bootstrap() {
     next();
   });
 
-  // Proxy Auth Service
+  // Proxy Auth Service (HTTP)
   app.use('/api/auth', createReverseProxy(authServiceUrl));
+
+  // WebSocket Proxy cho Notifications (Auth Service)
+  const authBaseUrlForWs = authServiceUrl.replace(/\/api\/auth\/?$/, '');
+  app.use('/socket.io', createProxyMiddleware({
+    target: authBaseUrlForWs,
+    ws: true,
+    changeOrigin: true
+  }));
 
   // Proxy Chat Service
   app.use('/api/chat', createReverseProxy(chatServiceUrl));
@@ -61,6 +70,10 @@ async function bootstrap() {
 
   // Proxy product uploads so the browser only needs the gateway's public URL.
   app.use('/uploads', createReverseProxy(productPublicUrl));
+
+  // Proxy Notifications API (part of Auth Service)
+  const authBaseUrl = authServiceUrl.replace(/\/api\/auth\/?$/, '');
+  app.use('/api/notifications', createReverseProxy(`${authBaseUrl}/api/notifications`));
 
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix); // Won't apply to raw .use middlewares above without rewriting. 

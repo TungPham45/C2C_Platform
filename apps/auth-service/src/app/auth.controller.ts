@@ -162,6 +162,14 @@ export class AuthController {
     const idArray = ids.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
     return this.authService.getUsersByIds(idArray);
   }
+
+  @Get('me')
+  async getMe(@Headers('x-user-id') userId: string) {
+    if (!userId) throw new UnauthorizedException('Not authenticated');
+    const users = await this.authService.getUsersByIds([parseInt(userId, 10)]);
+    if (!users || users.length === 0) throw new UnauthorizedException('User not found');
+    return users[0];
+  }
   @Put('internal/admin/addresses/update-status-by-location')
   updateAddressStatusByLocation(
     @Headers() headers: Record<string, string | string[] | undefined>,

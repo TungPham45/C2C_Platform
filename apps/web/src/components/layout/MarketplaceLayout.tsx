@@ -21,6 +21,7 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({
   const location = useLocation();
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
 
   useEffect(() => {
     const readUser = () => {
@@ -51,6 +52,27 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({
   useEffect(() => {
     if (currentUser) {
       fetchCartItems();
+
+      // Fetch unread chat count
+      const fetchChatCount = async () => {
+        try {
+          const res = await fetch('/api/chat/conversations', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('c2c_token')}` }
+          });
+          if (res.ok) {
+            const convs = await res.json();
+            const count = convs.reduce((sum: number, c: any) => {
+              const isMyShop = c.seller_id === currentUser.id;
+              return sum + (isMyShop ? (c.unread_count_seller || 0) : (c.unread_count_buyer || 0));
+            }, 0);
+            setUnreadChatCount(count);
+          }
+        } catch (e) {}
+      };
+      fetchChatCount();
+      // Optional: Poll every 15s like NotificationBell
+      const interval = setInterval(fetchChatCount, 15000);
+      return () => clearInterval(interval);
     }
   }, [currentUser, fetchCartItems]);
 
@@ -146,6 +168,11 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({
                       title="Tin nhắn"
                     >
                       <span className="material-symbols-outlined">chat</span>
+                      {unreadChatCount > 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 bg-[#ba1a1a] text-white text-[10px] flex items-center justify-center rounded-full font-bold">
+                          {unreadChatCount > 99 ? '99+' : unreadChatCount}
+                        </span>
+                      )}
                     </Link>
                   )}
                   <Link

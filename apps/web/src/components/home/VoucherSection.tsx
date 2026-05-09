@@ -1,8 +1,9 @@
 import { FC, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { VoucherCard } from '../vouchers/VoucherCard';
 
 export const VoucherSection: FC = () => {
+    const navigate = useNavigate();
     const [vouchers, setVouchers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -39,7 +40,11 @@ export const VoucherSection: FC = () => {
     const handleClaim = async (id: number) => {
         try {
             const userStr = localStorage.getItem('c2c_user');
-            if (!userStr) return;
+            if (!userStr) {
+                alert('Vui lòng đăng nhập để lưu voucher!');
+                navigate('/auth', { state: { from: '/' } });
+                return;
+            }
             const user = JSON.parse(userStr);
 
             const response = await fetch(`/api/vouchers/${id}/claim`, {
@@ -58,6 +63,14 @@ export const VoucherSection: FC = () => {
             }
         } catch (err) {
             console.error('Claim error', err);
+        }
+    };
+
+    const handleUse = (voucher: any) => {
+        if (voucher.shop_id) {
+            navigate(`/shop/${voucher.shop_id}`);
+        } else {
+            navigate('/products');
         }
     };
 
@@ -92,6 +105,7 @@ export const VoucherSection: FC = () => {
                             <VoucherCard 
                                 voucher={voucher} 
                                 onClaim={handleClaim}
+                                onUse={handleUse}
                                 isClaimed={voucher.isClaimed}
                             />
                         </div>

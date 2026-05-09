@@ -182,30 +182,16 @@ export const SellerCenterPage: FC = () => {
             <span className="material-symbols-outlined text-[18px]">upload</span>
             Xuất dữ liệu
           </button>
-          {shopStatus !== 'pending' && (
-            <Link
-              to="/seller/add-product"
-              className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold text-white shadow-md transition hover:brightness-105"
-              style={{ backgroundColor: PRIMARY, boxShadow: '0 4px 14px rgba(29,78,216,0.35)' }}
-            >
-              <span className="material-symbols-outlined text-[18px]">add</span>
-              Thêm sản phẩm mới
-            </Link>
-          )}
+          <Link
+            to="/seller/add-product"
+            className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold text-white shadow-md transition hover:brightness-105"
+            style={{ backgroundColor: PRIMARY, boxShadow: '0 4px 14px rgba(29,78,216,0.35)' }}
+          >
+            <span className="material-symbols-outlined text-[18px]">add</span>
+            Thêm sản phẩm mới
+          </Link>
         </div>
       </div>
-
-      {shopStatus === 'pending' && (
-        <div className="mb-8 flex items-start gap-4 rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-900 shadow-sm">
-          <span className="material-symbols-outlined text-3xl text-amber-500">hourglass_empty</span>
-          <div>
-            <h3 className="font-bold">Cửa hàng đang được xử lý</h3>
-            <p className="mt-1 text-sm opacity-90">
-              Hồ sơ của bạn đang chờ duyệt. Sau khi được chấp nhận, bạn có thể đăng sản phẩm ngay.
-            </p>
-          </div>
-        </div>
-      )}
 
 
           <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

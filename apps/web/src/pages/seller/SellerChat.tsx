@@ -21,6 +21,8 @@ interface Message {
   sender_role: string;
   content: string;
   sent_at: string;
+  is_read?: boolean;
+  message_type?: string;
 }
 
 const SellerChat: FC = () => {
@@ -31,6 +33,9 @@ const SellerChat: FC = () => {
   const [chatText, setChatText] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
     const userStr = localStorage.getItem('c2c_user');
@@ -55,7 +60,7 @@ const SellerChat: FC = () => {
       } catch (e) {}
     };
     fetchConvs();
-    const interval = setInterval(fetchConvs, 5000);
+    const interval = setInterval(fetchConvs, 1500);
     return () => clearInterval(interval);
   }, [currentUser]);
 
@@ -72,7 +77,7 @@ const SellerChat: FC = () => {
       } catch (e) {}
     };
     fetchMsgs();
-    const interval = setInterval(fetchMsgs, 3000);
+    const interval = setInterval(fetchMsgs, 1500);
     return () => clearInterval(interval);
   }, [currentUser, currentConvId]);
 
@@ -93,19 +98,74 @@ const SellerChat: FC = () => {
       sender_id: currentUser.id,
       sender_role: 'seller',
       content,
-      sent_at: new Date().toISOString()
+      sent_at: new Date().toISOString(),
+      is_read: false,
+      message_type: 'text'
     }]);
 
     try {
       await fetch(`/api/chat/conversations/${currentConvId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ content })
+        body: JSON.stringify({ content, message_type: 'text' })
       });
     } catch (err) {}
   };
 
-  const totalUnread = conversations.reduce((sum, c) => sum + (c.unread_count_seller || 0), 0);
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentConvId) return;
+    
+    // reset input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      const token = localStorage.getItem('c2c_token');
+      // Upload file
+      const uploadRes = await fetch('/api/products/upload', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+      
+      if (uploadRes.ok) {
+        const uploadData = await uploadRes.json();
+        const url = uploadData.url;
+        const type = file.type.startsWith('video/') ? 'video' : 'image';
+        
+        // Optimistic
+        setMessages(prev => [...prev, {
+          id: Date.now(),
+          sender_id: currentUser.id,
+          sender_role: 'seller',
+          content: url,
+          sent_at: new Date().toISOString(),
+          is_read: false,
+          message_type: type
+        }]);
+
+        // Send message API
+        await fetch(`/api/chat/conversations/${currentConvId}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ content: url, message_type: type })
+        });
+      } else {
+        alert('Có lỗi xảy ra khi tải file lên.');
+      }
+    } catch (err) {
+      alert('Có lỗi xảy ra khi tải file lên.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const shopConversations = conversations.filter(c => c.seller_id === currentUser?.id);
+  const totalUnread = shopConversations.reduce((sum, c) => sum + (c.unread_count_seller || 0), 0);
 
   return (
     <SellerLayout pageTitle="Tin nhắn">
@@ -124,20 +184,23 @@ const SellerChat: FC = () => {
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto">
-                {conversations.length === 0 ? (
+                {shopConversations.length === 0 ? (
                   <div className="p-8 text-center">
                     <span className="material-symbols-outlined text-4xl text-[#cfe5ff] mb-3 block">forum</span>
                     <p className="text-sm text-[#707882] font-semibold">Chưa có tin nhắn nào</p>
                     <p className="text-xs text-[#707882] mt-1">Khi khách hàng nhắn tin cho shop, tin nhắn sẽ xuất hiện ở đây.</p>
                   </div>
                 ) : (
-                  conversations.map(conv => {
+                  shopConversations.map(conv => {
                     const isActive = currentConvId === conv.id;
                     const unread = conv.unread_count_seller || 0;
                     return (
                       <div
                         key={conv.id}
-                        onClick={() => setSearchParams({ convId: String(conv.id) })}
+                        onClick={() => {
+                          setSearchParams({ convId: String(conv.id) });
+                          setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, unread_count_seller: 0 } : c));
+                        }}
                         className={`px-5 py-4 flex items-center gap-4 cursor-pointer transition-all border-b border-[#f5faff] ${isActive ? 'bg-[#e0efff] border-l-4 border-l-[#00629d]' : 'hover:bg-[#f9fafc]'}`}
                       >
                         <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#e0efff] to-[#cfe5ff] text-[#00629d] flex items-center justify-center font-bold text-sm flex-shrink-0 relative">
@@ -187,16 +250,8 @@ const SellerChat: FC = () => {
                         <span className="material-symbols-outlined">face</span>
                       </div>
                       <div>
-                        <h3 className="font-black text-[#0f1d25]">{conversations.find(c => c.id === currentConvId)?.buyer_name || `Người mua #${conversations.find(c => c.id === currentConvId)?.buyer_id}`}</h3>
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-2 h-2 bg-[#2e7d32] rounded-full"></div>
-                          <p className="text-[10px] text-[#2e7d32] font-bold uppercase tracking-widest">Đang hoạt động</p>
-                        </div>
+                        <h3 className="font-black text-[#0f1d25]">{shopConversations.find(c => c.id === currentConvId)?.buyer_name || `Người mua #${shopConversations.find(c => c.id === currentConvId)?.buyer_id}`}</h3>
                       </div>
-                    </div>
-                    <div className="flex gap-1">
-                      <button className="w-9 h-9 rounded-lg text-[#707882] hover:bg-[#f0f3f8] hover:text-[#0f1d25] transition-colors flex items-center justify-center" title="Thông tin"><span className="material-symbols-outlined text-xl">info</span></button>
-                      <button className="w-9 h-9 rounded-lg text-[#707882] hover:bg-[#f0f3f8] hover:text-[#0f1d25] transition-colors flex items-center justify-center" title="Thêm"><span className="material-symbols-outlined text-xl">more_vert</span></button>
                     </div>
                   </div>
 
@@ -209,8 +264,13 @@ const SellerChat: FC = () => {
                         <p className="text-xs text-[#707882]">Hãy gửi lời chào thân thiện nhé</p>
                       </div>
                     ) : (
-                      messages.map(msg => {
+                      messages.map((msg, index) => {
                         const isMine = msg.sender_id === currentUser?.id;
+                        // Determine if this is the last message sent by the user
+                        const isLastMyMsg = isMine && (
+                          index === messages.length - 1 || 
+                          messages.slice(index + 1).findIndex(m => m.sender_id === currentUser?.id) === -1
+                        );
                         return (
                           <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                             <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} max-w-[65%]`}>
@@ -219,10 +279,29 @@ const SellerChat: FC = () => {
                                   ? 'bg-[#00629d] text-white rounded-2xl rounded-br-sm'
                                   : 'bg-white text-[#0f1d25] border border-[#e4e9f0] rounded-2xl rounded-bl-sm'
                               }`}>
-                                {msg.content}
+                                {msg.message_type === 'image' ? (
+                                  <img 
+                                    src={msg.content} 
+                                    alt="Đính kèm" 
+                                    className="max-w-[200px] sm:max-w-[250px] rounded-lg cursor-pointer hover:opacity-90 transition-opacity" 
+                                    onClick={() => setSelectedImage(msg.content)}
+                                  />
+                                ) : msg.message_type === 'video' ? (
+                                  <video src={msg.content} controls className="max-w-[200px] sm:max-w-[250px] rounded-lg" />
+                                ) : (
+                                  msg.content
+                                )}
                               </div>
-                              <span className="text-[10px] text-[#707882] mt-1 px-1 font-medium">
+                              <span className="text-[10px] text-[#707882] mt-1 px-1 font-medium flex items-center gap-1">
                                 {new Date(msg.sent_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                {isLastMyMsg && (
+                                  <>
+                                    <span className="w-1 h-1 bg-[#dbeaf5] rounded-full mx-0.5"></span>
+                                    <span className={msg.is_read ? 'text-[#00629d] font-bold' : 'text-[#707882]'}>
+                                      {msg.is_read ? 'Đã xem' : 'Đã gửi'}
+                                    </span>
+                                  </>
+                                )}
                               </span>
                             </div>
                           </div>
@@ -234,8 +313,27 @@ const SellerChat: FC = () => {
 
                   {/* Input */}
                   <div className="p-5 bg-white border-t border-[#e4e9f0]">
-                    <form onSubmit={handleSendMessage} className="flex gap-3">
-                      <button type="button" className="w-12 h-12 rounded-xl text-[#707882] hover:bg-[#f0f3f8] hover:text-[#00629d] transition-colors flex items-center justify-center flex-shrink-0">
+                    <form onSubmit={handleSendMessage} className="flex gap-3 relative">
+                      {isUploading && (
+                        <div className="absolute -top-8 left-0 right-0 flex justify-center">
+                          <span className="bg-white px-3 py-1 rounded-full text-xs font-bold text-[#00629d] shadow-sm border border-[#e4e9f0] flex items-center gap-1.5">
+                            <span className="w-3 h-3 border-2 border-[#00629d] border-t-transparent rounded-full animate-spin"></span>
+                            Đang gửi file...
+                          </span>
+                        </div>
+                      )}
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        accept="image/*,video/*" 
+                        onChange={handleFileUpload} 
+                      />
+                      <button 
+                        type="button" 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-12 h-12 rounded-xl text-[#707882] hover:bg-[#f0f3f8] hover:text-[#00629d] transition-colors flex items-center justify-center flex-shrink-0"
+                      >
                         <span className="material-symbols-outlined">attach_file</span>
                       </button>
                       <div className="flex-1 relative">
@@ -244,11 +342,8 @@ const SellerChat: FC = () => {
                           value={chatText}
                           onChange={e => setChatText(e.target.value)}
                           placeholder="Nhập phản hồi cho khách hàng..."
-                          className="w-full h-12 bg-[#f0f3f8] border-none rounded-xl px-5 pr-12 text-[#0f1d25] text-sm font-medium focus:ring-2 focus:ring-[#00629d]/20 outline-none"
+                          className="w-full h-12 bg-[#f0f3f8] border-none rounded-xl px-5 pr-5 text-[#0f1d25] text-sm font-medium focus:ring-2 focus:ring-[#00629d]/20 outline-none"
                         />
-                        <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-[#707882] hover:text-[#00629d]">
-                          <span className="material-symbols-outlined text-xl">sentiment_satisfied</span>
-                        </button>
                       </div>
                       <button
                         type="submit"
@@ -266,6 +361,27 @@ const SellerChat: FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Image Viewer Modal */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4" 
+          onClick={() => setSelectedImage(null)}
+        >
+          <button 
+            className="absolute top-6 right-6 text-white/70 hover:text-white transition-colors"
+            onClick={() => setSelectedImage(null)}
+          >
+            <span className="material-symbols-outlined text-4xl">close</span>
+          </button>
+          <img 
+            src={selectedImage} 
+            alt="Phóng to" 
+            className="max-w-full max-h-full object-contain select-none" 
+            onClick={e => e.stopPropagation()} 
+          />
+        </div>
+      )}
     </SellerLayout>
   );
 };

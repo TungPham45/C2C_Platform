@@ -2,10 +2,12 @@ import { FC, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useCart } from '../hooks/useCart';
+import { resolveAssetUrl } from '../config/api';
 
 export const CartPage: FC = () => {
   const { cartItems, loading, updateCartItem, removeFromCart, fetchCartItems } = useCart();
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [selectedItemIds, setSelectedItemIds] = useState<Record<number, boolean>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -34,6 +36,18 @@ export const CartPage: FC = () => {
     return Object.values(groups);
   }, [cartItems]);
 
+  useEffect(() => {
+    setSelectedItemIds((prev) => {
+      const hadPreviousState = Object.keys(prev).length > 0;
+      const next: Record<number, boolean> = {};
+      for (const item of cartItems) {
+        const itemId = Number(item.id);
+        next[itemId] = hadPreviousState ? (prev[itemId] ?? true) : true;
+      }
+      return next;
+    });
+  }, [cartItems]);
+
   const handleUpdateQuantity = (itemId: number, newQuantity: number) => {
     if (newQuantity < 1) return;
     updateCartItem(itemId, newQuantity);
@@ -54,21 +68,63 @@ export const CartPage: FC = () => {
     return isNaN(numPrice) ? 0 : numPrice;
   };
 
-  const calculateSubtotal = () => {
-    return cartItems.reduce((acc, item) => acc + (getPrice(item) * item.quantity), 0);
+  const selectedCartItems = useMemo(
+    () => cartItems.filter((item) => !!selectedItemIds[Number(item.id)]),
+    [cartItems, selectedItemIds],
+  );
+
+  const selectedGroupedItems = useMemo(() => {
+    const groups: Record<number, { shop: any; items: any[] }> = {};
+    selectedCartItems.forEach((item) => {
+      const shopId = item.product?.shop?.id;
+      if (!shopId) return;
+      if (!groups[shopId]) {
+        groups[shopId] = { shop: item.product.shop, items: [] };
+      }
+      groups[shopId].items.push(item);
+    });
+    return Object.values(groups);
+  }, [selectedCartItems]);
+
+  const calculateSubtotal = (items: any[]) => {
+    return items.reduce((acc, item) => acc + (getPrice(item) * item.quantity), 0);
   };
 
-  const totalPayment = calculateSubtotal();
+  const totalPayment = calculateSubtotal(selectedCartItems);
+
+  const selectedCount = selectedCartItems.length;
+  const allSelected = cartItems.length > 0 && selectedCount === cartItems.length;
+
+  const toggleItemSelection = (itemId: number, checked: boolean) => {
+    setSelectedItemIds((prev) => ({ ...prev, [itemId]: checked }));
+  };
+
+  const toggleAllSelection = (checked: boolean) => {
+    const next: Record<number, boolean> = {};
+    for (const item of cartItems) {
+      next[Number(item.id)] = checked;
+    }
+    setSelectedItemIds(next);
+  };
+
+  const toggleShopSelection = (items: any[], checked: boolean) => {
+    setSelectedItemIds((prev) => {
+      const next = { ...prev };
+      for (const item of items) {
+        next[Number(item.id)] = checked;
+      }
+      return next;
+    });
+  };
 
   const handleCheckout = () => {
-    if (cartItems.length === 0) return;
+    if (selectedCartItems.length === 0) return;
     
-    // Pass everything to CheckoutPage
     navigate('/checkout', { 
         state: { 
             fromCart: true, 
-            cartItems: cartItems, 
-            groupedItems: groupedItems 
+            cartItems: selectedCartItems, 
+            groupedItems: selectedGroupedItems 
         } 
     });
   };
@@ -116,6 +172,13 @@ export const CartPage: FC = () => {
                       <div key={group.shop.id} className="space-y-6">
                         {/* Shop Header */}
                         <div className="flex items-center gap-3 border-b border-[#f0f3f8] pb-4">
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4 rounded text-[#00629d] focus:ring-[#00629d]"
+                              checked={group.items.every((item) => !!selectedItemIds[Number(item.id)])}
+                              onChange={(e) => toggleShopSelection(group.items, e.target.checked)}
+                              aria-label={`Chọn tất cả sản phẩm của ${group.shop.name}`}
+                            />
                             <span className="material-symbols-outlined text-[#00629d]">storefront</span>
                             <span className="font-bold text-[#0f1d25]">{group.shop.name}</span>
                             <Link to={`/seller/${group.shop.id}`} className="text-xs text-[#00629d] font-semibold hover:underline">Xem Shop</Link>
@@ -125,13 +188,23 @@ export const CartPage: FC = () => {
                         <div className="space-y-6">
                             {group.items.map((item) => (
                                 <div key={item.id} className="flex gap-6 items-start">
+                                    <input
+                                      type="checkbox"
+                                      className="mt-8 w-4 h-4 rounded text-[#00629d] focus:ring-[#00629d]"
+                                      checked={!!selectedItemIds[Number(item.id)]}
+                                      onChange={(e) => toggleItemSelection(Number(item.id), e.target.checked)}
+                                      aria-label={`Chọn sản phẩm ${item.product?.name || item.id}`}
+                                    />
                                     {/* Image */}
                                     <div className="w-24 h-24 bg-[#f0f3f8] rounded-2xl overflow-hidden flex-shrink-0">
-                                        {item.variant?.image_url || item.product?.thumbnail_url ? (
-                                            <img src={(item.variant?.image_url || item.product?.thumbnail_url).startsWith('http') ? (item.variant?.image_url || item.product?.thumbnail_url) : `http://localhost:3000${item.variant?.image_url || item.product?.thumbnail_url}`} alt="thumbnail" className="w-full h-full object-cover" />
-                                        ) : (
+                                        {(() => {
+                                          const imageSrc = resolveAssetUrl(item.variant?.image_url || item.product?.thumbnail_url || '');
+                                          return imageSrc ? (
+                                            <img src={imageSrc} alt="thumbnail" className="w-full h-full object-cover" />
+                                          ) : (
                                             <span className="material-symbols-outlined text-[#dbeaf5] text-4xl w-full h-full flex items-center justify-center">image</span>
-                                        )}
+                                          );
+                                        })()}
                                     </div>
 
                                     {/* Info */}
@@ -181,11 +254,26 @@ export const CartPage: FC = () => {
             <div className="w-full lg:w-[380px]">
               <div className="bg-white rounded-3xl shadow-sm border border-[#e4e9f0] p-6 lg:p-8 sticky top-32">
                 <h3 className="text-xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25] mb-6">Tóm tắt đơn hàng</h3>
+                <div className="mb-4 p-3 rounded-2xl bg-[#f5faff] border border-[#e4e9f0]">
+                  <label className="flex items-center justify-between text-sm font-semibold text-[#404751]">
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded text-[#00629d] focus:ring-[#00629d]"
+                        checked={allSelected}
+                        onChange={(e) => toggleAllSelection(e.target.checked)}
+                        disabled={cartItems.length === 0}
+                      />
+                      Chọn tất cả
+                    </span>
+                    <span className="text-[#00629d]">{selectedCount}/{cartItems.length}</span>
+                  </label>
+                </div>
                 
                 <div className="space-y-4 text-sm font-medium border-b border-[#f0f3f8] pb-6 mb-6">
                   <div className="flex justify-between text-[#404751]">
-                    <span>Tạm tính</span>
-                    <span className="font-bold text-[#0f1d25]">{calculateSubtotal().toLocaleString('vi-VN')} ₫</span>
+                    <span>Tạm tính ({selectedCount} sản phẩm)</span>
+                    <span className="font-bold text-[#0f1d25]">{totalPayment.toLocaleString('vi-VN')} ₫</span>
                   </div>
                   <div className="flex justify-between text-[#404751]">
                     <span>Giảm giá</span>
@@ -204,15 +292,15 @@ export const CartPage: FC = () => {
                 </div>
 
                 <button 
-                  disabled={cartItems.length === 0}
+                  disabled={selectedCount === 0}
                   onClick={handleCheckout}
                   className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg ${
-                    cartItems.length > 0 
+                    selectedCount > 0 
                     ? 'bg-[#00629d] hover:bg-[#004e7c] text-white shadow-blue-500/20 active:scale-[0.98]' 
                     : 'bg-[#e4e9f0] text-[#a0aab5] cursor-not-allowed shadow-none'
                   }`}
                 >
-                  Tiến hành thanh toán
+                  Thanh toán sản phẩm đã chọn
                   <span className="material-symbols-outlined text-xl">arrow_forward</span>
                 </button>
               </div>

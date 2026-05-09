@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { API_BASE_URL } from '../../config/api';
+import { io } from 'socket.io-client';
 
 interface Notification {
   id: number;
@@ -54,9 +55,50 @@ export const NotificationBell: React.FC = () => {
 
   useEffect(() => {
     if (!notificationsEnabled) return;
+    
+    // 1. Lấy dữ liệu ban đầu
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 15000); // Poll every 15s
-    return () => clearInterval(interval);
+
+    // 2. Thiết lập kết nối Real-time (WebSocket)
+    const token = localStorage.getItem('c2c_token');
+    if (!token || !isLikelyJwt(token)) return;
+
+    let userId: string | null = null;
+    try {
+      // Decode JWT để lấy userId
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      userId = payload.sub;
+    } catch (e) {
+      console.error('Failed to decode token for socket:', e);
+    }
+
+    if (!userId) return;
+
+    // Kết nối tới Gateway thông qua API Gateway (Cổng 3000)
+    const socketHost = API_BASE_URL.replace(/\/api\/?$/, '');
+    const socket = io(`${socketHost}/notifications`, {
+      query: { userId },
+      transports: ['websocket']
+    });
+
+    socket.on('connect', () => {
+      console.log('[Real-time] Connected to notification server');
+    });
+
+    // Lắng nghe sự kiện thông báo mới
+    socket.on('new_notification', (notif: Notification) => {
+      console.log('[Real-time] Received new notification:', notif);
+      setNotifications(prev => {
+        // Kiểm tra tránh trùng lặp
+        if (prev.some(p => p.id === notif.id)) return prev;
+        return [notif, ...prev];
+      });
+      setUnreadCount(prev => prev + 1);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, [notificationsEnabled]);
 
   const markAsRead = async (id: number) => {

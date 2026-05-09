@@ -40,9 +40,17 @@ export const VoucherCard: FC<VoucherCardProps> = ({ voucher, onClaim, isClaimed,
   const isInactive = isExpired || isComingSoon || isOutOfStock;
 
   const isPercentage = voucher.discount_type === 'percentage';
-  const discountDisplay = isPercentage 
-    ? `${parseFloat(voucher.discount_value)}%` 
-    : `${Number(voucher.discount_value).toLocaleString('vi-VN')}đ`;
+  let discountDisplay = '';
+  if (isPercentage) {
+    discountDisplay = `${parseFloat(voucher.discount_value)}%`;
+  } else {
+    const val = Number(voucher.discount_value);
+    if (val >= 1000 && val % 1000 === 0) {
+      discountDisplay = `${val / 1000}K`;
+    } else {
+      discountDisplay = `${val.toLocaleString('vi-VN')}đ`;
+    }
+  }
 
   const minSpendDisplay = voucher.min_spend 
     ? `Đơn tối thiểu ${Number(voucher.min_spend).toLocaleString('vi-VN')}đ` 
@@ -67,8 +75,8 @@ export const VoucherCard: FC<VoucherCardProps> = ({ voucher, onClaim, isClaimed,
       <div className={`flex flex-col items-center justify-center w-28 bg-white border-y border-l border-[#e9f5ff] rounded-l-2xl relative overflow-hidden ${isInactive ? 'grayscale' : ''}`}>
         <div className={`absolute top-0 left-0 w-full h-1 ${isInactive ? 'bg-slate-400' : 'bg-[#00629d]'}`}></div>
         <div className={`text-2xl font-black ${isInactive ? 'text-slate-400' : 'text-[#00629d]'}`}>{discountDisplay}</div>
-        <div className="text-[10px] font-bold text-[#707882] uppercase tracking-tighter">
-          {voucher.discount_type.replace('_', ' ')}
+        <div className="text-[10px] font-bold text-[#707882] uppercase tracking-widest mt-1">
+          Giảm Giá
         </div>
         
         {/* Cut-out circles */}

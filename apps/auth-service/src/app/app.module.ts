@@ -8,6 +8,7 @@ import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
 import { WalletController } from './wallet.controller';
 import { WalletService } from './wallet.service';
+import { NotificationsGateway } from './notifications.gateway';
 
 @Module({
   imports: [
@@ -18,6 +19,6 @@ import { WalletService } from './wallet.service';
     }),
   ],
   controllers: [AuthController, NotificationsController, WalletController],
-  providers: [AuthService, PrismaService, EmailService, NotificationsService, WalletService],
+  providers: [AuthService, PrismaService, EmailService, NotificationsService, WalletService, NotificationsGateway],
 })
 export class AppModule {}

@@ -311,6 +311,16 @@ export class ProductService {
         const data = await res.json();
         totalOrders = data.totalOrders || 0;
         totalRevenue = data.totalRevenue || 0;
+        if (Array.isArray(data.topProductsData) && data.topProductsData.length > 0) {
+          topProductsData.splice(
+            0,
+            topProductsData.length,
+            ...data.topProductsData.map((p: any) => ({
+              name: String(p?.name || 'Sản phẩm chưa xác định'),
+              sales: Number(p?.sales) || 0,
+            })),
+          );
+        }
 
         // Spread views evenly as approximation, since we only track a total counter natively
         const avgViews = totalViews > 0 ? Math.round(totalViews / days) : 0;
@@ -1702,7 +1712,12 @@ export class ProductService {
   async getActiveProducts(searchQuery?: string, categorySlug?: string) {
     const where: any = {
       status: 'active',
-      shop: { status: 'active' }
+      shop: { status: 'active' },
+      variants: {
+        some: {
+          stock_quantity: { gt: 0 },
+        },
+      },
     };
 
     if (categorySlug && categorySlug.trim() !== '') {
@@ -1812,7 +1827,15 @@ export class ProductService {
     }
 
     return this.prisma.product.findMany({
-      where: { shop_id: shopId, status: 'active' },
+      where: {
+        shop_id: shopId,
+        status: 'active',
+        variants: {
+          some: {
+            stock_quantity: { gt: 0 },
+          },
+        },
+      },
       select: {
         id: true,
         shop_id: true,
