@@ -97,6 +97,11 @@ export class AdminController {
     return this.adminService.updateLocationStatus(level, +id, isActive);
   }
 
+  @Delete('locations/:level/:id')
+  deleteLocation(@Param('level') level: string, @Param('id') id: string) {
+    return this.adminService.deleteLocation(level, +id);
+  }
+
   // --- CATEGORIES ---
 
   @Get('categories')

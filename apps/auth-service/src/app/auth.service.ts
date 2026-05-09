@@ -408,6 +408,7 @@ export class AuthService {
           address_line: payload.address_line,
           label: payload.label,
           is_default: shouldSetDefault,
+          status: 'active',
           updated_at: new Date(),
         },
       }),
@@ -441,6 +442,7 @@ export class AuthService {
           ward_code: payload.ward_code,
           address_line: payload.address_line,
           label: payload.label,
+          status: 'active',
           is_default: shouldSetDefault,
           updated_at: new Date(),
         },
@@ -566,5 +568,20 @@ export class AuthService {
     }
 
     return address;
+  }
+
+  async updateAddressStatusByLocation(level: string, code: string, status: string) {
+    if (level === 'province') {
+      await this.prisma.address.updateMany({
+        where: { province_code: code },
+        data: { status, updated_at: new Date() },
+      });
+    } else if (level === 'ward') {
+      await this.prisma.address.updateMany({
+        where: { ward_code: code },
+        data: { status, updated_at: new Date() },
+      });
+    }
+    return { success: true };
   }
 }

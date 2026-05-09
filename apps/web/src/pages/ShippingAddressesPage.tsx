@@ -31,6 +31,8 @@ const createEmptyForm = (fallbackName = ''): AddressFormState => ({
   is_default: false,
 });
 
+const MAX_ADDRESSES = 5;
+
 export const ShippingAddressesPage: FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -103,6 +105,10 @@ export const ShippingAddressesPage: FC = () => {
   }, []);
 
   const openCreateModal = () => {
+    if (addresses.length >= MAX_ADDRESSES) {
+      setError(`Bạn chỉ có thể lưu tối đa ${MAX_ADDRESSES} địa chỉ nhận hàng.`);
+      return;
+    }
     setEditingAddress(null);
     setFormState(createEmptyForm(currentUserName));
     setShowModal(true);
@@ -138,6 +144,10 @@ export const ShippingAddressesPage: FC = () => {
     try {
       setSaving(true);
       setError('');
+
+      if (!editingAddress && addresses.length >= MAX_ADDRESSES) {
+        throw new Error(`Bạn chỉ có thể lưu tối đa ${MAX_ADDRESSES} địa chỉ nhận hàng.`);
+      }
 
       const response = await fetch(
         editingAddress ? `${AUTH_API_URL}/addresses/${editingAddress.id}` : `${AUTH_API_URL}/addresses`,
@@ -220,7 +230,9 @@ export const ShippingAddressesPage: FC = () => {
               <h1 className="mt-3 text-4xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">Địa chỉ nhận hàng</h1>
               <p className="mt-3 max-w-2xl text-sm text-[#707882]">Quản lý thông tin giao hàng của bạn.</p>
               <div className="mt-5 flex flex-wrap items-center gap-3 text-sm">
-                <span className="rounded-full bg-[#eef6ff] px-4 py-2 font-bold text-[#1877F2]">{addresses.length} địa chỉ đã lưu</span>
+                <span className="rounded-full bg-[#eef6ff] px-4 py-2 font-bold text-[#1877F2]">
+                  {addresses.length} / {MAX_ADDRESSES} địa chỉ đã lưu
+                </span>
                 {defaultAddress && (
                   <span className="rounded-full bg-[#0f1d25] px-4 py-2 font-bold text-white">
                     Mặc định: {defaultAddress.recipient_name}
@@ -243,7 +255,8 @@ export const ShippingAddressesPage: FC = () => {
               <button
                 type="button"
                 onClick={openCreateModal}
-                className="inline-flex items-center gap-2 rounded-2xl bg-[#1877F2] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 transition hover:-translate-y-0.5 hover:bg-[#0f68d8]"
+                disabled={addresses.length >= MAX_ADDRESSES}
+                className="inline-flex items-center gap-2 rounded-2xl bg-[#1877F2] px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-200 transition hover:-translate-y-0.5 hover:bg-[#0f68d8] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
               >
                 <span className="material-symbols-outlined text-[18px]">add</span>
                 Thêm địa chỉ mới
@@ -304,6 +317,11 @@ export const ShippingAddressesPage: FC = () => {
                           {address.is_default && (
                             <span className="rounded-full bg-[#0f1d25] px-3 py-1 text-[11px] font-black uppercase tracking-wider text-white">
                               Mặc định
+                            </span>
+                          )}
+                          {address.status === 'Cần thay đổi' && (
+                            <span className="rounded-full bg-[#ba1a1a] px-3 py-1 text-[11px] font-black uppercase tracking-wider text-white animate-pulse">
+                              Cần thay đổi
                             </span>
                           )}
                         </div>

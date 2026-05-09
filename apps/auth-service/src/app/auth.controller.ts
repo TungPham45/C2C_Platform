@@ -162,4 +162,12 @@ export class AuthController {
     const idArray = ids.split(',').map(id => parseInt(id.trim(), 10)).filter(id => !isNaN(id));
     return this.authService.getUsersByIds(idArray);
   }
+  @Put('internal/admin/addresses/update-status-by-location')
+  updateAddressStatusByLocation(
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Body() data: { level: string; code: string; status: string },
+  ) {
+    this.requireInternalAccess(headers);
+    return this.authService.updateAddressStatusByLocation(data.level, data.code, data.status);
+  }
 }

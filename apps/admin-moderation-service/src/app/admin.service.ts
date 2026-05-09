@@ -576,6 +576,17 @@ export class AdminService {
       throw new BadRequestException('isActive must be a boolean');
     }
 
+    const location =
+      level === 'province'
+        ? await this.prisma.province.findUnique({ where: { id } })
+        : await this.prisma.ward.findUnique({ where: { id } });
+
+    if (!location) {
+      throw new NotFoundException('Không tìm thấy địa giới hành chính');
+    }
+
+    const code = location.code;
+
     if (level === 'province') {
       await this.prisma.$transaction([
         this.prisma.province.update({
@@ -587,14 +598,72 @@ export class AdminService {
           data: { is_active: isActive },
         }),
       ]);
-
-      return { success: true };
+    } else {
+      await this.prisma.ward.update({
+        where: { id },
+        data: { is_active: isActive },
+      });
     }
 
-    await this.prisma.ward.update({
-      where: { id },
-      data: { is_active: isActive },
-    });
+    try {
+      await fetch(`${this.authBaseUrl}/internal/admin/addresses/update-status-by-location`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getInternalHeaders(),
+        },
+        body: JSON.stringify({
+          level,
+          code,
+          status: isActive ? 'active' : 'Cần thay đổi',
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to notify auth-service about location status change:', error);
+    }
+
+    return { success: true };
+  }
+
+  async deleteLocation(levelValue: string, id: number) {
+    const level = normalizeLocationLevel(levelValue);
+
+    const location =
+      level === 'province'
+        ? await this.prisma.province.findUnique({ where: { id } })
+        : await this.prisma.ward.findUnique({ where: { id } });
+
+    if (!location) {
+      throw new NotFoundException('Không tìm thấy địa giới hành chính');
+    }
+
+    const code = location.code;
+
+    if (level === 'province') {
+      await this.prisma.$transaction([
+        this.prisma.ward.deleteMany({ where: { province_id: id } }),
+        this.prisma.province.delete({ where: { id } }),
+      ]);
+    } else {
+      await this.prisma.ward.delete({ where: { id } });
+    }
+
+    try {
+      await fetch(`${this.authBaseUrl}/internal/admin/addresses/update-status-by-location`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getInternalHeaders(),
+        },
+        body: JSON.stringify({
+          level,
+          code,
+          status: 'Cần thay đổi',
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to notify auth-service about location deletion:', error);
+    }
 
     return { success: true };
   }

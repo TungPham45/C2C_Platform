@@ -26,6 +26,7 @@ export interface ReceiverAddress {
   address_line: string;
   label?: string | null;
   is_default?: boolean | null;
+  status?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
 }

@@ -414,6 +414,16 @@ const LocationManagement = () => {
   };
 
   const handleStatusToggle = async (node: LocationNode) => {
+    if (node.isActive) {
+      if (
+        !window.confirm(
+          `Bạn có chắc muốn tắt ${getLevelLabel(node.level)} "${node.name}"? Tất cả địa chỉ người dùng thuộc khu vực này sẽ được chuyển sang trạng thái "Cần thay đổi".`,
+        )
+      ) {
+        return;
+      }
+    }
+
     const rowKey = `${node.level}-${node.id}`;
 
     try {
@@ -436,6 +446,31 @@ const LocationManagement = () => {
       setError(toggleError instanceof Error ? toggleError.message : 'Không thể cập nhật trạng thái');
     } finally {
       setTogglingRowKey(null);
+    }
+  };
+
+  const handleDelete = async (node: LocationNode) => {
+    if (
+      !window.confirm(
+        `Bạn có chắc muốn xoá ${getLevelLabel(node.level)} "${node.name}"? Tất cả địa chỉ người dùng thuộc khu vực này sẽ được chuyển sang trạng thái "Cần thay đổi".`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/locations/${node.level}/${node.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || 'Không thể xoá địa giới');
+      }
+
+      await Promise.all([refreshOptions(), refreshTable()]);
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Không thể xoá địa giới');
     }
   };
 
@@ -538,6 +573,13 @@ const LocationManagement = () => {
                 }`}
               >
                 {togglingRowKey === rowKey ? 'Đang lưu...' : item.isActive ? 'Tắt' : 'Bật'}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDelete(item)}
+                className="rounded-full bg-[#ba1a1a]/10 px-3 py-2 text-xs font-semibold text-[#ba1a1a] transition hover:bg-[#ba1a1a]/20"
+              >
+                Xóa
               </button>
             </div>
           </td>
@@ -819,7 +861,9 @@ const LocationManagement = () => {
                   <span className="text-sm font-semibold text-[#0f1d25]">Mã hành chính</span>
                   <input
                     value={formState.code}
-                    onChange={(event) => setFormState((current) => ({ ...current, code: event.target.value }))}
+                    onChange={(event) =>
+                      setFormState((current) => ({ ...current, code: event.target.value.replace(/\D/g, '') }))
+                    }
                     placeholder="Ví dụ: 79, 760, 26734"
                     className="w-full rounded-2xl border border-[#d6e7f6] px-4 py-3 outline-none"
                   />

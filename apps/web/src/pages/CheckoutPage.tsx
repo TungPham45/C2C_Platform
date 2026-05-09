@@ -52,7 +52,7 @@ interface CheckoutVoucherResponse {
   shop_vouchers: CheckoutVoucherGroup[];
 }
 
-const SHIPPING_FEE_PER_SHOP = 50000;
+const SHIPPING_FEE_PER_SHOP = 30000;
 
 const formatCurrency = (value: number) => `${Math.round(value).toLocaleString('vi-VN')} ₫`;
 
@@ -165,7 +165,8 @@ export const CheckoutPage = () => {
 
         setSavedAddresses(addressData);
         setLocationOptions(optionsResponse);
-        setSelectedAddress(addressData.find((address) => address.is_default) ?? addressData[0] ?? null);
+        // Fix race condition: only set initial selection if none is currently selected
+        setSelectedAddress((current) => current ?? (addressData.find((address) => address.is_default) ?? addressData[0] ?? null));
       } catch (loadError: any) {
         if (!ignore) {
           setAddressError(loadError.message || 'Không thể tải địa chỉ nhận hàng');
@@ -185,7 +186,7 @@ export const CheckoutPage = () => {
   }, []);
 
   const getSinglePrice = () => {
-    if (!stateData?.product) return 450000;
+    if (!stateData?.product) return 0;
     return parsePrice((stateData.variant?.price_override || stateData.variant?.price) ?? stateData.product.base_price);
   };
 
@@ -197,14 +198,14 @@ export const CheckoutPage = () => {
   const groups = isMultiItem ? stateData.groupedItems : [
     {
       shop: {
-        id: stateData?.product?.shop_id || 101,
+        id: stateData?.product?.shop_id || 0,
         name: stateData?.product?.shop?.name || 'Cửa hàng',
       },
       items: [
         {
-          id: stateData?.variant?.id || stateData?.product?.id || 1,
+          id: stateData?.variant?.id || stateData?.product?.id || 0,
           cart_item_id: null,
-          product: stateData?.product || { name: 'Product' },
+          product: stateData?.product || { name: 'Sản phẩm' },
           variant: stateData?.variant,
           quantity: stateData?.quantity || 1,
           price: getSinglePrice(),
@@ -222,7 +223,7 @@ export const CheckoutPage = () => {
 
       return {
         product_variant_id: isMultiItem ? item.product_variant_id : item.id,
-        product_name: typeof item.product?.name === 'string' ? item.product.name : 'Product',
+        product_name: typeof item.product?.name === 'string' ? item.product.name : 'Sản phẩm',
         quantity: Number(item.quantity) || 1,
         price_at_purchase: price,
       };
@@ -303,7 +304,7 @@ export const CheckoutPage = () => {
 
   const subtotalAfterShopDiscount = Math.max(0, subTotal - shopDiscountTotal);
   const totalPayment = Math.max(0, subtotalAfterShopDiscount + totalShippingFee);
-
+  // chỉnh địa chỉ trả về
   const formatShippingAddressForOrder = (address: ReceiverAddress) => {
     const wardName = findWardByCode(locationOptions, address.ward_code)?.name || address.ward_code;
     const provinceName = findProvinceByCode(locationOptions, address.province_code)?.name || address.province_code;
@@ -313,15 +314,23 @@ export const CheckoutPage = () => {
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!selectedAddress) {
       setAddressError('Vui lòng chọn địa chỉ nhận hàng trước khi đặt đơn.');
       return;
     }
 
+    if (selectedAddress.status === 'Cần thay đổi') {
+      setAddressError('Địa chỉ hiện tại không còn hợp lệ. Vui lòng cập nhật lại địa chỉ giao hàng.');
+      return;
+    }
+
+    const formattedAddress = formatShippingAddressForOrder(selectedAddress);
+
     const orderData: any = {
       total_payment: totalPayment,
       payment_method: paymentMethod,
-      shipping_address: formatShippingAddressForOrder(selectedAddress),
+      shipping_address: formattedAddress,
       shop_orders: shopOrders.map((shopOrder: any) => ({
         shop_id: shopOrder.shop_id,
         subtotal: shopOrder.subtotal,
@@ -336,6 +345,7 @@ export const CheckoutPage = () => {
     }
 
     const result = await createOrder(orderData);
+
     if (result) {
       sessionStorage.removeItem(CHECKOUT_SESSION_KEY);
       navigate('/order-success', { state: { orderId: result.id } });
@@ -400,6 +410,11 @@ export const CheckoutPage = () => {
                                 Mặc định
                               </span>
                             )}
+                            {selectedAddress.status === 'Cần thay đổi' && (
+                              <span className="px-3 py-1 rounded-full bg-[#ba1a1a] text-white text-[11px] font-black uppercase tracking-wider animate-pulse">
+                                Cần thay đổi
+                              </span>
+                            )}
                           </div>
                           <p className="mt-1 text-sm font-semibold text-[#404751]">{selectedAddress.phone_number}</p>
                           <p className="mt-3 text-sm text-[#5d6975] leading-6">
@@ -437,9 +452,14 @@ export const CheckoutPage = () => {
                             >
                               <div className="flex items-start justify-between gap-4">
                                 <div>
-                                  <p className="font-bold text-[#0f1d25]">
-                                    {getAddressLabelMeta(address.label).label} · {address.recipient_name}
-                                  </p>
+                                    <p className="font-bold text-[#0f1d25] flex flex-wrap items-center gap-2">
+                                      {getAddressLabelMeta(address.label).label} · {address.recipient_name}
+                                      {address.status === 'Cần thay đổi' && (
+                                        <span className="px-2 py-0.5 rounded-full bg-[#ba1a1a] text-white text-[10px] font-bold uppercase animate-pulse">
+                                          Cần thay đổi
+                                        </span>
+                                      )}
+                                    </p>
                                   <p className="text-sm text-[#707882] mt-1">{address.phone_number}</p>
                                   <p className="text-sm text-[#5d6975] mt-2 leading-6">
                                     {formatReceiverAddressLine(address, locationOptions)}
