@@ -34,7 +34,9 @@ export class AppService {
       });
       if (res.ok) {
         const users: any[] = await res.json();
-        users.forEach(u => { map[u.id] = u.full_name || u.email || `User ${u.id}`; });
+        users.forEach(u => { 
+          map[u.id] = u.full_name || (u.email ? u.email.split('@')[0] : `User ${u.id}`); 
+        });
       }
     } catch (e) {
       this.logger.warn('Failed to fetch user names', e);
@@ -138,13 +140,23 @@ export class AppService {
       });
     }
 
+    // Mark messages from the other person as read
+    await this.prisma.messages.updateMany({
+      where: {
+        conversation_id: conversationId,
+        sender_id: { not: userId },
+        is_read: false
+      },
+      data: { is_read: true }
+    });
+
     return this.prisma.messages.findMany({
       where: { conversation_id: conversationId },
       orderBy: { sent_at: 'asc' }
     });
   }
 
-  async sendMessage(conversationId: number, senderId: number, content: string) {
+  async sendMessage(conversationId: number, senderId: number, content: string, messageType: string = 'text') {
     const conv = await this.prisma.conversations.findUnique({
       where: { id: conversationId }
     });
@@ -156,8 +168,12 @@ export class AppService {
     const senderRole = conv.buyer_id === senderId ? 'buyer' : 'seller';
     
     // Increment unread count for the other party
+    let previewText = content.substring(0, 50);
+    if (messageType === 'image') previewText = '[Hình ảnh]';
+    if (messageType === 'video') previewText = '[Video]';
+
     const updateData: any = {
-      last_message_preview: content.substring(0, 50),
+      last_message_preview: previewText,
       updated_at: new Date()
     };
     if (senderRole === 'buyer') {
@@ -176,7 +192,7 @@ export class AppService {
     await this.sendNotification({
       user_id: receiverId,
       title: 'Có tin nhắn mới',
-      message: content.length > 50 ? content.substring(0, 50) + '...' : content,
+      message: messageType === 'text' ? (content.length > 50 ? content.substring(0, 50) + '...' : content) : previewText,
       type: 'CHAT',
       link: senderRole === 'buyer' ? `/seller/chat` : `/messages`
     });
@@ -187,7 +203,7 @@ export class AppService {
         sender_id: senderId,
         sender_role: senderRole,
         content,
-        message_type: 'text'
+        message_type: messageType
       }
     });
   }

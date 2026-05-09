@@ -18,12 +18,14 @@ const AccountManagement: FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
+  // state for filter and search
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterRole, setFilterRole] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
 
+  // handle debounced
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchTerm);
@@ -40,7 +42,7 @@ const AccountManagement: FC = () => {
         ...(filterStatus !== 'all' && { status: filterStatus }),
         sortBy: sortBy,
       }).toString();
-      
+
       const response = await fetch(`/api/admin/users?${queryParams}`);
       if (!response.ok) throw new Error('Failed to fetch users');
       const data = await response.json();
@@ -90,6 +92,8 @@ const AccountManagement: FC = () => {
                 </span>
               </div>
             </div>
+
+            {/* filter and search bar */}
             <div className="flex flex-wrap gap-4 items-center bg-[#f5faff] p-4 rounded-xl">
               <div className="flex-1 min-w-[200px] relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#707882] text-lg">search</span>
@@ -136,6 +140,7 @@ const AccountManagement: FC = () => {
             </div>
           </div>
 
+          {/* user table */}
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
@@ -187,8 +192,8 @@ const AccountManagement: FC = () => {
                       </td>
                       <td className="px-6 py-6">
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${user.status === 'active' ? 'bg-[#dcfce7] text-[#166534]' :
-                            user.status === 'pending_verification' ? 'bg-[#fef9c3] text-[#854d0e]' :
-                              'bg-[#fee2e2] text-[#991b1b]'
+                          user.status === 'pending_verification' ? 'bg-[#fef9c3] text-[#854d0e]' :
+                            'bg-[#fee2e2] text-[#991b1b]'
                           }`}>
                           {user.status === 'active' ? 'Hoạt động' :
                             user.status === 'pending_verification' ? 'Chờ xác thực' : 'Đình chỉ'}
@@ -206,8 +211,8 @@ const AccountManagement: FC = () => {
                             <button
                               onClick={() => handleUpdateStatus(user.id, user.status)}
                               className={`w-[85px] py-2 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all text-center ${user.status === 'active'
-                                  ? 'bg-[#fee2e2] text-[#991b1b] hover:bg-[#fecaca]'
-                                  : 'bg-[#dcfce7] text-[#166534] hover:bg-[#bbf7d0]'
+                                ? 'bg-[#fee2e2] text-[#991b1b] hover:bg-[#fecaca]'
+                                : 'bg-[#dcfce7] text-[#166534] hover:bg-[#bbf7d0]'
                                 }`}
                             >
                               {user.status === 'active' ? 'Khóa' : 'Mở khóa'}
@@ -226,6 +231,7 @@ const AccountManagement: FC = () => {
         </div>
       </div>
 
+      {/* user detail modal */}
       {selectedUser && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-[slideUp_0.3s_ease-out]">
@@ -249,7 +255,7 @@ const AccountManagement: FC = () => {
                   <p className="text-sm text-[#707882]">{selectedUser.email}</p>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="block text-[#707882] text-xs uppercase font-bold mb-1">Số điện thoại</span>
@@ -261,13 +267,12 @@ const AccountManagement: FC = () => {
                 </div>
                 <div>
                   <span className="block text-[#707882] text-xs uppercase font-bold mb-1">Trạng thái</span>
-                  <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-semibold ${
-                    selectedUser.status === 'active' ? 'bg-[#dcfce7] text-[#166534]' :
-                    selectedUser.status === 'pending_verification' ? 'bg-[#fef9c3] text-[#854d0e]' :
-                    'bg-[#fee2e2] text-[#991b1b]'
-                  }`}>
+                  <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-semibold ${selectedUser.status === 'active' ? 'bg-[#dcfce7] text-[#166534]' :
+                      selectedUser.status === 'pending_verification' ? 'bg-[#fef9c3] text-[#854d0e]' :
+                        'bg-[#fee2e2] text-[#991b1b]'
+                    }`}>
                     {selectedUser.status === 'active' ? 'Hoạt động' :
-                     selectedUser.status === 'pending_verification' ? 'Chờ xác thực' : 'Đình chỉ'}
+                      selectedUser.status === 'pending_verification' ? 'Chờ xác thực' : 'Đình chỉ'}
                   </span>
                 </div>
                 <div>
@@ -279,7 +284,7 @@ const AccountManagement: FC = () => {
               </div>
             </div>
             <div className="p-4 border-t border-gray-100 bg-[#f9fafb] flex justify-end">
-              <button 
+              <button
                 onClick={() => setSelectedUser(null)}
                 className="px-6 py-2 bg-[#00629d] text-white font-bold rounded-xl hover:bg-[#004f80] transition-colors"
               >

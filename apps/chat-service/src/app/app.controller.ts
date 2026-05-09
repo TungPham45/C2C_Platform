@@ -32,8 +32,8 @@ export class AppController {
   }
 
   @Post(':id/messages')
-  async sendMessage(@Req() req: any, @Param('id') id: string, @Body() body: { content: string }) {
+  async sendMessage(@Req() req: any, @Param('id') id: string, @Body() body: { content: string, message_type?: string }) {
     const userId = this.getUserId(req);
-    return this.appService.sendMessage(+id, userId, body.content);
+    return this.appService.sendMessage(+id, userId, body.content, body.message_type);
   }
 }
