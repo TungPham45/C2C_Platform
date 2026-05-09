@@ -189,7 +189,8 @@ export const CheckoutPage = () => {
     return parsePrice((stateData.variant?.price_override || stateData.variant?.price) ?? stateData.product.base_price);
   };
 
-  const getCartItemPrice = (item: any) => parsePrice((item.variant?.price_override || item.variant?.price) ?? item.product?.base_price);
+  const getCartItemPrice = (item: any) =>
+    parsePrice((item.variant?.price_override || item.variant?.price) ?? item.product?.base_price);
 
   const isMultiItem = stateData?.fromCart === true;
 
@@ -488,8 +489,8 @@ export const CheckoutPage = () => {
                     type="button"
                     onClick={() => setPaymentMethod(method.id)}
                     className={`flex items-center gap-4 p-5 lg:p-6 rounded-2xl border-2 transition-all ${paymentMethod === method.id
-                        ? 'bg-[#f5faff] border-[#00629d] text-[#00629d]'
-                        : 'bg-white border-[#f0f3f8] hover:border-[#dbeaf5] text-[#404751]'
+                      ? 'bg-[#f5faff] border-[#00629d] text-[#00629d]'
+                      : 'bg-white border-[#f0f3f8] hover:border-[#dbeaf5] text-[#404751]'
                       }`}
                   >
                     <span className="material-symbols-outlined">{method.icon}</span>
@@ -574,8 +575,8 @@ export const CheckoutPage = () => {
                                   type="button"
                                   onClick={() => toggleShopVoucher(shopOrder.shop_id, option.claim_id)}
                                   className={`w-full text-left p-4 rounded-2xl border transition-all ${isSelected
-                                      ? 'border-[#00629d] bg-white'
-                                      : 'border-[#e4e9f0] bg-white hover:border-[#cfe4f6]'
+                                    ? 'border-[#00629d] bg-white'
+                                    : 'border-[#e4e9f0] bg-white hover:border-[#cfe4f6]'
                                     }`}
                                 >
                                   <div className="flex items-start justify-between gap-4">

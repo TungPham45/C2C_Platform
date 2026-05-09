@@ -12,13 +12,13 @@ export class AuthService {
     @Inject(JwtService) private jwtService: JwtService,
     @Inject(EmailService) private emailService: EmailService,
     @Inject(NotificationsService) private notificationsService: NotificationsService
-  ) {}
+  ) { }
 
   async validateUser(email: string, pass: string): Promise<any> {
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
-    
+
     if (user && await bcrypt.compare(pass, user.password)) {
       const { password, ...result } = user;
       return result;
@@ -27,8 +27,8 @@ export class AuthService {
   }
 
   async login(user: any) {
-    const payload = { 
-      sub: user.id, 
+    const payload = {
+      sub: user.id,
       email: user.email,
       role: user.role, // 'user' | 'admin'
     };
@@ -60,7 +60,7 @@ export class AuthService {
       data: {
         ...rest,
         password: hashedPassword,
-        role: 'user', 
+        role: 'user',
         status: 'pending' // Đã khôi phục bước chờ OTP
       },
     });
@@ -127,7 +127,7 @@ export class AuthService {
 
   async resetPassword(data: any) {
     const { email, code, newPassword } = data;
-    
+
     // We verify the OTP right before resetting
     await this.verifyOtp(email, code, 'RESET_PASSWORD');
 
@@ -253,7 +253,7 @@ export class AuthService {
 
   async getUserGrowthAnalytics(timeframe?: string) {
     const whereClause: any = { created_at: { not: null } };
-    
+
     if (timeframe === 'week') {
       const dt = new Date();
       dt.setDate(dt.getDate() - 7);
@@ -271,7 +271,7 @@ export class AuthService {
     });
 
     const growth: Record<string, number> = {};
-    
+
     users.forEach(user => {
       if (user.created_at) {
         // format YYYY-MM-DD
@@ -290,7 +290,7 @@ export class AuthService {
     if (!ids.length) return [];
     return this.prisma.user.findMany({
       where: { id: { in: ids } },
-      select: { id: true, full_name: true, avatar_url: true, status: true },
+      select: { id: true, full_name: true, email: true, avatar_url: true, status: true },
     });
   }
 
@@ -392,11 +392,11 @@ export class AuthService {
     const results = await this.prisma.$transaction([
       ...(shouldSetDefault
         ? [
-            this.prisma.address.updateMany({
-              where: { user_id: userId, is_default: true },
-              data: { is_default: false, updated_at: new Date() },
-            }),
-          ]
+          this.prisma.address.updateMany({
+            where: { user_id: userId, is_default: true },
+            data: { is_default: false, updated_at: new Date() },
+          }),
+        ]
         : []),
       this.prisma.address.create({
         data: {

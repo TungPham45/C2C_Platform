@@ -2,13 +2,25 @@ import { FC, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { PRODUCT_API_URL, resolveAssetUrl } from '../config/api';
+import { FollowersModal } from '../components/FollowersModal';
 
 interface ShopData {
-  id: string;
+  id: string | number;
   name: string;
   description?: string;
   logo_url?: string;
   status: 'active' | 'pending' | 'suspended';
+  _count?: { followers: number; products: number };
+}
+
+interface FollowedShop {
+  id: number;
+  name: string;
+  slug: string;
+  logo_url: string;
+  follower_count: number;
+  is_following?: boolean;
+  _count?: { products: number };
 }
 
 interface UserProfile {
@@ -31,6 +43,12 @@ export const ProfilePage: FC = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [shopDetail, setShopDetail] = useState<ShopData | null>(null);
   const [loadingShop, setLoadingShop] = useState(false);
+
+  const [followedShops, setFollowedShops] = useState<FollowedShop[]>([]);
+  const [loadingFollows, setLoadingFollows] = useState(false);
+  
+  const [showFollowersModal, setShowFollowersModal] = useState(false);
+  const [targetShopId, setTargetShopId] = useState<number | string | null>(null);
 
   useEffect(() => {
     const userStr = localStorage.getItem('c2c_user');
@@ -61,11 +79,44 @@ export const ProfilePage: FC = () => {
           })
           .catch(() => { })
           .finally(() => setLoadingShop(false));
+
+        setLoadingFollows(true);
+        fetch(`${PRODUCT_API_URL}/following`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+          .then((res) => (res.ok ? res.json() : []))
+          .then((data) => setFollowedShops(data.map((shop: any) => ({ ...shop, is_following: true }))))
+          .catch(() => {})
+          .finally(() => setLoadingFollows(false));
       }
     } catch {
       navigate('/login');
     }
   }, [navigate]);
+
+  const toggleFollowShop = async (shopId: number, currentFollowingStatus: boolean) => {
+    const token = localStorage.getItem('c2c_token');
+    if (!token) return;
+    try {
+      const res = await fetch(`${PRODUCT_API_URL}/shop/${shopId}/follow`, {
+        method: currentFollowingStatus ? 'DELETE' : 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const result = await res.json();
+        setFollowedShops(prev => prev.map(s => {
+          if (s.id === shopId) {
+            return {
+              ...s,
+              is_following: Boolean(result.is_following),
+              follower_count: Number(result.follower_count)
+            };
+          }
+          return s;
+        }));
+      }
+    } catch (e) {}
+  };
 
   if (!user) return null;
 
@@ -299,18 +350,39 @@ export const ProfilePage: FC = () => {
                     </div>
                   </div>
 
-                  {/* Shop ID */}
-                  {shopId && (
-                    <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-[#e9f5ff] flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined text-[#00629d] text-lg">tag</span>
+                  {/* Shop ID & Stats */}
+                  <div className="grid grid-cols-2 gap-4">
+                    {shopId && (
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#e9f5ff] flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[#00629d] text-lg">tag</span>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-[#bfc7d3] mb-0.5">Mã cửa hàng</p>
+                          <p className="font-mono text-sm font-bold text-[#404751]">{shopId}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-[#bfc7d3] mb-0.5">Mã cửa hàng</p>
-                        <p className="font-mono text-sm font-bold text-[#404751]">{shopId}</p>
-                      </div>
-                    </div>
-                  )}
+                    )}
+                    {shopStatus === 'active' && shopDetail?._count && (
+                      <button
+                        onClick={() => {
+                          setTargetShopId(shopDetail.id);
+                          setShowFollowersModal(true);
+                        }}
+                        className="flex items-start gap-3 hover:opacity-80 transition-opacity text-left"
+                        title="Xem danh sách người theo dõi"
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-[#e9f5ff] flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[#00629d] text-lg">group</span>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-[#bfc7d3] mb-0.5">Người theo dõi</p>
+                          <p className="text-sm font-bold text-[#00629d] underline underline-offset-2">{shopDetail._count.followers} người • {shopDetail._count.products} Sản phẩm</p>
+                        </div>
+                      </button>
+                    )}
+
+                  </div>
 
                   {/* Status info block */}
                   {shopStatus === 'pending' && (
@@ -441,9 +513,63 @@ export const ProfilePage: FC = () => {
                 </div>
               </div>
             )}
+
+            {/* Followed Shops Section */}
+            <div className="bg-white rounded-[2rem] border border-[#e9f5ff] shadow-sm overflow-hidden">
+              <div className="px-7 py-5 border-b border-[#f0f7ff] flex items-center gap-3">
+                <span className="material-symbols-outlined text-[#00629d]">favorite</span>
+                <h2 className="font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">Đang theo dõi</h2>
+                <span className="bg-[#e9f5ff] text-[#00629d] px-2 py-0.5 rounded-full text-xs font-bold">{followedShops.filter(s => s.is_following).length}</span>
+              </div>
+              <div className="p-0">
+                {loadingFollows ? (
+                  <div className="p-8 flex justify-center"><span className="material-symbols-outlined animate-spin text-[#00629d]">progress_activity</span></div>
+                ) : followedShops.length === 0 ? (
+                  <div className="p-8 text-center text-[#707882] text-sm">Bạn chưa theo dõi cửa hàng nào.</div>
+                ) : (
+                  <div className="divide-y divide-[#f0f7ff]">
+                    {followedShops.map(shop => (
+                      <div key={shop.id} className="p-4 px-7 flex items-center justify-between hover:bg-[#fcfdfe] transition-colors">
+                        <Link to={`/shop/${shop.id}`} className="flex items-center gap-4 group">
+                          <div className="w-12 h-12 rounded-xl border border-[#e9f5ff] overflow-hidden shrink-0">
+                            {shop.logo_url ? <img src={resolveAssetUrl(shop.logo_url)} alt={shop.name} className="w-full h-full object-cover" /> : <span className="material-symbols-outlined w-full h-full flex items-center justify-center bg-[#f5faff] text-[#bfc7d3]">storefront</span>}
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-[#0f1d25] group-hover:text-[#00629d] transition-colors">{shop.name}</h3>
+                            <p className="text-xs text-[#707882] mt-0.5">{shop.follower_count} người theo dõi • {shop._count?.products || 0} sản phẩm</p>
+                          </div>
+                        </Link>
+                        {shop.is_following !== false ? (
+                          <button onClick={() => toggleFollowShop(shop.id, true)} className="px-4 py-1.5 border border-[#dbeaf5] text-[#707882] rounded-full text-xs font-bold hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors shadow-sm">
+                            Bỏ theo dõi
+                          </button>
+                        ) : (
+                          <button onClick={() => toggleFollowShop(shop.id, false)} className="px-4 py-1.5 bg-[#00629d] text-white rounded-full text-xs font-bold hover:bg-[#004e7c] transition-colors shadow-sm">
+                            Theo dõi
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
+
+      {/* Followers Modal */}
+      {targetShopId && (
+        <FollowersModal
+          shopId={targetShopId}
+          isOpen={showFollowersModal}
+          onClose={() => {
+            setShowFollowersModal(false);
+            setTargetShopId(null);
+          }}
+        />
+      )}
     </MarketplaceLayout>
   );
 };

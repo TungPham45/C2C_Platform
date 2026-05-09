@@ -438,6 +438,11 @@ export class ProductController {
     return this.productService.getPublicShopProducts(+id);
   }
 
+  @Get('shops/:id/followers')
+  getShopFollowers(@Param('id') id: string) {
+    return this.productService.getShopFollowers(+id);
+  }
+
   @Get('shop/:shopId')
   getShopDetail(@Headers() headers: any, @Param('shopId') shopId: string) {
     return this.productService.getPublicShopDetail(+shopId, this.getOptionalProviderUserId(headers));

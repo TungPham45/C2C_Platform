@@ -43,6 +43,7 @@ import { BannersAdminPage } from '../pages/admin/BannersAdminPage';
 import { VoucherList } from '../pages/admin/VoucherManagement/VoucherList';
 import { ReportModeration } from '../pages/admin/ReportModeration';
 import LocationManagement from '../pages/admin/LocationManagement';
+import { ReturnManagement } from '../pages/admin/ReturnManagement';
 import { SellerProtectedRoute } from '../components/auth/SellerProtectedRoute';
 import { BuyerProtectedRoute } from '../components/auth/BuyerProtectedRoute';
 import { AdminProtectedRoute } from '../components/auth/AdminProtectedRoute';
@@ -84,7 +85,7 @@ export function App() {
         <Route path="/seller/wallet" element={<SellerWalletPage />} />
         <Route path="/seller/settings" element={<SettingsPage />} />
       </Route>
-      
+
       {/* Order Flow */}
       <Route element={<BuyerProtectedRoute />}>
         <Route path="/my-purchases" element={<Navigate to="/orders" replace />} />
@@ -100,7 +101,7 @@ export function App() {
       <Route element={<BuyerProtectedRoute />}>
         <Route path="/profile" element={<ProfilePage />} />
       </Route>
-      
+
       {/* Admin Routes */}
       <Route element={<AdminProtectedRoute />}>
         <Route path="/admin" element={<AdminDashboard />} />
@@ -115,6 +116,7 @@ export function App() {
         <Route path="/admin/categories" element={<CategoryManagement />} />
         <Route path="/admin/locations" element={<LocationManagement />} />
         <Route path="/admin/reports" element={<ReportModeration />} />
+        <Route path="/admin/returns" element={<ReturnManagement />} />
         <Route path="/admin/wallets" element={<WalletManagement />} />
       </Route>
 

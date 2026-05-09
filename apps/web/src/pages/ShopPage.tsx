@@ -4,6 +4,7 @@ import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { VoucherCard } from '../components/vouchers/VoucherCard';
 import { formatPriceRange } from '../utils/currency';
 import ReportModal from '../components/shared/ReportModal';
+import { FollowersModal } from '../components/FollowersModal';
 
 interface ShopDetail {
   id: number;
@@ -61,6 +62,7 @@ export const ShopPage: FC = () => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFollowLoading, setIsFollowLoading] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [showFollowersModal, setShowFollowersModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
 
   const loadShopVouchers = async (shopId = id) => {
@@ -232,6 +234,50 @@ export const ShopPage: FC = () => {
     }
   };
 
+  const handleChatWithShop = async () => {
+    const token = localStorage.getItem('c2c_token');
+    const userStr = localStorage.getItem('c2c_user');
+    const currentUser = userStr ? JSON.parse(userStr) : null;
+
+    if (!token || !currentUser) {
+      navigate('/login', { state: { from: `/shop/${id}` } });
+      return;
+    }
+
+    if (!shopDetail) return;
+
+    // Don't let owner chat with their own shop
+    const isOwn =
+      (currentUser.shop?.id != null && Number(currentUser.shop.id) === Number(shopDetail.id)) ||
+      (currentUser.id != null && Number(currentUser.id) === Number(shopDetail.owner_id));
+    if (isOwn) return;
+
+    try {
+      const res = await fetch('/api/chat/conversations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          shop_id: shopDetail.id,
+          seller_id: shopDetail.owner_id,
+        }),
+      });
+
+      if (res.ok) {
+        const conv = await res.json();
+        navigate(`/messages?convId=${conv.id}`);
+      } else {
+        const err = await res.json().catch(() => null);
+        alert(err?.message || 'Không thể mở cuộc trò chuyện');
+      }
+    } catch (err) {
+      console.error('Failed to start chat', err);
+      alert('Không thể kết nối đến dịch vụ chat');
+    }
+  };
+
   // Set default category if none selected
   useEffect(() => {
     if (activeTab === 'categories' && !selectedCategoryId && shopDetail?.categories && shopDetail.categories.length > 0) {
@@ -284,13 +330,6 @@ export const ShopPage: FC = () => {
     : activeTab === 'categories' && selectedCategoryId
       ? products.filter(p => p.shop_categories?.some(sc => sc.id === selectedCategoryId))
       : products;
-
-  // Mock vouchers for the shop (static display)
-  const vouchers = [
-    { discount: '10% OFF', condition: 'Đơn tối thiểu 200K', expires: 'CÒN 2 NGÀY', code: 'SHOP10', color: '#00629d' },
-    { discount: '15% OFF', condition: 'Sản phẩm mới', expires: 'SỐ LƯỢNG CÓ HẠN', code: 'NEW15OFF', color: '#00629d' },
-    { discount: '5% OFF', condition: 'Không giới hạn', expires: 'MỖI NGÀY', code: 'DAILY5', color: '#00629d' },
-  ];
 
   // Stats
   const stats = [
@@ -371,9 +410,14 @@ export const ShopPage: FC = () => {
                     >
                       {isOwnShop ? 'Cửa hàng của bạn' : isFollowLoading ? 'Đang xử lý...' : isFollowing ? 'Đang theo dõi' : 'Theo dõi'}
                     </button>
-                    <button className="px-5 py-2.5 rounded-full font-bold text-sm border-2 border-[#dbeaf5] text-[#0f1d25] bg-white hover:bg-[#f5faff] transition-all">
+                    {!isOwnShop && (
+                    <button
+                      onClick={handleChatWithShop}
+                      className="px-5 py-2.5 rounded-full font-bold text-sm border-2 border-[#dbeaf5] text-[#0f1d25] bg-white hover:bg-[#f5faff] transition-all"
+                    >
                       Chat
                     </button>
+                    )}
                     {!isOwnShop && currentUser && (
                       <button
                         onClick={() => setShowReportModal(true)}
@@ -397,7 +441,15 @@ export const ShopPage: FC = () => {
               {stats.map((stat, i) => (
                 <div
                   key={i}
-                  className="flex flex-col items-center justify-center py-5 sm:py-6 gap-1 hover:bg-[#f5faff] transition-colors"
+                  onClick={() => {
+                    if (stat.label === 'NGƯỜI THEO DÕI') {
+                      setShowFollowersModal(true);
+                    }
+                  }}
+                  className={`flex flex-col items-center justify-center py-5 sm:py-6 gap-1 transition-colors ${
+                    stat.label === 'NGƯỜI THEO DÕI' ? 'cursor-pointer hover:bg-[#e9f5ff]' : 'hover:bg-[#f5faff]'
+                  }`}
+                  title={stat.label === 'NGƯỜI THEO DÕI' ? 'Xem danh sách người theo dõi' : undefined}
                 >
                   <span className="text-xl sm:text-2xl font-black font-['Plus_Jakarta_Sans'] text-[#00629d]">
                     {stat.value}
@@ -464,7 +516,41 @@ export const ShopPage: FC = () => {
             )}
           </div>
         )}
+        {false && activeTab === 'home' && (
+          <div className="max-w-[1200px] mx-auto px-4 sm:px-8 mt-8">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg sm:text-xl font-black font-['Plus_Jakarta_Sans'] text-[#0f1d25]">
+                Mã giảm giá của Shop
+              </h2>
+              <button className="text-sm font-bold text-[#00629d] hover:underline">Xem tất cả</button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {vouchers.map((v, i) => (
+                <div
+                  key={i}
+                  className="bg-white border border-[#e4e9f0] rounded-2xl p-5 flex items-center justify-between hover:shadow-md hover:border-[#00629d]/20 transition-all group relative overflow-hidden"
+                >
+                  {/* Left dashed border decoration */}
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#00629d] to-[#42a5f5] rounded-l-2xl"></div>
 
+                  <div className="pl-3 flex-1">
+                    <div className="flex items-center gap-3 mb-1">
+                      <span className="text-lg font-black text-[#00629d] font-['Plus_Jakarta_Sans']">{v.discount}</span>
+                      <button className="px-3 py-1 bg-[#00629d] text-white text-xs font-bold rounded-full hover:bg-[#004e7c] transition-colors shadow-sm">
+                        Lưu
+                      </button>
+                    </div>
+                    <p className="text-xs text-[#707882]">{v.condition}</p>
+                    <div className="flex items-center justify-between mt-3">
+                      <span className="text-[10px] font-bold text-[#a0aab5] uppercase tracking-wider">{v.expires}</span>
+                      <span className="text-[11px] font-black text-[#00629d] tracking-wider">{v.code}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ==================== PRODUCTS SECTION ==================== */}
         <div className="max-w-[1200px] mx-auto px-4 sm:px-8 mt-10">
@@ -639,6 +725,13 @@ export const ShopPage: FC = () => {
         targetType="shop"
         targetId={shopDetail?.id}
         reporterId={currentUser?.id}
+      />
+
+      {/* Followers Modal */}
+      <FollowersModal
+        shopId={shopDetail.id}
+        isOpen={showFollowersModal}
+        onClose={() => setShowFollowersModal(false)}
       />
 
     </MarketplaceLayout>

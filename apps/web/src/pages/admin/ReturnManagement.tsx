@@ -29,6 +29,10 @@ export const ReturnManagement: FC = () => {
       });
       if (res.ok) {
         setReturns(await res.json());
+      } else {
+        console.error('API Error:', res.status, res.statusText);
+        const errText = await res.text();
+        console.error('Response:', errText);
       }
     } catch (e) {
       console.error(e);

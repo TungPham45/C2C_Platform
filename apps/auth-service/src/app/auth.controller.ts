@@ -7,7 +7,7 @@ export class AuthController {
   constructor(
     @Inject(AuthService) private readonly authService: AuthService,
     @Inject(JwtService) private readonly jwtService: JwtService,
-  ) {}
+  ) { }
 
   private requireInternalAccess(headers: Record<string, string | string[] | undefined>) {
     const expectedToken = process.env.INTERNAL_SERVICE_TOKEN ?? 'internal-dev-token';

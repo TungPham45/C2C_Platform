@@ -190,12 +190,28 @@ export const ProductDetailPage: FC = () => {
   };
 
   const getPrice = () => {
-    let rawPrice = selectedVariant?.price_override || selectedVariant?.price;
+    let rawPrice = selectedVariant?.price_override ?? selectedVariant?.price;
     if (rawPrice === undefined || rawPrice === null) {
        rawPrice = product?.base_price;
     }
     const numPrice = Number(String(rawPrice).replace(/[^0-9.-]+/g,""));
     return isNaN(numPrice) ? 0 : numPrice;
+  };
+
+  const getComparePrice = () => {
+    // Giá gốc thực (trước giảm): lấy từ variant hoặc product
+    const raw = selectedVariant?.compare_at_price ?? selectedVariant?.original_price
+      ?? product?.compare_at_price ?? product?.original_price ?? null;
+    if (raw == null) return null;
+    const num = Number(String(raw).replace(/[^0-9.-]+/g, ''));
+    return isNaN(num) || num <= 0 ? null : num;
+  };
+
+  const getDiscountPercent = () => {
+    const comparePrice = getComparePrice();
+    const salePrice = getPrice();
+    if (!comparePrice || comparePrice <= salePrice) return null;
+    return Math.round((1 - salePrice / comparePrice) * 100);
   };
 
   const allImages = [
@@ -344,10 +360,20 @@ export const ProductDetailPage: FC = () => {
                  </div>
               </div>
 
-              <div className="bg-[#f0f7ff] rounded-2xl p-6 mb-8 flex items-baseline gap-4">
+              <div className="bg-[#f0f7ff] rounded-2xl p-6 mb-8 flex items-baseline gap-4 flex-wrap">
                  <span className="text-4xl font-black text-[#00629d] font-['Plus_Jakarta_Sans']">
                    {selectedVariant ? formatVnd(getPrice()) : formatPriceRange(product.base_price, product.variants)}
                  </span>
+                 {getComparePrice() && getComparePrice()! > getPrice() && (
+                   <>
+                     <span className="text-lg font-semibold text-[#707882] line-through">
+                       {formatVnd(getComparePrice()!)}
+                     </span>
+                     <span className="text-xs font-bold text-[#d32f2f] uppercase tracking-wider">
+                       GIẢM {getDiscountPercent()}%
+                     </span>
+                   </>
+                 )}
               </div>
 
               {/* Variant Selections */}
@@ -381,40 +407,34 @@ export const ProductDetailPage: FC = () => {
                     </div>
                   ))}
                 </div>
-              ) : product?.variants?.length > 1 && (
+              ) : product?.variants?.length > 1 || product?.variants?.some((v: any) => !!v.name) ? (
                 <div className="space-y-6 mb-8">
                   <div>
                     <h3 className="text-[10px] font-bold uppercase tracking-widest text-[#707882] mb-3">Chọn phiên bản</h3>
                     <div className="flex flex-wrap gap-3">
-                      {product.variants.map((v: any, idx: number) => {
-                        // Show a friendly label instead of raw SKU codes
-                        const label = (v.attributes && Object.keys(v.attributes).length > 0)
-                          ? Object.values(v.attributes).join(' / ')
-                          : `Phiên bản ${idx + 1}`;
-                        return (
-                          <button 
-                            key={v.id} 
-                            disabled={(v.stock_quantity || 0) <= 0}
-                            onClick={() => {
-                                setSelectedVariant(v);
-                                if (v.image_url) setSelectedImage(v.image_url);
-                            }}
-                            className={`px-6 py-2.5 rounded-full border text-sm font-semibold transition-colors ${
-                              selectedVariant?.id === v.id 
-                                ? 'border-[#00629d] bg-[#f0f7ff] text-[#00629d]' 
-                                : (v.stock_quantity || 0) > 0
-                                  ? 'border-transparent bg-[#f0f3f8] text-[#404751] hover:bg-[#e4e9f0]'
-                                  : 'border-transparent bg-[#f0f3f8]/50 text-[#bfc7d3] cursor-not-allowed opacity-50'
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
+                      {product.variants.map((v: any, idx: number) => (
+                        <button 
+                          key={v.id} 
+                          disabled={(v.stock_quantity || 0) <= 0}
+                          onClick={() => {
+                              setSelectedVariant(v);
+                              if (v.image_url) setSelectedImage(v.image_url);
+                          }}
+                          className={`px-6 py-2.5 rounded-full border text-sm font-semibold transition-colors ${
+                            selectedVariant?.id === v.id 
+                              ? 'border-[#00629d] bg-[#f0f7ff] text-[#00629d]' 
+                              : (v.stock_quantity || 0) > 0
+                                ? 'border-transparent bg-[#f0f3f8] text-[#404751] hover:bg-[#e4e9f0]'
+                                : 'border-transparent bg-[#f0f3f8]/50 text-[#bfc7d3] cursor-not-allowed opacity-50'
+                          }`}
+                        >
+                          {v.name || `Phiên bản ${idx + 1}`}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* Quantity Picker & Stock */}
               <div className="flex items-center gap-4 mb-10">

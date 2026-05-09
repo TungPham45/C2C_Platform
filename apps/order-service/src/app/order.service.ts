@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
 import { ProductPrismaService } from './product-prisma.service';
 import { AuthPrismaService } from './auth-prisma.service';
@@ -526,6 +526,199 @@ export class OrderService {
     return updatedOrder;
   }
 
+  // ───────── RETURN METHODS ─────────
+
+  async requestReturn(userId: number, orderId: number, data: { reason: string; images: string[]; video_url?: string }) {
+    const order = await this.prisma.shopOrder.findUnique({
+      where: { id: orderId },
+      include: { checkout_session: true }
+    });
+
+    if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
+    if (order.checkout_session.user_id !== userId) throw new ForbiddenException('Bạn không có quyền thao tác trên đơn hàng này');
+    if (order.status !== 'delivered') throw new BadRequestException('Chỉ có thể yêu cầu trả hàng cho đơn hàng đã giao thành công');
+
+    if (!order.delivered_at) throw new BadRequestException('Ngày giao hàng không xác định, không thể yêu cầu hoàn trả');
+    
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    if (new Date().getTime() - new Date(order.delivered_at).getTime() > sevenDaysMs) {
+      throw new BadRequestException('Đã quá thời hạn 7 ngày để yêu cầu đổi/trả hàng');
+    }
+
+    const existingReturn = await (this.prisma as any).returnRequest.findUnique({
+      where: { shop_order_id: orderId }
+    });
+
+    if (existingReturn) {
+      throw new BadRequestException('Đơn hàng này đã có yêu cầu trả hàng');
+    }
+
+    const returnRequest = await (this.prisma as any).returnRequest.create({
+      data: {
+        shop_order_id: orderId,
+        user_id: userId,
+        reason: data.reason,
+        images: data.images,
+        video_url: data.video_url || null,
+        status: 'pending',
+      }
+    });
+
+    await this.prisma.shopOrder.update({
+      where: { id: orderId },
+      data: { status: 'return_requested' }
+    });
+
+    try {
+      await this.notificationClient.sendNotification({
+        user_id: userId,
+        title: 'Yêu cầu trả hàng đã được gửi',
+        message: `Yêu cầu trả hàng cho đơn #${orderId} đang được Admin xử lý.`,
+        type: 'order',
+        link: `/orders/${orderId}`,
+      });
+    } catch (e) {}
+
+    return returnRequest;
+  }
+
+  async cancelReturn(userId: number, orderId: number) {
+    // 1. Lấy đơn hàng & kiểm tra quyền sở hữu
+    const order = await this.prisma.shopOrder.findUnique({
+      where: { id: orderId },
+      include: { checkout_session: true }
+    });
+    if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
+    if (order.checkout_session.user_id !== userId) throw new ForbiddenException('Bạn không có quyền thao tác trên đơn hàng này');
+    if (order.status !== 'return_requested') throw new BadRequestException('Đơn hàng không ở trạng thái chờ xử lý hoàn trả');
+
+    // 2. Tìm return request
+    const returnReq = await (this.prisma as any).returnRequest.findUnique({
+      where: { shop_order_id: orderId }
+    });
+    if (!returnReq) throw new NotFoundException('Không tìm thấy yêu cầu hoàn trả');
+    if (returnReq.status !== 'pending') throw new BadRequestException('Chỉ có thể hủy yêu cầu đang chờ xử lý (chưa được duyệt)');
+
+    // 3. Xóa return request và đưa đơn hàng về trạng thái "delivered"
+    await (this.prisma as any).returnRequest.delete({
+      where: { shop_order_id: orderId }
+    });
+    await this.prisma.shopOrder.update({
+      where: { id: orderId },
+      data: { status: 'delivered' }
+    });
+
+    return { message: 'Đã hủy yêu cầu hoàn trả thành công' };
+  }
+
+  async getAdminReturns(status?: string) {
+    const where: any = {};
+    if (status) where.status = status;
+
+    const returns = await (this.prisma as any).returnRequest.findMany({
+      where,
+      include: {
+        shop_order: {
+          include: {
+            items: true,
+            checkout_session: true
+          }
+        }
+      },
+      orderBy: { created_at: 'desc' }
+    });
+
+    return returns;
+  }
+
+  async updateReturnStatus(returnId: number, status: string, adminNote?: string) {
+    const returnReq = await (this.prisma as any).returnRequest.findUnique({
+      where: { id: returnId },
+      include: { shop_order: { include: { checkout_session: true, items: true } } }
+    });
+
+    if (!returnReq) throw new NotFoundException('Không tìm thấy yêu cầu hoàn trả');
+    if (returnReq.status !== 'pending') throw new BadRequestException('Yêu cầu này đã được xử lý');
+
+    const updated = await (this.prisma as any).returnRequest.update({
+      where: { id: returnId },
+      data: { status, admin_note: adminNote, updated_at: new Date() }
+    });
+
+    const orderId = returnReq.shop_order_id;
+    const order = returnReq.shop_order;
+
+    if (status === 'approved') {
+      await this.prisma.shopOrder.update({
+        where: { id: orderId },
+        data: { status: 'returned' }
+      });
+
+      // 1. Restock items
+      for (const item of order.items) {
+        await this.productPrisma.productVariant.update({
+          where: { id: item.product_variant_id },
+          data: { stock_quantity: { increment: item.quantity } }
+        });
+      }
+
+      // 2. Refund buyer
+      const buyerId = order.checkout_session.user_id;
+      const orderAmount = Number(order.subtotal) + Number(order.shipping_fee) - Number(order.platform_discount_amount || 0);
+      const platformUserId = await this.walletClient.getPlatformUserId();
+
+      await this.walletClient.transfer(
+        platformUserId,
+        buyerId,
+        orderAmount,
+        `Hoàn tiền đơn hàng #${orderId} do yêu cầu trả hàng được duyệt`,
+        orderId.toString(),
+        'shop_order',
+        { from: 'transfer_out', to: 'refund' }
+      );
+
+      // 3. Cancel seller payout if it exists and hasn't been paid
+      const sellerPayout = await this.prisma.sellerPayout.findUnique({
+        where: { shop_order_id: orderId }
+      });
+
+      if (sellerPayout && sellerPayout.status !== 'paid') {
+        await this.prisma.sellerPayout.update({
+          where: { id: sellerPayout.id },
+          data: { status: 'cancelled' }
+        });
+      }
+
+      try {
+        await this.notificationClient.sendNotification({
+          user_id: buyerId,
+          title: 'Yêu cầu trả hàng ĐƯỢC DUYỆT',
+          message: `Yêu cầu trả hàng đơn #${orderId} đã được duyệt. Tiền đã được hoàn vào ví của bạn.`,
+          type: 'order',
+          link: `/orders/${orderId}`,
+        });
+      } catch (e) {}
+
+    } else if (status === 'rejected') {
+      await this.prisma.shopOrder.update({
+        where: { id: orderId },
+        data: { status: 'delivered' }
+      });
+
+      try {
+        await this.notificationClient.sendNotification({
+          user_id: order.checkout_session.user_id,
+          title: 'Yêu cầu trả hàng BỊ TỪ CHỐI',
+          message: `Yêu cầu trả hàng đơn #${orderId} bị từ chối. Ghi chú: ${adminNote || 'Không có'}`,
+          type: 'order',
+          link: `/orders/${orderId}`,
+        });
+      } catch (e) {}
+    }
+
+    return updated;
+  }
+
   // ───────── PAYOUT METHODS ─────────
 
   async getPayouts(filters: { status?: string; shopId?: number }) {
@@ -713,6 +906,7 @@ export class OrderService {
       shippedOrders,
       deliveredOrders,
       cancelledOrders,
+      returnedOrders,
       revenueTotals,
       todayOrders,
     ] = await Promise.all([
@@ -722,6 +916,7 @@ export class OrderService {
       this.prisma.shopOrder.count({ where: { status: 'shipped' } }),
       this.prisma.shopOrder.count({ where: { status: 'delivered' } }),
       this.prisma.shopOrder.count({ where: { status: 'cancelled' } }),
+      this.prisma.shopOrder.count({ where: { status: 'returned' } }),
       this.prisma.shopOrder.aggregate({
         where: { status: { not: 'cancelled' } },
         _sum: {
@@ -750,6 +945,7 @@ export class OrderService {
       shippedOrders,
       deliveredOrders,
       cancelledOrders,
+      returnedOrders,
       todayOrders,
       totalRevenue: this.roundCurrency(subtotal + shippingFee - platformDiscount),
     };

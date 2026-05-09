@@ -82,6 +82,10 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children, pageTitle = 'Seren
             <span className="material-symbols-outlined">flag</span> Quản lý Tố Cáo
           </NavLink>
 
+          <NavLink to="/admin/returns" className={getNavLinkClass}>
+            <span className="material-symbols-outlined">assignment_return</span> Quản lý Đổi trả
+          </NavLink>
+
           <NavLink to="/admin/wallets" className={getNavLinkClass}>
             <span className="material-symbols-outlined">account_balance_wallet</span> Ví & Giao dịch
           </NavLink>
@@ -154,6 +158,7 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children, pageTitle = 'Seren
 const getAdminPageSubtitle = (pathname: string) => {
   if (pathname.startsWith('/admin/applications')) return 'Xem xét và duyệt đăng ký mở shop';
   if (pathname.startsWith('/admin/reports')) return 'Xem xét và xử lý báo cáo vi phạm';
+  if (pathname.startsWith('/admin/returns')) return 'Quản lý và kiểm duyệt các yêu cầu hoàn/trả hàng';
   if (pathname.startsWith('/admin/wallets')) return 'Giám sát ví người dùng và kiểm duyệt giao dịch';
   if (pathname.startsWith('/admin/shops')) return 'Theo dõi và quản lý trạng thái gian hàng';
   if (pathname.startsWith('/admin/categories')) return 'Quản lý cây danh mục và bộ thuộc tính sản phẩm';
