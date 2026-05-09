@@ -11,7 +11,7 @@ export const ReturnManagement: FC = () => {
   const [returns, setReturns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
-  
+
   const [selectedReturn, setSelectedReturn] = useState<any | null>(null);
   const [adminNote, setAdminNote] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
@@ -20,10 +20,10 @@ export const ReturnManagement: FC = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('c2c_token');
-      const url = filter === 'all' 
+      const url = filter === 'all'
         ? `${ORDER_API_URL}/internal/admin/returns`
         : `${ORDER_API_URL}/internal/admin/returns?status=${filter}`;
-        
+
       const res = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -90,11 +90,10 @@ export const ReturnManagement: FC = () => {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${
-                filter === f 
-                  ? 'bg-white text-[#0f1d25] shadow-sm' 
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${filter === f
+                  ? 'bg-white text-[#0f1d25] shadow-sm'
                   : 'text-[#707882] hover:text-[#0f1d25]'
-              }`}
+                }`}
             >
               {f === 'all' ? 'Tất cả' : statusMap[f]?.label}
             </button>
@@ -203,14 +202,14 @@ export const ReturnManagement: FC = () => {
                         </a>
                       ))}
                       {(!selectedReturn.images || selectedReturn.images.length === 0) && (
-                         <div className="col-span-3 text-sm text-[#707882] italic">Không có hình ảnh</div>
+                        <div className="col-span-3 text-sm text-[#707882] italic">Không có hình ảnh</div>
                       )}
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-            
+
             {selectedReturn.status === 'pending' && (
               <div className="p-6 border-t border-[#e4e9f0] bg-white shrink-0">
                 <div className="mb-4">

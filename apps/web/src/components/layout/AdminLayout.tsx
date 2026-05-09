@@ -55,6 +55,10 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children, pageTitle = 'Seren
             <span className="material-symbols-outlined">category</span> Quản lý Danh mục
           </NavLink>
 
+          <NavLink to="/admin/locations" className={getNavLinkClass}>
+            <span className="material-symbols-outlined">location_city</span> Quản lý Địa giới
+          </NavLink>
+
           <NavLink to="/admin/banners" className={getNavLinkClass}>
             <span className="material-symbols-outlined">view_carousel</span> Quản lý Banner
           </NavLink>
@@ -153,6 +157,7 @@ const getAdminPageSubtitle = (pathname: string) => {
   if (pathname.startsWith('/admin/wallets')) return 'Giám sát ví người dùng và kiểm duyệt giao dịch';
   if (pathname.startsWith('/admin/shops')) return 'Theo dõi và quản lý trạng thái gian hàng';
   if (pathname.startsWith('/admin/categories')) return 'Quản lý cây danh mục và bộ thuộc tính sản phẩm';
+  if (pathname.startsWith('/admin/locations')) return 'Quản lý tỉnh thành và phường xã theo mô hình mới';
   if (pathname.startsWith('/admin/banners')) return 'Quản lý banner hiển thị trên marketplace';
   if (pathname.startsWith('/admin/vouchers')) return 'Quản lý voucher và chương trình khuyến mãi';
   if (pathname.startsWith('/admin/products')) return 'Review and approve submitted products';

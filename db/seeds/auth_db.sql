@@ -53,13 +53,13 @@ SET
   status = EXCLUDED.status,
   updated_at = NOW();
 
-INSERT INTO addresses (user_id, address_line, city, district, ward, phone_contact, type, is_default)
+INSERT INTO addresses (user_id, recipient_name, phone_number, province_code, ward_code, address_line, label, is_default)
 SELECT u.id,
-       '12 Nguyễn Trãi',
-       'Hà Nội',
-       'Thanh Xuân',
-       'Khương Mai',
+       'Nguyễn Văn A',
        '0901000001',
+       '01',
+       '01141',
+       '12 Nguyễn Trãi',
        'home',
        true
 FROM users u
@@ -68,18 +68,37 @@ WHERE u.email = 'buyer@gmail.com'
     SELECT 1
     FROM addresses a
     WHERE a.user_id = u.id
-      AND a.type = 'home'
+      AND a.label = 'home'
       AND a.address_line = '12 Nguyễn Trãi'
   );
 
-INSERT INTO addresses (user_id, address_line, city, district, ward, phone_contact, type, is_default)
+INSERT INTO addresses (user_id, recipient_name, phone_number, province_code, ward_code, address_line, label, is_default)
 SELECT u.id,
-       '245 Cách Mạng Tháng 8',
-       'Thành phố Hồ Chí Minh',
-       'Quận 3',
-       'Phường 10',
+       'Nguyễn Văn A',
+       '0901000001',
+       '79',
+       '27157',
+       '88 Nguyễn Hữu Cảnh, Landmark View',
+       'other',
+       false
+FROM users u
+WHERE u.email = 'buyer@gmail.com'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM addresses a
+    WHERE a.user_id = u.id
+      AND a.label = 'other'
+      AND a.address_line = '88 Nguyễn Hữu Cảnh, Landmark View'
+  );
+
+INSERT INTO addresses (user_id, recipient_name, phone_number, province_code, ward_code, address_line, label, is_default)
+SELECT u.id,
+       'Trần Thị B',
        '0901000002',
-       'shop_pickup',
+       '79',
+       '26740',
+       '245 Cách Mạng Tháng 8',
+       'office',
        true
 FROM users u
 WHERE u.email = 'seller1@gmail.com'
@@ -87,17 +106,17 @@ WHERE u.email = 'seller1@gmail.com'
     SELECT 1
     FROM addresses a
     WHERE a.user_id = u.id
-      AND a.type = 'shop_pickup'
+      AND a.label = 'office'
       AND a.address_line = '245 Cách Mạng Tháng 8'
   );
 
-INSERT INTO addresses (user_id, address_line, city, district, ward, phone_contact, type, is_default)
+INSERT INTO addresses (user_id, recipient_name, phone_number, province_code, ward_code, address_line, label, is_default)
 SELECT u.id,
-       '31 Võ Nguyên Giáp',
-       'Đà Nẵng',
-       'Sơn Trà',
-       'Phước Mỹ',
+       'Lê Văn C',
        '0901000004',
+       '48',
+       '20296',
+       '31 Võ Nguyên Giáp',
        'office',
        true
 FROM users u
@@ -106,7 +125,7 @@ WHERE u.email = 'seller2@gmail.com'
     SELECT 1
     FROM addresses a
     WHERE a.user_id = u.id
-      AND a.type = 'office'
+      AND a.label = 'office'
       AND a.address_line = '31 Võ Nguyên Giáp'
   );
 

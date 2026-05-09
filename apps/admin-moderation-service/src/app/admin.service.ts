@@ -1,5 +1,102 @@
-import { BadGatewayException, Injectable } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
+
+type LocationLevel = 'province' | 'ward';
+
+interface LocationTreeNode {
+  id: number;
+  name: string;
+  code: string;
+  level: LocationLevel;
+  unitType: string;
+  status: 'active' | 'inactive';
+  isActive: boolean;
+  parentId: number | null;
+  parentName: string | null;
+  childrenCount: number;
+  updatedAt: string | null;
+  children: LocationTreeNode[];
+}
+
+const LOCATION_LEVELS: LocationLevel[] = ['province', 'ward'];
+
+const LOCATION_TYPE_LABELS: Record<string, string> = {
+  province: 'Tỉnh/Thành phố',
+  ward: 'Phường/Xã',
+  tinh: 'Tỉnh',
+  thanh_pho: 'Thành phố',
+  phuong: 'Phường',
+  xa: 'Xã',
+  dac_khu: 'Đặc khu',
+};
+
+const normalizeTextValue = (value: unknown) => String(value ?? '').trim();
+
+const normalizeLocationLevel = (value: unknown): LocationLevel => {
+  const normalized = normalizeTextValue(value).toLowerCase();
+
+  if (LOCATION_LEVELS.includes(normalized as LocationLevel)) {
+    return normalized as LocationLevel;
+  }
+
+  throw new BadRequestException('Location level must be one of province or ward');
+};
+
+const normalizeStatusFilter = (value: unknown) => {
+  const normalized = normalizeTextValue(value).toLowerCase();
+
+  if (!normalized || normalized === 'all') return 'all';
+  if (normalized === 'active' || normalized === 'inactive') return normalized;
+
+  throw new BadRequestException('Status filter must be all, active, or inactive');
+};
+
+const normalizeTypeFilter = (value: unknown) => {
+  const normalized = normalizeTextValue(value).toLowerCase();
+
+  if (!normalized || normalized === 'all') return 'all';
+  if (LOCATION_LEVELS.includes(normalized as LocationLevel)) return normalized as LocationLevel;
+
+  throw new BadRequestException('Type filter must be all, province, or ward');
+};
+
+const formatLocationTypeLabel = (value: string | null | undefined, fallback: LocationLevel) =>
+  LOCATION_TYPE_LABELS[value ?? ''] ?? LOCATION_TYPE_LABELS[fallback];
+
+const matchesLocationSearch = (node: LocationTreeNode, search: string) =>
+  !search || node.name.toLowerCase().includes(search) || node.code.toLowerCase().includes(search);
+
+const matchesLocationStatus = (node: LocationTreeNode, status: 'all' | 'active' | 'inactive') =>
+  status === 'all' || (status === 'active' ? node.isActive : !node.isActive);
+
+const matchesLocationLevel = (node: LocationTreeNode, level: 'all' | LocationLevel) =>
+  level === 'all' || node.level === level;
+
+const filterLocationTree = (
+  node: LocationTreeNode,
+  search: string,
+  level: 'all' | LocationLevel,
+  status: 'all' | 'active' | 'inactive',
+): LocationTreeNode | null => {
+  const filteredChildren = node.children
+    .map((child) => filterLocationTree(child, search, level, status))
+    .filter((child): child is LocationTreeNode => Boolean(child));
+
+  const includeCurrentNode =
+    matchesLocationSearch(node, search) &&
+    matchesLocationLevel(node, level) &&
+    matchesLocationStatus(node, status);
+
+  if (!includeCurrentNode && filteredChildren.length === 0) {
+    return null;
+  }
+
+  return {
+    ...node,
+    childrenCount: filteredChildren.length,
+    children: filteredChildren,
+  };
+};
 
 @Injectable()
 export class AdminService {
@@ -96,10 +193,10 @@ export class AdminService {
         activeUsers: number;
         suspendedUsers: number;
       }>(`${this.authBaseUrl}/internal/admin/stats`),
-      this.requestJson<{ 
+      this.requestJson<{
         totalShops: number;
-        activeShops: number; 
-        pendingApplications: number; 
+        activeShops: number;
+        pendingApplications: number;
         totalProducts: number;
         activeProducts: number;
         pendingProducts: number;
@@ -278,6 +375,228 @@ export class AdminService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reason }),
     });
+  }
+
+  // --- LOCATIONS ---
+
+  async getLocationSummary() {
+    const [totalProvinces, totalWards, activeProvinces, activeWards] = await Promise.all([
+      this.prisma.province.count(),
+      this.prisma.ward.count(),
+      this.prisma.province.count({ where: { is_active: true } }),
+      this.prisma.ward.count({ where: { is_active: true } }),
+    ]);
+
+    const inactiveProvinces = totalProvinces - activeProvinces;
+    const inactiveWards = totalWards - activeWards;
+
+    return {
+      totalProvinces,
+      totalWards,
+      pendingSync: inactiveProvinces + inactiveWards,
+      activeUnits: activeProvinces + activeWards,
+      inactiveUnits: inactiveProvinces + inactiveWards,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  async getLocations(query: any = {}) {
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(25, Math.max(1, Number(query.limit) || 10));
+    const search = normalizeTextValue(query.search).toLowerCase();
+    const levelFilter = normalizeTypeFilter(query.type);
+    const statusFilter = normalizeStatusFilter(query.status);
+
+    const provinces = await this.prisma.province.findMany({
+      orderBy: [{ code: 'asc' }, { name: 'asc' }],
+      include: {
+        wards: {
+          orderBy: [{ code: 'asc' }, { name: 'asc' }],
+        },
+      },
+    });
+
+    const tree = provinces.map<LocationTreeNode>((province) => ({
+      id: province.id,
+      name: province.name,
+      code: province.code,
+      level: 'province',
+      unitType: formatLocationTypeLabel(province.type, 'province'),
+      status: province.is_active ? 'active' : 'inactive',
+      isActive: Boolean(province.is_active),
+      parentId: null,
+      parentName: null,
+      childrenCount: province.wards.length,
+      updatedAt: province.updated_at?.toISOString() ?? null,
+      children: province.wards.map<LocationTreeNode>((ward) => ({
+        id: ward.id,
+        name: ward.name,
+        code: ward.code,
+        level: 'ward',
+        unitType: formatLocationTypeLabel(ward.type, 'ward'),
+        status: ward.is_active ? 'active' : 'inactive',
+        isActive: Boolean(ward.is_active),
+        parentId: province.id,
+        parentName: province.name,
+        childrenCount: 0,
+        updatedAt: ward.updated_at?.toISOString() ?? null,
+        children: [],
+      })),
+    }));
+
+    const filteredRoots = tree
+      .map((node) => filterLocationTree(node, search, levelFilter, statusFilter))
+      .filter((node): node is LocationTreeNode => Boolean(node));
+
+    const total = filteredRoots.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.min(page, totalPages);
+    const startIndex = (safePage - 1) * limit;
+
+    return {
+      items: filteredRoots.slice(startIndex, startIndex + limit),
+      pagination: {
+        page: safePage,
+        limit,
+        total,
+        totalPages,
+      },
+      filters: {
+        search: normalizeTextValue(query.search),
+        type: levelFilter,
+        status: statusFilter,
+      },
+    };
+  }
+
+  async getLocationOptions() {
+    const provinces = await this.prisma.province.findMany({
+      where: { is_active: true },
+      orderBy: [{ code: 'asc' }, { name: 'asc' }],
+      include: {
+        wards: {
+          where: { is_active: true },
+          orderBy: [{ code: 'asc' }, { name: 'asc' }],
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            province_id: true,
+          },
+        },
+      },
+    });
+
+    return {
+      provinces,
+    };
+  }
+
+  async createLocation(data: any) {
+    const level = normalizeLocationLevel(data?.level);
+    const name = normalizeTextValue(data?.name);
+    const code = normalizeTextValue(data?.code);
+    const administrativeType = normalizeTextValue(data?.administrativeType);
+    const isActive = data?.isActive !== false;
+    const parentId = data?.parentId ? Number(data.parentId) : null;
+
+    if (!name) throw new BadRequestException('Location name is required');
+    if (!code) throw new BadRequestException('Location code is required');
+
+    await this.ensureLocationCodeIsUnique(level, code);
+
+    if (level === 'province') {
+      return this.prisma.province.create({
+        data: {
+          name,
+          code,
+          type: administrativeType || null,
+          is_active: isActive,
+        },
+      });
+    }
+
+    if (!parentId) throw new BadRequestException('A ward must belong to a province');
+
+    const province = await this.prisma.province.findUnique({ where: { id: parentId } });
+    if (!province) throw new NotFoundException('Province not found');
+
+    return this.prisma.ward.create({
+      data: {
+        province_id: province.id,
+        name,
+        code,
+        type: administrativeType || null,
+        is_active: isActive,
+      },
+    });
+  }
+
+  async updateLocation(levelValue: string, id: number, data: any) {
+    const level = normalizeLocationLevel(levelValue);
+    const name = normalizeTextValue(data?.name);
+    const code = normalizeTextValue(data?.code);
+    const administrativeType = normalizeTextValue(data?.administrativeType);
+    const isActive = data?.isActive !== false;
+
+    if (!name) throw new BadRequestException('Location name is required');
+    if (!code) throw new BadRequestException('Location code is required');
+
+    await this.ensureLocationCodeIsUnique(level, code, id);
+
+    if (level === 'province') {
+      await this.ensureProvinceExists(id);
+      return this.prisma.province.update({
+        where: { id },
+        data: {
+          name,
+          code,
+          type: administrativeType || null,
+          is_active: isActive,
+        },
+      });
+    }
+
+    await this.ensureWardExists(id);
+    return this.prisma.ward.update({
+      where: { id },
+      data: {
+        name,
+        code,
+        type: administrativeType || null,
+        is_active: isActive,
+      },
+    });
+  }
+
+  async updateLocationStatus(levelValue: string, id: number, isActive: boolean) {
+    const level = normalizeLocationLevel(levelValue);
+
+    if (typeof isActive !== 'boolean') {
+      throw new BadRequestException('isActive must be a boolean');
+    }
+
+    if (level === 'province') {
+      await this.prisma.$transaction([
+        this.prisma.province.update({
+          where: { id },
+          data: { is_active: isActive },
+        }),
+        this.prisma.ward.updateMany({
+          where: { province_id: id },
+          data: { is_active: isActive },
+        }),
+      ]);
+
+      return { success: true };
+    }
+
+    await this.prisma.ward.update({
+      where: { id },
+      data: { is_active: isActive },
+    });
+
+    return { success: true };
   }
 
   // --- CATEGORIES ---
@@ -472,7 +791,7 @@ export class AdminService {
       productIds.length ? this.getProductsByIds(productIds) : Promise.resolve([]),
       reporterIds.length
         ? this.requestJson<any[]>(`${this.authBaseUrl}/internal/admin/users-by-ids?ids=${reporterIds.join(',')}`)
-            .catch(() => [] as any[])
+          .catch(() => [] as any[])
         : Promise.resolve([]),
     ]);
 
@@ -562,5 +881,53 @@ export class AdminService {
     return this.requestJson<any>(`${this.orderPayoutAdminBaseUrl}/${shopOrderId}/release`, {
       method: 'POST',
     });
+  }
+
+  private async ensureLocationCodeIsUnique(level: LocationLevel, code: string, ignoreId?: number) {
+    if (level === 'province') {
+      const existing = await this.prisma.province.findFirst({
+        where: {
+          code,
+          ...(ignoreId ? { NOT: { id: ignoreId } } : {}),
+        },
+      });
+
+      if (existing) {
+        throw new ConflictException('Province code already exists');
+      }
+
+      return;
+    }
+
+    const existing = await this.prisma.ward.findFirst({
+      where: {
+        code,
+        ...(ignoreId ? { NOT: { id: ignoreId } } : {}),
+      },
+    });
+
+    if (existing) {
+      throw new ConflictException('Ward code already exists');
+    }
+  }
+
+  private async ensureProvinceExists(id: number) {
+    const province = await this.prisma.province.findUnique({ where: { id } });
+
+    if (!province) {
+      throw new NotFoundException('Province not found');
+    }
+
+    return province;
+  }
+
+  private async ensureWardExists(id: number) {
+    const ward = await this.prisma.ward.findUnique({ where: { id } });
+
+    if (!ward) {
+      throw new NotFoundException('Ward not found');
+    }
+
+    return ward;
   }
 }

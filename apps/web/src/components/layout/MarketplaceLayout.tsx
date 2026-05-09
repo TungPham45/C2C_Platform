@@ -23,12 +23,27 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    const userStr = localStorage.getItem('c2c_user');
-    if (userStr) {
+    const readUser = () => {
+      const userStr = localStorage.getItem('c2c_user');
+      if (!userStr) {
+        setCurrentUser(null);
+        return;
+      }
+
       try {
         setCurrentUser(JSON.parse(userStr));
-      } catch (e) { }
-    }
+      } catch (e) {
+        setCurrentUser(null);
+      }
+    };
+
+    readUser();
+    window.addEventListener('storage', readUser);
+    window.addEventListener('user-updated', readUser);
+    return () => {
+      window.removeEventListener('storage', readUser);
+      window.removeEventListener('user-updated', readUser);
+    };
   }, []);
 
   const { cartItems, fetchCartItems } = useCart();
@@ -200,6 +215,13 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({
                               Đơn mua
                             </Link>
                             <Link
+                              to="/addresses"
+                              className="flex items-center gap-3 px-5 py-3 hover:bg-[#EBF4FF] transition-colors text-sm font-bold text-[#0f1d25]"
+                            >
+                              <span className="material-symbols-outlined text-[#2b82c9] text-lg">location_on</span>
+                              Địa chỉ nhận hàng
+                            </Link>
+                            <Link
                               to="/wallet"
                               className="flex items-center gap-3 px-5 py-3 hover:bg-[#EBF4FF] transition-colors text-sm font-bold text-[#0f1d25]"
                             >
@@ -264,6 +286,13 @@ export const MarketplaceLayout: FC<MarketplaceLayoutProps> = ({
                             >
                               <span className="material-symbols-outlined text-[#00629d] text-lg">receipt_long</span>
                               Đơn mua
+                            </Link>
+                            <Link
+                              to="/addresses"
+                              className="flex items-center gap-3 px-5 py-3 hover:bg-[#f5faff] transition-colors text-sm font-bold text-[#0f1d25]"
+                            >
+                              <span className="material-symbols-outlined text-[#00629d] text-lg">location_on</span>
+                              Địa chỉ nhận hàng
                             </Link>
                             <Link
                               to="/wallet"

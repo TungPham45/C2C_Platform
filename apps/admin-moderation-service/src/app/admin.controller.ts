@@ -65,6 +65,38 @@ export class AdminController {
     return this.adminService.rejectProduct(+id, reason);
   }
 
+  // --- LOCATIONS ---
+
+  @Get('locations/summary')
+  getLocationSummary() {
+    return this.adminService.getLocationSummary();
+  }
+
+  @Get('locations')
+  getLocations(@Query() query: any) {
+    return this.adminService.getLocations(query);
+  }
+
+  @Get('locations/options')
+  getLocationOptions() {
+    return this.adminService.getLocationOptions();
+  }
+
+  @Post('locations')
+  createLocation(@Body() data: any) {
+    return this.adminService.createLocation(data);
+  }
+
+  @Put('locations/:level/:id')
+  updateLocation(@Param('level') level: string, @Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateLocation(level, +id, data);
+  }
+
+  @Put('locations/:level/:id/status')
+  updateLocationStatus(@Param('level') level: string, @Param('id') id: string, @Body('isActive') isActive: boolean) {
+    return this.adminService.updateLocationStatus(level, +id, isActive);
+  }
+
   // --- CATEGORIES ---
 
   @Get('categories')

@@ -3,6 +3,18 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { MarketplaceLayout } from '../components/layout/MarketplaceLayout';
 import { useOrders } from '../hooks/useOrders';
 import { useWallet } from '../hooks/useWallet';
+import { AUTH_API_URL } from '../config/api';
+import {
+  fetchLocationOptions,
+  findProvinceByCode,
+  findWardByCode,
+  formatReceiverAddressLine,
+  getAddressLabelMeta,
+  LocationOptionsResponse,
+  ReceiverAddress,
+} from '../utils/locationOptions';
+
+const CHECKOUT_SESSION_KEY = 'c2c_checkout_state';
 
 interface CheckoutVoucher {
   id: number;
@@ -72,14 +84,29 @@ export const CheckoutPage = () => {
   const { wallet, fetchWallet } = useWallet();
   const navigate = useNavigate();
   const location = useLocation();
-  const stateData = location.state as any;
+  const stateData = React.useMemo(() => {
+    if (location.state) {
+      return location.state as any;
+    }
 
-  const [shippingAddress, setShippingAddress] = useState({
-    fullName: '',
-    address: '',
-    city: '',
-    phone: '',
-  });
+    const persistedState = sessionStorage.getItem(CHECKOUT_SESSION_KEY);
+    if (!persistedState) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(persistedState);
+    } catch {
+      sessionStorage.removeItem(CHECKOUT_SESSION_KEY);
+      return null;
+    }
+  }, [location.state]);
+
+  const [savedAddresses, setSavedAddresses] = useState<ReceiverAddress[]>([]);
+  const [selectedAddress, setSelectedAddress] = useState<ReceiverAddress | null>(null);
+  const [locationOptions, setLocationOptions] = useState<LocationOptionsResponse | null>(null);
+  const [addressLoading, setAddressLoading] = useState(true);
+  const [addressError, setAddressError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('e_wallet');
   const [voucherData, setVoucherData] = useState<CheckoutVoucherResponse | null>(null);
   const [voucherLoading, setVoucherLoading] = useState(false);
@@ -88,6 +115,74 @@ export const CheckoutPage = () => {
   useEffect(() => {
     fetchWallet();
   }, [fetchWallet]);
+
+  useEffect(() => {
+    if (location.state) {
+      sessionStorage.setItem(CHECKOUT_SESSION_KEY, JSON.stringify(location.state));
+      return;
+    }
+
+    if (!stateData) {
+      sessionStorage.removeItem(CHECKOUT_SESSION_KEY);
+    }
+  }, [location.state, stateData]);
+
+  useEffect(() => {
+    if (!stateData) {
+      navigate('/cart', { replace: true });
+    }
+  }, [navigate, stateData]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadAddresses = async () => {
+      const token = localStorage.getItem('c2c_token');
+      if (!token) {
+        if (!ignore) {
+          setAddressLoading(false);
+        }
+        return;
+      }
+
+      try {
+        setAddressLoading(true);
+        setAddressError('');
+
+        const [addressResponse, optionsResponse] = await Promise.all([
+          fetch(`${AUTH_API_URL}/addresses`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetchLocationOptions(),
+        ]);
+
+        if (!addressResponse.ok) {
+          throw new Error('Không thể tải địa chỉ nhận hàng');
+        }
+
+        const addressData = (await addressResponse.json()) as ReceiverAddress[];
+        if (ignore) return;
+
+        setSavedAddresses(addressData);
+        setLocationOptions(optionsResponse);
+        setSelectedAddress(addressData.find((address) => address.is_default) ?? addressData[0] ?? null);
+      } catch (loadError: any) {
+        if (!ignore) {
+          setAddressError(loadError.message || 'Không thể tải địa chỉ nhận hàng');
+        }
+      } finally {
+        if (!ignore) {
+          setAddressLoading(false);
+        }
+      }
+    };
+
+    loadAddresses();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const getSinglePrice = () => {
     if (!stateData?.product) return 450000;
@@ -208,13 +303,24 @@ export const CheckoutPage = () => {
   const subtotalAfterShopDiscount = Math.max(0, subTotal - shopDiscountTotal);
   const totalPayment = Math.max(0, subtotalAfterShopDiscount + totalShippingFee);
 
+  const formatShippingAddressForOrder = (address: ReceiverAddress) => {
+    const wardName = findWardByCode(locationOptions, address.ward_code)?.name || address.ward_code;
+    const provinceName = findProvinceByCode(locationOptions, address.province_code)?.name || address.province_code;
+
+    return `${address.recipient_name}, ${address.address_line}, ${wardName}, ${provinceName}, ${address.phone_number}`;
+  };
+
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedAddress) {
+      setAddressError('Vui lòng chọn địa chỉ nhận hàng trước khi đặt đơn.');
+      return;
+    }
 
     const orderData: any = {
       total_payment: totalPayment,
       payment_method: paymentMethod,
-      shipping_address: `${shippingAddress.fullName}, ${shippingAddress.address}, ${shippingAddress.city}, ${shippingAddress.phone}`,
+      shipping_address: formatShippingAddressForOrder(selectedAddress),
       shop_orders: shopOrders.map((shopOrder: any) => ({
         shop_id: shopOrder.shop_id,
         subtotal: shopOrder.subtotal,
@@ -230,6 +336,7 @@ export const CheckoutPage = () => {
 
     const result = await createOrder(orderData);
     if (result) {
+      sessionStorage.removeItem(CHECKOUT_SESSION_KEY);
       navigate('/order-success', { state: { orderId: result.id } });
     }
   };
@@ -240,6 +347,10 @@ export const CheckoutPage = () => {
       [shopId]: current[shopId] === claimId ? null : claimId,
     }));
   };
+
+  if (!stateData) {
+    return null;
+  }
 
   return (
     <MarketplaceLayout>
@@ -264,48 +375,101 @@ export const CheckoutPage = () => {
                 Thông tin giao hàng
               </h2>
 
-              <div className="grid grid-cols-2 gap-6 text-[#0f1d25]">
-                <div className="col-span-2 space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-[#707882] ml-1">Họ và tên</label>
-                  <input
-                    type="text"
-                    value={shippingAddress.fullName}
-                    onChange={(e) => setShippingAddress({ ...shippingAddress, fullName: e.target.value })}
-                    placeholder="Nhập họ và tên"
-                    className="w-full h-14 px-6 bg-[#f5faff] border border-transparent focus:bg-white focus:border-[#00629d]/50 rounded-2xl outline-none transition-all placeholder-[#a0aab5]"
-                  />
+              {addressError && (
+                <div className="mb-5 rounded-2xl border border-[#ffdad6] bg-[#fff8f7] px-4 py-3 text-sm font-semibold text-[#ba1a1a]">
+                  {addressError}
                 </div>
-                <div className="col-span-2 space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-[#707882] ml-1">Địa chỉ</label>
-                  <input
-                    type="text"
-                    value={shippingAddress.address}
-                    onChange={(e) => setShippingAddress({ ...shippingAddress, address: e.target.value })}
-                    placeholder="Số nhà, tên đường, phường xã"
-                    className="w-full h-14 px-6 bg-[#f5faff] border border-transparent focus:bg-white focus:border-[#00629d]/50 rounded-2xl outline-none transition-all placeholder-[#a0aab5]"
-                  />
+              )}
+
+              {addressLoading ? (
+                <div className="h-36 rounded-[1.75rem] bg-[#f5faff] animate-pulse" />
+              ) : selectedAddress ? (
+                <div className="space-y-5">
+                  <div className="rounded-[1.75rem] border border-[#dbeaf5] bg-[#f8fbff] p-6">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-[#e1f0fb] text-[#00629d] flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined">{getAddressLabelMeta(selectedAddress.label).icon}</span>
+                        </div>
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-lg font-black text-[#0f1d25]">{selectedAddress.recipient_name}</p>
+                            {selectedAddress.is_default && (
+                              <span className="px-3 py-1 rounded-full bg-[#0f1d25] text-white text-[11px] font-black uppercase tracking-wider">
+                                Mặc định
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1 text-sm font-semibold text-[#404751]">{selectedAddress.phone_number}</p>
+                          <p className="mt-3 text-sm text-[#5d6975] leading-6">
+                            {formatReceiverAddressLine(selectedAddress, locationOptions)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => navigate('/addresses?returnTo=/checkout', { state: { checkoutState: stateData } })}
+                        className="inline-flex items-center gap-2 rounded-full border border-[#dbeaf5] bg-white px-4 py-2 text-sm font-bold text-[#00629d] hover:bg-[#f5faff] transition-all"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">edit_location</span>
+                        Quản lý địa chỉ
+                      </button>
+                    </div>
+                  </div>
+
+                  {savedAddresses.length > 1 && (
+                    <div className="space-y-3">
+                      <p className="text-xs font-bold uppercase tracking-widest text-[#707882]">Chọn địa chỉ khác</p>
+                      <div className="grid gap-3">
+                        {savedAddresses.map((address) => {
+                          const isActive = selectedAddress.id === address.id;
+                          return (
+                            <button
+                              key={address.id}
+                              type="button"
+                              onClick={() => setSelectedAddress(address)}
+                              className={`text-left rounded-[1.5rem] border p-4 transition-all ${isActive
+                                ? 'border-[#00629d] bg-white shadow-sm'
+                                : 'border-[#e4e9f0] bg-white hover:border-[#cfe4f6]'
+                                }`}
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div>
+                                  <p className="font-bold text-[#0f1d25]">
+                                    {getAddressLabelMeta(address.label).label} · {address.recipient_name}
+                                  </p>
+                                  <p className="text-sm text-[#707882] mt-1">{address.phone_number}</p>
+                                  <p className="text-sm text-[#5d6975] mt-2 leading-6">
+                                    {formatReceiverAddressLine(address, locationOptions)}
+                                  </p>
+                                </div>
+                                <div className={`w-5 h-5 rounded-full border-2 ${isActive ? 'border-[#00629d] bg-[#00629d]' : 'border-[#c8d3de]'}`}></div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-[#707882] ml-1">Thành phố</label>
-                  <input
-                    type="text"
-                    value={shippingAddress.city}
-                    onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })}
-                    placeholder="Thành phố"
-                    className="w-full h-14 px-6 bg-[#f5faff] border border-transparent focus:bg-white focus:border-[#00629d]/50 rounded-2xl outline-none transition-all placeholder-[#a0aab5]"
-                  />
+              ) : (
+                <div className="rounded-[1.75rem] border border-dashed border-[#dbeaf5] bg-[#fbfdff] px-6 py-8 text-center">
+                  <div className="w-16 h-16 mx-auto rounded-3xl bg-[#e1f0fb] text-[#00629d] flex items-center justify-center">
+                    <span className="material-symbols-outlined text-3xl">location_on</span>
+                  </div>
+                  <p className="mt-5 text-lg font-bold text-[#0f1d25]">Bạn chưa có địa chỉ nhận hàng</p>
+                  <p className="mt-2 text-sm text-[#707882]">Tạo địa chỉ trước khi thanh toán để hệ thống ghi nhận nơi giao đơn.</p>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/addresses?returnTo=/checkout', { state: { checkoutState: stateData } })}
+                    className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#00629d] px-5 py-3 text-white text-sm font-bold hover:bg-[#004e7c] transition-all"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">add_location_alt</span>
+                    Thêm địa chỉ nhận hàng
+                  </button>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold uppercase tracking-widest text-[#707882] ml-1">Số điện thoại</label>
-                  <input
-                    type="text"
-                    value={shippingAddress.phone}
-                    onChange={(e) => setShippingAddress({ ...shippingAddress, phone: e.target.value })}
-                    placeholder="0123456789"
-                    className="w-full h-14 px-6 bg-[#f5faff] border border-transparent focus:bg-white focus:border-[#00629d]/50 rounded-2xl outline-none transition-all placeholder-[#a0aab5]"
-                  />
-                </div>
-              </div>
+              )}
             </section>
 
             <section className="bg-white border border-[#e4e9f0] rounded-[2rem] p-8 lg:p-10 shadow-sm">

@@ -1,9 +1,13 @@
-import { Controller, Post, Body, UnauthorizedException, Inject, Get, Headers, ForbiddenException, Put, Param, Query } from '@nestjs/common';
+import { Controller, Post, Body, UnauthorizedException, Inject, Get, Headers, ForbiddenException, Put, Param, Query, Req, Delete } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { JwtService } from '@nestjs/jwt';
 
 @Controller('auth')
 export class AuthController {
-  constructor(@Inject(AuthService) private readonly authService: AuthService) {}
+  constructor(
+    @Inject(AuthService) private readonly authService: AuthService,
+    @Inject(JwtService) private readonly jwtService: JwtService,
+  ) {}
 
   private requireInternalAccess(headers: Record<string, string | string[] | undefined>) {
     const expectedToken = process.env.INTERNAL_SERVICE_TOKEN ?? 'internal-dev-token';
@@ -11,6 +15,21 @@ export class AuthController {
     const normalizedToken = Array.isArray(actualToken) ? actualToken[0] : actualToken;
     if (normalizedToken !== expectedToken) {
       throw new ForbiddenException('Invalid internal service token');
+    }
+  }
+
+  private getUserIdFromReq(req: any): number {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      throw new UnauthorizedException('Missing token');
+    }
+
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = this.jwtService.verify(token);
+      return decoded.sub;
+    } catch {
+      throw new UnauthorizedException('Invalid token');
     }
   }
 
@@ -53,6 +72,48 @@ export class AuthController {
   @Post('reset-password')
   async resetPassword(@Body() body: any) {
     return this.authService.resetPassword(body);
+  }
+
+  @Get('profile')
+  async getProfile(@Req() req: any) {
+    const userId = this.getUserIdFromReq(req);
+    return this.authService.getProfile(userId);
+  }
+
+  @Put('profile')
+  async updateProfile(@Req() req: any, @Body() body: any) {
+    const userId = this.getUserIdFromReq(req);
+    return this.authService.updateProfile(userId, body);
+  }
+
+  @Get('addresses')
+  async getAddresses(@Req() req: any) {
+    const userId = this.getUserIdFromReq(req);
+    return this.authService.getAddresses(userId);
+  }
+
+  @Post('addresses')
+  async createAddress(@Req() req: any, @Body() body: any) {
+    const userId = this.getUserIdFromReq(req);
+    return this.authService.createAddress(userId, body);
+  }
+
+  @Put('addresses/:id')
+  async updateAddress(@Req() req: any, @Param('id') id: string, @Body() body: any) {
+    const userId = this.getUserIdFromReq(req);
+    return this.authService.updateAddress(userId, +id, body);
+  }
+
+  @Put('addresses/:id/default')
+  async setDefaultAddress(@Req() req: any, @Param('id') id: string) {
+    const userId = this.getUserIdFromReq(req);
+    return this.authService.setDefaultAddress(userId, +id);
+  }
+
+  @Delete('addresses/:id')
+  async deleteAddress(@Req() req: any, @Param('id') id: string) {
+    const userId = this.getUserIdFromReq(req);
+    return this.authService.deleteAddress(userId, +id);
   }
 
   @Get('internal/admin/stats')

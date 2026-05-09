@@ -25,6 +25,7 @@ import { ProductDetailPage } from '../pages/ProductDetail';
 import { ShopPage } from '../pages/ShopPage';
 import { CartPage } from '../pages/CartPage';
 import { ProfilePage } from '../pages/ProfilePage';
+import { ShippingAddressesPage } from '../pages/ShippingAddressesPage';
 import { WalletPage } from '../pages/WalletPage';
 import { AuthPage } from '../pages/auth/AuthPage';
 import { MessagesPage } from '../pages/MessagesPage';
@@ -41,6 +42,7 @@ import WalletManagement from '../pages/admin/WalletManagement';
 import { BannersAdminPage } from '../pages/admin/BannersAdminPage';
 import { VoucherList } from '../pages/admin/VoucherManagement/VoucherList';
 import { ReportModeration } from '../pages/admin/ReportModeration';
+import LocationManagement from '../pages/admin/LocationManagement';
 import { SellerProtectedRoute } from '../components/auth/SellerProtectedRoute';
 import { BuyerProtectedRoute } from '../components/auth/BuyerProtectedRoute';
 import { AdminProtectedRoute } from '../components/auth/AdminProtectedRoute';
@@ -91,6 +93,7 @@ export function App() {
         <Route path="/order-success" element={<OrderSuccess />} />
         <Route path="/orders" element={<MyPurchasesPage />} />
         <Route path="/orders/:id" element={<BuyerOrderDetail />} />
+        <Route path="/addresses" element={<ShippingAddressesPage />} />
         <Route path="/wallet" element={<WalletPage />} />
         <Route path="/messages" element={<MessagesPage />} />
       </Route>
@@ -110,6 +113,7 @@ export function App() {
         <Route path="/admin/analytics/users" element={<UserAnalytics />} />
         <Route path="/admin/analytics/shop-sales" element={<ShopSalesAnalytics />} />
         <Route path="/admin/categories" element={<CategoryManagement />} />
+        <Route path="/admin/locations" element={<LocationManagement />} />
         <Route path="/admin/reports" element={<ReportModeration />} />
         <Route path="/admin/wallets" element={<WalletManagement />} />
       </Route>
